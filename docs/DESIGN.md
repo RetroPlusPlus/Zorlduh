@@ -85,6 +85,9 @@ in a room), **cell** (one 8×8 tile position).
 
 - The component model of rendering above.
 - The layer aggregates are this project's own, in `modules/layers/`, until the engine ships its own form.
+  A layer built through them with no options draws exactly as a plain engine layer would: every layer
+  field beyond its key, depth, size and content passes through with the engine's own default, and the
+  layer's size is the active viewport.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The free-form room model and the camera behavior above.

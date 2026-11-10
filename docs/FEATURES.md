@@ -8,7 +8,7 @@ the first column. Status changes are logged in `docs/features/CHANGELOG.md`.
 | Feature | Status | What it is |
 |---|---|---|
 | build-system | ✅ complete | CMake with `add_subdirectory(engine)`; `zorlduh-lib`, the `zorlduh` executable, one GoogleTest executable per test file; a Release-by-default, dead-stripped, symbol-stripped binary that opens a 60 Hz Game Boy Color window |
-| layer-kit | ⬜ planned | The return types, `LayerOptions`, `SpriteLayer` and `TileLayer`, in `modules/layers/` |
+| layer-kit | 🧪 testing | The return types (with `Raster`), `LayerOptions` and `RasterLayerOptions`, and one aggregate per kind of layer content — `SpriteLayer`, `TileLayer`, `RasterLayer`, `ImageLayer`: a header-only module in `modules/layers/` that depends on the engine alone, with its own guide (`modules/layers/docs/`) and a compiled getting-started program |
 | assets | ⬜ planned | Generated placeholder art and the struct that loads every sheet, palette and map |
 | world | ⬜ planned | The world map, its collision grid and room table, on screen as one tile layer |
 | player | ⬜ planned | Eight-direction movement, tile collision that slides along walls, four facings, walk animation |

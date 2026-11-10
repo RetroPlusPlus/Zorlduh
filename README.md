@@ -12,12 +12,14 @@ proven.
 It runs at Game Boy Color resolution (160×144) on a 60 Hz tick, with rooms of any size and a camera that
 follows the player through them.
 
-**Status: early.** The build stands up and opens the game's window; nothing is drawn in it yet.
+**Status: early.** The build stands up and opens the game's window, and the layer kit that every
+on-screen component goes through is in place and tested. The window is still empty.
 
 ## Progress
 
 - [x] **Build** — the engine as a submodule, a lean Release executable, a GoogleTest suite
-- [ ] **Layer kit** — sprite and tile layers that gather components onto the screen
+- [x] **Layer kit** — sprite, tile, raster and image layers that gather components onto the screen
+  ([`modules/layers/`](modules/layers/README.md))
 - [ ] **Assets** — generated placeholder art and the struct that loads it
 - [ ] **World** — a map of free-form rooms with collision, on screen
 - [ ] **Player** — walking, collision, facing, animation
