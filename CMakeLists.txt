@@ -39,6 +39,12 @@ enable_testing()
 # ---------------------------------------------------------------------------
 add_subdirectory(engine)
 
+# Modules: systems that depend on the engine alone and include nothing from this
+# project, each with its own CMakeLists.txt. Their example programs are built so
+# the examples their guides walk through always compile.
+set(LAYERS_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
+add_subdirectory(modules/layers)  # layers::layers — SpriteLayer, TileLayer, RasterLayer, ImageLayer
+
 # Warnings apply to this project's targets only; the engine keeps its own flags.
 if(MSVC)
     set(_zorlduh_warn /W4)
@@ -55,7 +61,7 @@ add_library(zorlduh-lib STATIC
 target_include_directories(zorlduh-lib PUBLIC src)
 target_compile_features(zorlduh-lib PUBLIC cxx_std_20)
 target_compile_options(zorlduh-lib PRIVATE ${_zorlduh_warn})
-target_link_libraries(zorlduh-lib PUBLIC retropp::engine)
+target_link_libraries(zorlduh-lib PUBLIC retropp::engine layers::layers)
 
 # ---------------------------------------------------------------------------
 # The game executable.
@@ -109,3 +115,5 @@ function(zorlduh_add_test name)
 endfunction()
 
 zorlduh_add_test(smoke)
+zorlduh_add_test(layers)
+zorlduh_add_test(raster_layers)
