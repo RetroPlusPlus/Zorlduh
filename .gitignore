@@ -1,0 +1,9 @@
+.DS_Store
+.cache/
+
+# Build output
+build*/
+
+# Private working docs: local only, never committed.
+docs-internal/
+/CLAUDE.md
