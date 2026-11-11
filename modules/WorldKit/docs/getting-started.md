@@ -186,7 +186,7 @@ frame.layers.push_back(LayerKit::SpriteLayer("marker", 10, {{markerSprite}}, {.s
 frame.regions = WorldKit::Fade(camera, world);
 ```
 
-`WorldLayers` is one tile layer per area on screen — the current area, any area joined to it seamlessly
+`WorldLayers` is one tile layer per area on screen — the current area, any area reached through seams
 that is in view, and the next area while a scroll runs — each assembled from its map through its art,
 placed where the camera says, and confined to the layout's view, so a part of the screen kept for
 something else is never drawn over. The marker's own layer takes `camera.scroll(world)`, the scroll for

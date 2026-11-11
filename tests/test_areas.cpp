@@ -1,10 +1,11 @@
-// The game's world: the two layouts over the real maps, every opening's cells on the map it names,
-// every way out having a way back, the three art catalogs, and the player going from area to area
+// The game's world: the three layouts over the real maps, every opening's cells on the map it names,
+// every way out having a way back, the four art catalogs, and the player going from area to area
 // through the tick: the scroll east into the lake, the fade down into the cave, the camera following
-// across the lake, input ignored while a transition runs, and the dungeon — down from the lake, up
-// into the hall, across the seam into the treasury and back, the wings, and out. No renderer is
-// needed: the maps are decoded from the bytes baked into the test binary and the art catalogs name
-// handles the test makes up.
+// across the lake, input ignored while a transition runs; the dungeon — down from the lake, up into
+// the hall, across the seam into the treasury and back, the wings, and out; and the forest — down from
+// the field, then across every seam both ways, each crossing a case of how the camera follows. No
+// renderer is needed: the maps are decoded from the bytes baked into the test binary and the art
+// catalogs name handles the test makes up.
 
 #include <gtest/gtest.h>
 
@@ -39,6 +40,7 @@ using zorlduh::kCellSize;
 using zorlduh::Layout;
 using zorlduh::Room;
 using zorlduh::WorldCell;
+using zorlduh::Woods;
 
 constexpr retropp::TimingProfile kHz60{.tickPeriodNs = retropp::TickPeriodNs::Hz60};
 
@@ -51,10 +53,18 @@ zorlduh::Assets headlessAssets() {
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
+    assets.forest = retropp::AtlasManifest{
+        .atlasId = retropp::AtlasId{9},
+        .slots = retropp::sliceLayout({.width = 32, .height = 8}, {.width = 8, .height = 8},
+                                      retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
+        .kind = retropp::ContentKind::Tileset,
+    };
     assets.palettes = zorlduh::Palettes{
         .floor = retropp::PaletteId{4},
         .wall = retropp::PaletteId{8},
         .water = retropp::PaletteId{12},
+        .grass = retropp::PaletteId{16},
+        .leaf = retropp::PaletteId{20},
     };
     zorlduh::OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
@@ -78,6 +88,21 @@ zorlduh::Assets headlessAssets() {
     dungeon.eastWing.collision = retropp::loadMapPng("assets/maps/dungeon-one/east-wing/collision.png");
     dungeon.treasury.tiles = retropp::loadMapPng("assets/maps/dungeon-one/treasury/tiles.png");
     dungeon.treasury.collision = retropp::loadMapPng("assets/maps/dungeon-one/treasury/collision.png");
+    zorlduh::SeamlessForestMaps& forest = assets.areas.seamlessForest;
+    forest.edge.tiles = retropp::loadMapPng("assets/maps/seamless-forest/edge/tiles.png");
+    forest.edge.collision = retropp::loadMapPng("assets/maps/seamless-forest/edge/collision.png");
+    forest.glade.tiles = retropp::loadMapPng("assets/maps/seamless-forest/glade/tiles.png");
+    forest.glade.collision = retropp::loadMapPng("assets/maps/seamless-forest/glade/collision.png");
+    forest.thicket.tiles = retropp::loadMapPng("assets/maps/seamless-forest/thicket/tiles.png");
+    forest.thicket.collision = retropp::loadMapPng("assets/maps/seamless-forest/thicket/collision.png");
+    forest.bower.tiles = retropp::loadMapPng("assets/maps/seamless-forest/bower/tiles.png");
+    forest.bower.collision = retropp::loadMapPng("assets/maps/seamless-forest/bower/collision.png");
+    forest.hollow.tiles = retropp::loadMapPng("assets/maps/seamless-forest/hollow/tiles.png");
+    forest.hollow.collision = retropp::loadMapPng("assets/maps/seamless-forest/hollow/collision.png");
+    forest.brook.tiles = retropp::loadMapPng("assets/maps/seamless-forest/brook/tiles.png");
+    forest.brook.collision = retropp::loadMapPng("assets/maps/seamless-forest/brook/collision.png");
+    forest.clearing.tiles = retropp::loadMapPng("assets/maps/seamless-forest/clearing/tiles.png");
+    forest.clearing.collision = retropp::loadMapPng("assets/maps/seamless-forest/clearing/collision.png");
     return assets;
 }
 
@@ -130,7 +155,7 @@ std::uint16_t value(CollisionCell cell) {
 TEST(Areas, OneLayoutPerNameAndOneAreaPerNameInOrderOverItsOwnMaps) {
     const zorlduh::Assets assets = headlessAssets();
     const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView);
-    ASSERT_EQ(world.layouts.size(), 2u);
+    ASSERT_EQ(world.layouts.size(), 3u);
     const WorldKit::Layout& overworld = world.layouts[Layout::Overworld];
     ASSERT_EQ(overworld.areas.size(), 5u);
     EXPECT_EQ(overworld.areas[Area::Meadow].tiles, &assets.areas.overworld.meadow.tiles);
@@ -146,10 +171,20 @@ TEST(Areas, OneLayoutPerNameAndOneAreaPerNameInOrderOverItsOwnMaps) {
     EXPECT_EQ(dungeon.areas[Room::WestWing].tiles, &assets.areas.dungeonOne.westWing.tiles);
     EXPECT_EQ(dungeon.areas[Room::EastWing].tiles, &assets.areas.dungeonOne.eastWing.tiles);
     EXPECT_EQ(dungeon.areas[Room::Treasury].tiles, &assets.areas.dungeonOne.treasury.tiles);
+    const WorldKit::Layout& forest = world.layouts[Layout::SeamlessForest];
+    ASSERT_EQ(forest.areas.size(), 7u);
+    EXPECT_EQ(forest.areas[Woods::Edge].tiles, &assets.areas.seamlessForest.edge.tiles);
+    EXPECT_EQ(forest.areas[Woods::Glade].collision, &assets.areas.seamlessForest.glade.collision);
+    EXPECT_EQ(forest.areas[Woods::Thicket].tiles, &assets.areas.seamlessForest.thicket.tiles);
+    EXPECT_EQ(forest.areas[Woods::Bower].tiles, &assets.areas.seamlessForest.bower.tiles);
+    EXPECT_EQ(forest.areas[Woods::Hollow].tiles, &assets.areas.seamlessForest.hollow.tiles);
+    EXPECT_EQ(forest.areas[Woods::Brook].collision, &assets.areas.seamlessForest.brook.collision);
+    EXPECT_EQ(forest.areas[Woods::Clearing].tiles, &assets.areas.seamlessForest.clearing.tiles);
     for (const WorldKit::Layout& layout : world.layouts) {
         EXPECT_EQ(layout.cellSize, kCellSize);
         EXPECT_EQ(layout.open.value, value(CollisionCell::Open));
         EXPECT_EQ(layout.view, zorlduh::kView);
+        EXPECT_EQ(layout.seamDepth, 0u);
     }
     EXPECT_EQ(zorlduh::kStartLayout, Layout::Overworld);
     EXPECT_EQ(zorlduh::kStartArea, Area::Meadow);
@@ -180,7 +215,7 @@ TEST(Areas, EveryWayOutHasAWayBack) {
             }
         }
     }
-    EXPECT_EQ(exits, 18);
+    EXPECT_EQ(exits, 32);
 }
 
 // The doorway and stairs cells on each map are exactly where its openings say.
@@ -260,7 +295,21 @@ TEST(Areas, TheArtDrawsEveryKindOfCellFromItsTileThroughItsPalette) {
     EXPECT_EQ(entry(dungeon, WorldCell::Wall).palette, assets.palettes.water);
     EXPECT_EQ(entry(dungeon, WorldCell::Stairs).palette, assets.palettes.floor);
     EXPECT_EQ(entry(dungeon, WorldCell::Stairs).slot, 4);
-    // Every value any map holds has an entry in all three.
+    const retropp::TileCatalog forest = zorlduh::ForestArt(assets);
+    EXPECT_EQ(entry(forest, WorldCell::Floor).sheet, assets.forest.atlasId);
+    EXPECT_EQ(entry(forest, WorldCell::Floor).slot, 0);
+    EXPECT_EQ(entry(forest, WorldCell::Floor).palette, assets.palettes.grass);
+    EXPECT_EQ(entry(forest, WorldCell::Wall).sheet, assets.forest.atlasId);
+    EXPECT_EQ(entry(forest, WorldCell::Wall).slot, 1);
+    EXPECT_EQ(entry(forest, WorldCell::Wall).palette, assets.palettes.leaf);
+    EXPECT_EQ(entry(forest, WorldCell::Water).slot, 2);
+    EXPECT_EQ(entry(forest, WorldCell::Water).palette, assets.palettes.water);
+    EXPECT_EQ(entry(forest, WorldCell::Doorway).slot, 3);
+    EXPECT_EQ(entry(forest, WorldCell::Doorway).palette, assets.palettes.grass);
+    EXPECT_EQ(entry(forest, WorldCell::Stairs).sheet, assets.terrain.atlasId);
+    EXPECT_EQ(entry(forest, WorldCell::Stairs).slot, 4);
+    EXPECT_EQ(entry(forest, WorldCell::Stairs).palette, assets.palettes.floor);
+    // Every value any map holds has an entry in all four.
     const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView);
     for (const WorldKit::Layout& layout : world.layouts) {
         for (const WorldKit::Area& area : layout.areas) {
@@ -268,6 +317,7 @@ TEST(Areas, TheArtDrawsEveryKindOfCellFromItsTileThroughItsPalette) {
                 EXPECT_NE(entry(overworld, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
                 EXPECT_NE(entry(cave, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
                 EXPECT_NE(entry(dungeon, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
+                EXPECT_NE(entry(forest, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
             }
         }
     }
@@ -574,6 +624,286 @@ TEST(Dungeon, TheEntrancesDoorFadesBackUpToTheLakeWithoutGoingStraightDownAgain)
     EXPECT_EQ(state.player.position(), (Vec2i{240, 8}));   // centered on the dungeon door: box (243, 16)
     run(state, config, {}, 16);
     EXPECT_FALSE(state.camera.transitioning());
+}
+
+// ── The forest ───────────────────────────────────────────────────────────────────────────────
+//
+// In the glade's pixels the edge's top-left is (−160, 16), the thicket's (88, −80), the bower's
+// (184, −80), the hollow's (240, 64), the brook's (400, 80) and the clearing's (32, 160). The player's
+// box is its position plus (3, 8), 10×8, so its center is the position plus (8, 12).
+
+// From the meadow down the south road into the field at (72, 4), right to (104, 4) — the camera
+// following to x = 32 — and down through the forest path: the box's center reaches y = 128 after 112
+// ticks, and the scroll carries the player 16 px into the edge, which sits 40 px right of the field's
+// left edge and 128 px down.
+zorlduh::GameState inTheEdge(const zorlduh::Config& config) {
+    zorlduh::GameState state = start(config);
+    run(state, config, {.down = true}, 60 + 32);
+    run(state, config, {.right = true}, 32);
+    run(state, config, {.down = true}, 112 + 32);
+    return state;
+}
+
+// Down the edge to (64, 56), then east across its seam into the glade at (−8, 72).
+zorlduh::GameState inTheGlade(const zorlduh::Config& config) {
+    zorlduh::GameState state = inTheEdge(config);
+    run(state, config, {.down = true}, 52);
+    run(state, config, {.right = true}, 88);
+    return state;
+}
+
+// The scroll slides down only, so the edge lands where the field's camera was across: 8 px left of its
+// own place. The edge is exactly the view's size, so the camera follows it on both axes — but only with
+// the player's steps toward that place.
+TEST(Forest, TheFieldsForestPathScrollsDownIntoTheEdgeWhichComesIntoPlaceAsThePlayerWalks) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = start(config);
+    run(state, config, {.down = true}, 60 + 32);
+    run(state, config, {.right = true}, 32);
+    EXPECT_EQ(state.camera.position(), (Vec2i{32, 0}));
+    Entered entered = run(state, config, {.down = true}, 112);
+    EXPECT_TRUE(state.camera.transitioning());
+    EXPECT_EQ(entered.count, 0);
+    entered = run(state, config, {.down = true}, 32);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.layout, Layout::SeamlessForest);
+    EXPECT_EQ(entered.last.area, Woods::Edge);
+    EXPECT_FALSE(state.camera.transitioning());
+    EXPECT_EQ(state.player.position(), (Vec2i{64, 4}));   // (104 − 40, 116 + 16 − 128)
+    EXPECT_EQ(state.camera.position(), (Vec2i{-8, 0}));   // 32 − 40
+
+    run(state, config, {}, 30);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-8, 0}));
+    run(state, config, {.left = true}, 10);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-8, 0}));
+    run(state, config, {.right = true}, 5);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-3, 0}));
+    run(state, config, {.right = true}, 8);
+    EXPECT_EQ(state.camera.position(), (Vec2i{0, 0}));     // in place, and it stays there
+    run(state, config, {.left = true}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{0, 0}));
+
+    // Back up the path: the field scrolls in above, sliding up only.
+    run(state, config, {.right = true}, 20);
+    EXPECT_EQ(state.player.position(), (Vec2i{67, 4}));
+    entered = run(state, config, {.up = true}, 17 + 32);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.layout, Layout::Overworld);
+    EXPECT_EQ(entered.last.area, Area::Field);
+    EXPECT_EQ(state.player.position(), (Vec2i{107, 99}));   // (67 + 40, −13 − 16 + 128)
+    EXPECT_EQ(state.camera.position(), (Vec2i{40, 0}));
+}
+
+// The glade sits 16 px higher than level with the edge: crossing moves the player and the camera by
+// (−160, 16) and nothing on screen. The glade's law then wants the camera 4 px lower, and it goes there
+// only as the player walks down.
+TEST(Forest, CrossingIntoTheBiggerGladeMovesNothingOnScreenAndTheCameraFollowsOnlyWithThePlayer) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = inTheEdge(config);
+    run(state, config, {.down = true}, 52);
+    EXPECT_EQ(state.player.position(), (Vec2i{64, 56}));
+    Entered entered = run(state, config, {.right = true}, 87);
+    EXPECT_EQ(entered.count, 0);
+    EXPECT_EQ(state.player.position(), (Vec2i{151, 56}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{79, 0}));
+    std::vector<WorldKit::Shown> shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 2u);
+    EXPECT_EQ(shown[1].area, Woods::Glade);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = 79 - 160, .y = -16 + 16}));
+
+    entered = run(state, config, {.right = true}, 1);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.layout, Layout::SeamlessForest);
+    EXPECT_EQ(entered.last.area, Woods::Glade);
+    EXPECT_FALSE(state.camera.transitioning());
+    EXPECT_EQ(state.player.position(), (Vec2i{-8, 72}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, 16}));
+    shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 2u);
+    EXPECT_EQ(shown[0].scroll, (retropp::LayerScroll{.x = -80, .y = 0}));    // one step on from (−81, 0)
+    EXPECT_EQ(shown[1].area, Woods::Edge);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = 80, .y = -16}));   // one step on from (79, −16)
+
+    run(state, config, {}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, 16}));
+    run(state, config, {.up = true}, 4);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, 16}));
+    run(state, config, {.down = true}, 10);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, 26}));
+    run(state, config, {.right = true}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-60, 26}));
+
+    // Back across: the edge is current again, the camera 10 px below its rows where the glade had it.
+    entered = run(state, config, {.left = true}, 21);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Edge);
+    EXPECT_EQ(state.player.position(), (Vec2i{151, 62}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{79, 10}));
+}
+
+// Below the thicket in the glade, the view reaches past the thicket's east wall, so the bower — two
+// seams away — is drawn where it hangs. The thicket is smaller than the view, but its seams reach into
+// the glade below and the bower beside it, so it follows on both axes; the bower, with one seam west,
+// follows across and holds still up and down.
+TEST(Forest, TheBowerIsSeenThroughTheThicketWhichFollowsOnBothAxesWhileTheBowerHoldsStillUpAndDown) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = inTheGlade(config);
+    ASSERT_EQ(state.camera.area(), Woods::Glade);
+    ASSERT_EQ(state.player.position(), (Vec2i{-8, 72}));
+    run(state, config, {.right = true}, 128);
+    EXPECT_EQ(state.camera.position(), (Vec2i{48, 16}));
+    Entered entered = run(state, config, {.up = true}, 84);
+    EXPECT_EQ(entered.count, 0);
+    EXPECT_EQ(state.player.position(), (Vec2i{120, -12}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{48, -64}));
+    std::vector<WorldKit::Shown> shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 3u);
+    EXPECT_EQ(shown[1].area, Woods::Thicket);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = 48 - 88, .y = -80 + 80}));
+    EXPECT_EQ(shown[2].area, Woods::Bower);
+    EXPECT_EQ(shown[2].scroll, (retropp::LayerScroll{.x = 48 - 184, .y = -80 + 80}));
+
+    entered = run(state, config, {.up = true}, 1);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Thicket);
+    EXPECT_EQ(state.player.position(), (Vec2i{32, 67}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-40, 15}));
+    shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 3u);
+    EXPECT_EQ(shown[1].area, Woods::Glade);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = 48, .y = -81}));
+    EXPECT_EQ(shown[2].area, Woods::Bower);
+    EXPECT_EQ(shown[2].scroll, (retropp::LayerScroll{.x = -136, .y = -1}));
+
+    run(state, config, {.up = true}, 14);   // the camera follows up, though the thicket is short
+    EXPECT_EQ(state.camera.position(), (Vec2i{-40, 1}));
+    entered = run(state, config, {.right = true}, 56);   // and across, with the player's steps
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Bower);
+    EXPECT_EQ(state.player.position(), (Vec2i{-8, 53}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, 1}));   // (16 − 96, 1)
+
+    run(state, config, {.right = true}, 30);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-50, 1}));
+    run(state, config, {.down = true}, 10);
+    EXPECT_EQ(state.player.position(), (Vec2i{22, 56}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-50, 1}));
+    run(state, config, {.up = true}, 60);
+    EXPECT_EQ(state.player.position(), (Vec2i{22, 0}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-50, 1}));
+
+    // Back into the thicket, and down into the glade.
+    entered = run(state, config, {.left = true}, 31);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Thicket);
+    EXPECT_EQ(state.player.position(), (Vec2i{87, 0}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{15, 1}));
+    run(state, config, {.left = true}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{0, 1}));
+    entered = run(state, config, {.down = true}, 68);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Glade);
+    EXPECT_EQ(state.player.position(), (Vec2i{155, -12}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{88, -64}));
+}
+
+// The hollow and the brook are half the view's height: through the chain the camera holds still up
+// and down where the crossing from the glade left it, and follows across. The brook sits two cells
+// lower than level, so the hollow's top row runs into the brook's void, and the crossing in the rows
+// that meet moves everything by (−160, −16).
+TEST(Forest, TheChainHoldsStillUpAndDownAndTheBrookSitsTwoCellsLower) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = inTheGlade(config);
+    Entered entered = run(state, config, {.right = true}, 240);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Hollow);
+    EXPECT_EQ(state.player.position(), (Vec2i{-8, 8}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, -48}));   // (160 − 240, 16 − 64)
+    std::vector<WorldKit::Shown> shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 2u);
+    EXPECT_EQ(shown[1].area, Woods::Glade);
+
+    run(state, config, {.right = true}, 40);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-40, -48}));
+    run(state, config, {.up = true}, 10);
+    EXPECT_EQ(state.player.position(), (Vec2i{32, 0}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-40, -48}));
+    entered = run(state, config, {.right = true}, 200);   // along the top row: the brook's void stops it
+    EXPECT_EQ(entered.count, 0);
+    EXPECT_EQ(state.player.position(), (Vec2i{147, 0}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{75, -48}));
+    EXPECT_TRUE(state.camera.solids(config.world).solidBox({.x = 160, .y = 8, .width = 1, .height = 8}));
+    EXPECT_FALSE(state.camera.solids(config.world).solidBox({.x = 160, .y = 24, .width = 1, .height = 8}));
+    run(state, config, {.down = true}, 24);
+    EXPECT_EQ(state.camera.position(), (Vec2i{75, -48}));
+
+    entered = run(state, config, {.right = true}, 5);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Brook);
+    EXPECT_EQ(state.player.position(), (Vec2i{-8, 8}));       // (152 − 160, 24 − 16)
+    EXPECT_EQ(state.camera.position(), (Vec2i{-80, -64}));    // (80 − 160, −48 − 16)
+    shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 2u);
+    EXPECT_EQ(shown[1].area, Woods::Hollow);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = 80, .y = -64}));   // the hollow's own, one step on
+    run(state, config, {.right = true}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-60, -64}));
+
+    entered = run(state, config, {.left = true}, 21);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Hollow);
+    EXPECT_EQ(state.player.position(), (Vec2i{151, 24}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{79, -48}));
+    entered = run(state, config, {.left = true}, 160);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Glade);
+    EXPECT_EQ(state.player.position(), (Vec2i{231, 88}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{159, 16}));
+}
+
+// The clearing is the view's size, centered under the wider glade. Crossing near its left end, the
+// glade's camera is 32 px left of the glade (its law reaches into the edge), 64 px left of the
+// clearing's place: void shows left of the clearing, and the edge — two seams away — is in view above
+// it. The camera comes into the clearing's place only as the player walks right, and stops there.
+TEST(Forest, TheClearingIsEnteredOffCenterAndComesIntoPlaceOnlyAsThePlayerWalks) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = inTheGlade(config);
+    run(state, config, {.right = true}, 48);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-32, 16}));
+    Entered entered = run(state, config, {.down = true}, 76);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Clearing);
+    EXPECT_EQ(state.player.position(), (Vec2i{8, -12}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{-64, -68}));   // (−32 − 32, 92 − 160)
+    const std::vector<WorldKit::Shown> shown = state.camera.shown(config.world);
+    ASSERT_EQ(shown.size(), 3u);
+    EXPECT_EQ(shown[1].area, Woods::Glade);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = -32, .y = 76}));
+    EXPECT_EQ(shown[2].area, Woods::Edge);
+
+    run(state, config, {}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-64, -68}));
+    run(state, config, {.left = true}, 3);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-64, -68}));
+    run(state, config, {.right = true}, 30);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-34, -68}));
+    run(state, config, {.down = true}, 20);
+    EXPECT_EQ(state.camera.position(), (Vec2i{-34, -48}));
+    run(state, config, {.right = true}, 50);
+    EXPECT_EQ(state.camera.position(), (Vec2i{0, -48}));     // in place across, and no further
+    run(state, config, {.left = true}, 10);
+    EXPECT_EQ(state.camera.position(), (Vec2i{0, -48}));
+
+    entered = run(state, config, {.up = true}, 21);
+    EXPECT_EQ(entered.count, 1);
+    EXPECT_EQ(entered.last.area, Woods::Glade);
+    EXPECT_EQ(state.player.position(), (Vec2i{107, 147}));
+    EXPECT_EQ(state.camera.position(), (Vec2i{32, 95}));
 }
 
 }  // namespace

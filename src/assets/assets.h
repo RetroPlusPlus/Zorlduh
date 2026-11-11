@@ -52,6 +52,15 @@ enum class TerrainTile : std::size_t {
     Stairs = 4,
 };
 
+// The slots of the forest sheet: one 8×8 tile each for the forest's ground, its walls, its water and
+// its doorways.
+enum class ForestTile : std::size_t {
+    Grass = 0,
+    Tree = 1,
+    Stream = 2,
+    Trodden = 3,
+};
+
 // The animations of the player sheet: one row of two walk frames per facing. A standing player
 // shows frame 0 of its facing.
 enum class PlayerWalk : std::size_t {
@@ -75,6 +84,8 @@ struct Palettes {
     retropp::PaletteId floor{};  // Floor and Doorway tiles
     retropp::PaletteId wall{};
     retropp::PaletteId water{};
+    retropp::PaletteId grass{};  // the forest's ground and doorways
+    retropp::PaletteId leaf{};   // the forest's trees
     retropp::PaletteId player{};
     retropp::PaletteId enemy{};
     retropp::PaletteId sword{};
@@ -106,14 +117,27 @@ struct DungeonOneMaps {
     AreaMaps treasury;  // 30×16: open along its south wall to the hall
 };
 
+// SeamlessForest's rooms' maps, from assets/maps/seamless-forest/<room>/.
+struct SeamlessForestMaps {
+    AreaMaps edge;      // 20×16: the path up to the field, open along its east wall to the glade
+    AreaMaps glade;     // 30×20: open in every wall
+    AreaMaps thicket;   // 12×10: open along its south and east walls
+    AreaMaps bower;     // 16×10: open along its west wall
+    AreaMaps hollow;    // 20×8: open along both side walls
+    AreaMaps brook;     // 20×8: open along its west wall
+    AreaMaps clearing;  // 20×16: open along its north wall
+};
+
 // Every area's maps, by layout.
 struct AreaMapSet {
     OverworldMaps overworld;
     DungeonOneMaps dungeonOne;
+    SeamlessForestMaps seamlessForest;
 };
 
 struct Assets {
     retropp::AtlasManifest terrain;  // Tileset of 8×8 tiles, slots in TerrainTile order
+    retropp::AtlasManifest forest;   // Tileset of 8×8 tiles, slots in ForestTile order
     retropp::AtlasManifest player;   // AnimationSeries of 16×16 frames, animations in PlayerWalk order
     TopDownMovement::DirectionalAnimations playerWalk;  // each facing's row of the player sheet, two
                                                         // frames of 8 ticks each, through the player palette
@@ -125,7 +149,8 @@ struct Assets {
 };
 
 // Uploads every sheet and palette to `renderer` and decodes every area's maps. Index 0 is transparent
-// on the player, enemy, sword and hearts sheets; the terrain sheet has no transparent index. Throws
+// on the player, enemy, sword and hearts sheets; the terrain and forest sheets have no transparent
+// index. Throws
 // std::runtime_error when a file cannot be decoded or uploaded.
 [[nodiscard]] Assets loadAssets(retropp::Renderer& renderer);
 

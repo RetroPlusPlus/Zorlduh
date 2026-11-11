@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 namespace zorlduh {
 
@@ -13,6 +15,15 @@ retropp::TileCatalogEntry terrain(const Assets& assets, WorldCell cell, TerrainT
         .id = static_cast<std::uint16_t>(cell),
         .sheet = assets.terrain.atlasId,
         .slot = assets.terrain[static_cast<std::size_t>(tile)].tile,
+        .palette = palette,
+    };
+}
+
+retropp::TileCatalogEntry forest(const Assets& assets, WorldCell cell, ForestTile tile, retropp::PaletteId palette) {
+    return retropp::TileCatalogEntry{
+        .id = static_cast<std::uint16_t>(cell),
+        .sheet = assets.forest.atlasId,
+        .slot = assets.forest[static_cast<std::size_t>(tile)].tile,
         .palette = palette,
     };
 }
@@ -55,6 +66,8 @@ WorldKit::Layout overworld(const Assets& assets, CameraKit::View view) {
                      .leadsTo = {.area = Area::Meadow, .opening = "south road"}},
                     {.name = "east door", .side = Side::East, .span = {3, 6}, .transition = Transition::Scroll,
                      .leadsTo = {.area = Area::Shrine, .opening = "west door"}},
+                    {.name = "forest path", .side = Side::South, .span = {13, 16}, .transition = Transition::Scroll,
+                     .leadsTo = {.layout = Layout::SeamlessForest, .area = Woods::Edge, .opening = "north path"}},
                 }},
             WorldKit::Area{
                 .tiles = &maps.shrine.tiles,
@@ -142,6 +155,76 @@ WorldKit::Layout dungeonOne(const Assets& assets, CameraKit::View view) {
     };
 }
 
+WorldKit::Layout seamlessForest(const Assets& assets, CameraKit::View view) {
+    using WorldKit::Side;
+    using WorldKit::Transition;
+    const SeamlessForestMaps& maps = assets.areas.seamlessForest;
+    const auto room = [&](const AreaMaps& area, std::vector<WorldKit::Opening> openings) {
+        return WorldKit::Area{
+            .tiles = &area.tiles,
+            .art = ForestArt(assets),
+            .collision = &area.collision,
+            .openings = std::move(openings),
+        };
+    };
+    return WorldKit::Layout{
+        .areas = {
+            room(maps.edge,
+                 {
+                     {.name = "north path", .side = Side::North, .span = {8, 11}, .transition = Transition::Scroll,
+                      .leadsTo = {.layout = Layout::Overworld, .area = Area::Field, .opening = "forest path"}},
+                     {.name = "east wall", .side = Side::East, .span = {1, 14}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Glade, .opening = "west wall"}},
+                 }),
+            room(maps.glade,
+                 {
+                     {.name = "west wall", .side = Side::West, .span = {3, 16}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Edge, .opening = "east wall"}},
+                     {.name = "north wall", .side = Side::North, .span = {12, 21}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Thicket, .opening = "south wall"}},
+                     {.name = "east wall", .side = Side::East, .span = {8, 15}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Hollow, .opening = "west wall"}},
+                     {.name = "south wall", .side = Side::South, .span = {5, 22}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Clearing, .opening = "north wall"}},
+                 }),
+            room(maps.thicket,
+                 {
+                     {.name = "south wall", .side = Side::South, .span = {1, 10}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Glade, .opening = "north wall"}},
+                     {.name = "east wall", .side = Side::East, .span = {1, 8}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Bower, .opening = "west wall"}},
+                 }),
+            room(maps.bower,
+                 {
+                     {.name = "west wall", .side = Side::West, .span = {1, 8}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Thicket, .opening = "east wall"}},
+                 }),
+            // The hollow's side walls are open along their whole height, so the brook can sit two cells
+            // lower than level: the rows of the two walls that meet are the way through.
+            room(maps.hollow,
+                 {
+                     {.name = "west wall", .side = Side::West, .span = {0, 7}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Glade, .opening = "east wall"}},
+                     {.name = "east wall", .side = Side::East, .span = {0, 7}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Brook, .opening = "west wall", .offset = {.x = 0, .y = 2}}},
+                 }),
+            room(maps.brook,
+                 {
+                     {.name = "west wall", .side = Side::West, .span = {0, 7}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Hollow, .opening = "east wall", .offset = {.x = 0, .y = -2}}},
+                 }),
+            room(maps.clearing,
+                 {
+                     {.name = "north wall", .side = Side::North, .span = {1, 18}, .transition = Transition::Seamless,
+                      .leadsTo = {.area = Woods::Glade, .opening = "south wall"}},
+                 }),
+        },
+        .cellSize = kCellSize,
+        .open = CollisionCell::Open,
+        .view = view,
+    };
+}
+
 }  // namespace
 
 retropp::TileCatalog OverworldArt(const Assets& assets) {
@@ -177,8 +260,19 @@ retropp::TileCatalog DungeonArt(const Assets& assets) {
     }};
 }
 
+retropp::TileCatalog ForestArt(const Assets& assets) {
+    const Palettes& palettes = assets.palettes;
+    return retropp::TileCatalog{.entries = {
+        terrain(assets, WorldCell::Stairs, TerrainTile::Stairs, palettes.floor),
+        forest(assets, WorldCell::Wall, ForestTile::Tree, palettes.leaf),
+        forest(assets, WorldCell::Water, ForestTile::Stream, palettes.water),
+        forest(assets, WorldCell::Doorway, ForestTile::Trodden, palettes.grass),
+        forest(assets, WorldCell::Floor, ForestTile::Grass, palettes.grass),
+    }};
+}
+
 WorldKit::World gameWorld(const Assets& assets, CameraKit::View view) {
-    WorldKit::World world{.layouts = {overworld(assets, view), dungeonOne(assets, view)}};
+    WorldKit::World world{.layouts = {overworld(assets, view), dungeonOne(assets, view), seamlessForest(assets, view)}};
     WorldKit::validate(world);
     return world;
 }

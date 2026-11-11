@@ -150,6 +150,11 @@ struct Layout {
     // arriving in one; the color it goes to.
     std::uint32_t fadeTicks = 16;
     retropp::Rgba8 fadeColor{};
+
+    // How many seams away from the current area an area may be and still be drawn when it is in view:
+    // 0 for any number, 1 for the areas joined to the current one, 2 for those and the areas joined to
+    // them, and so on. The camera's law and the solid query reach one seam whatever this is.
+    std::uint32_t seamDepth = 0;
 };
 
 // The whole world. Layout indices are positions in `layouts`.

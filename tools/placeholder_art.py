@@ -3,9 +3,10 @@
 and collision map.
 
     assets/gfx/tiles/terrain.png                  the terrain tiles, one per world id
+    assets/gfx/tiles/forest.png                   the forest's tiles: grass, tree, stream, trodden
     assets/gfx/sprites/{player,enemy,sword}.png   the sprite sheets
     assets/gfx/hud/hearts.png                     the HUD's hearts
-    assets/palettes/tiles/{floor,wall,water}.png
+    assets/palettes/tiles/{floor,wall,water,grass,leaf}.png
     assets/palettes/sprites/{player,enemy,sword}.png
     assets/palettes/hud/hearts.png
     assets/maps/<layout>/<area>/tiles.png         one world id per cell, for each area of each layout
@@ -107,6 +108,8 @@ UNUSED = (0, 0, 0, 0)
 FLOOR_PAL = [(88, 72, 40, 255), (160, 136, 80, 255), (208, 184, 120, 255), (232, 216, 160, 255)]
 WALL_PAL = [(32, 32, 48, 255), (88, 88, 112, 255), (144, 144, 168, 255), (208, 208, 216, 255)]
 WATER_PAL = [(16, 48, 88, 255), (40, 104, 176, 255), (88, 168, 224, 255), (176, 224, 248, 255)]
+GRASS_PAL = [(40, 56, 16, 255), (96, 128, 40, 255), (152, 184, 72, 255), (208, 224, 128, 255)]   # yellowish greens
+LEAF_PAL = [(8, 24, 24, 255), (24, 64, 56, 255), (48, 104, 88, 255), (96, 152, 120, 255)]       # darker, bluish greens
 
 PLAYER_PAL = [UNUSED, (40, 24, 32, 255), (200, 80, 56, 255), (248, 224, 192, 255)]   # outline, cloak, face
 ENEMY_PAL = [UNUSED, (32, 8, 48, 255), (128, 64, 192, 255), (240, 240, 160, 255)]    # outline, body, eyes
@@ -200,6 +203,57 @@ STAIRS = parse([
 ], 8, 8)
 
 TILES = side_by_side(FLOOR, WALL, WATER, DOORWAY, STAIRS)
+
+# The forest, one 8×8 tile per ForestTile in src/assets/assets.h: grass drawn through the grass
+# palette, a tree filling its cell through the leaf palette, a stream through the water palette, and
+# trodden grass, worn to earth where one room passes into the next, through the grass palette. No
+# transparent index.
+
+GRASS = parse([
+    "21222122",
+    "22232222",
+    "12222212",
+    "22122322",
+    "23222221",
+    "22212222",
+    "12222232",
+    "22321222",
+], 8, 8)
+
+TREE = parse([
+    "12333321",
+    "23322332",
+    "33233233",
+    "23332332",
+    "12233221",
+    "01222210",
+    "00011000",
+    "10011001",
+], 8, 8)
+
+STREAM = parse([
+    "21122112",
+    "22222222",
+    "23322222",
+    "22233322",
+    "12222221",
+    "22222222",
+    "22223332",
+    "33222222",
+], 8, 8)
+
+TRODDEN = parse([
+    "21101122",
+    "11000112",
+    "10001011",
+    "01000001",
+    "10000110",
+    "11010001",
+    "21100012",
+    "22111122",
+], 8, 8)
+
+FOREST = side_by_side(GRASS, TREE, STREAM, TRODDEN)
 
 # The player: a hooded traveler in a cloak. Rows Down, Up, Left, Right; two walk frames each. The
 # second Down and Up frames are the first mirrored, and Right is Left mirrored.
@@ -391,7 +445,8 @@ HUD = side_by_side(HEART_FULL, HEART_HALF, HEART_EMPTY)
 #
 # Each area is its own map, one pixel per cell, ringed by wall except its doorways. The openings
 # between areas are declared in src/game/areas.cpp; the doorway and stairs cells here are where those
-# openings say they are. The areas are grouped by layout: the overworld, and the rooms of DungeonOne.
+# openings say they are. The areas are grouped by layout: the overworld, the rooms of DungeonOne, and
+# the rooms of SeamlessForest.
 
 # World ids, as WorldCell in src/assets/assets.h, spread from near black (stairs) to white (floor).
 STAIRS_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 32, 64, 128, 192, 255
@@ -420,7 +475,8 @@ LAYOUTS = {
         # pond, fades down into DungeonOne.
         "lake": dict(size=(40, 16), doorways=column(0, 6, 9), stairs=[(30, 2), (31, 2)], pond=True),
         # One and a half play areas wide: not a multiple of the screen.
-        "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6)),
+        # The forest path in its south wall scrolls down into SeamlessForest.
+        "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6) + row(15, 13, 16)),
         # Smaller than the play area on both axes: centered on screen.
         "shrine": dict(size=(12, 10), doorways=column(0, 3, 6)),
         # Reached by a fade from the meadow's cave mouth; the stairs lead back up.
@@ -436,6 +492,26 @@ LAYOUTS = {
         "east-wing": dict(size=(12, 10), doorways=column(0, 3, 6)),
         # One and a half play areas wide; its south wall open over the hall's width, centered.
         "treasury": dict(size=(30, 16), doorways=row(15, 6, 23)),
+    },
+    # Seven rooms joined only by seams, each a different case of how the camera follows.
+    "seamless-forest": {
+        # Exactly one play area: the path north back up to the field, and its east wall open into the
+        # glade. It follows on both axes and comes into its own place only as the player walks.
+        "edge": dict(size=(20, 16), doorways=row(0, 8, 11) + column(19, 1, 14)),
+        # Bigger than the play area both ways, with a seam in every wall: into the edge, the thicket,
+        # the hollow and the clearing.
+        "glade": dict(size=(30, 20), doorways=column(0, 3, 16) + row(0, 12, 21) + column(29, 8, 15) + row(19, 5, 22)),
+        # Smaller than the play area both ways, with two seams: the glade below and the bower beside it
+        # make it big enough to follow on both axes.
+        "thicket": dict(size=(12, 10), doorways=row(9, 1, 10) + column(11, 1, 8)),
+        # Hung off the thicket's side: seen from the glade through the thicket.
+        "bower": dict(size=(16, 10), doorways=column(0, 1, 8)),
+        # As wide as the play area and half as tall, open along both side walls: the middle of a chain.
+        "hollow": dict(size=(20, 8), doorways=column(0, 0, 7) + column(19, 0, 7)),
+        # The chain's end, joined two cells lower than level.
+        "brook": dict(size=(20, 8), doorways=column(0, 0, 7)),
+        # One play area, centered under the wider glade: entered off center.
+        "clearing": dict(size=(20, 16), doorways=row(0, 1, 18)),
     },
 }
 
@@ -467,6 +543,7 @@ def files():
     """Every file the script writes, by path under assets/."""
     out = {
         "gfx/tiles/terrain.png": sheet_png(TILES),
+        "gfx/tiles/forest.png": sheet_png(FOREST),
         "gfx/sprites/player.png": sheet_png(PLAYER),
         "gfx/sprites/enemy.png": sheet_png(ENEMY),
         "gfx/sprites/sword.png": sheet_png(SWORD),
@@ -474,6 +551,8 @@ def files():
         "palettes/tiles/floor.png": palette_png(FLOOR_PAL),
         "palettes/tiles/wall.png": palette_png(WALL_PAL),
         "palettes/tiles/water.png": palette_png(WATER_PAL),
+        "palettes/tiles/grass.png": palette_png(GRASS_PAL),
+        "palettes/tiles/leaf.png": palette_png(LEAF_PAL),
         "palettes/sprites/player.png": palette_png(PLAYER_PAL),
         "palettes/sprites/enemy.png": palette_png(ENEMY_PAL),
         "palettes/sprites/sword.png": palette_png(SWORD_PAL),

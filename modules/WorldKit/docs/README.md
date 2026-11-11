@@ -44,7 +44,7 @@ screen.
 |---|---|
 | [getting-started.md](getting-started.md) | A complete program, four areas joined by a door, stairs and a seam, built as `WorldKit-example-getting-started`, explained part by part |
 | [concepts.md](concepts.md) | Areas, layouts and openings; how movement plugs in; a tick of following; scrolls, fades and seams; the camera and its law; drawing; where each part lives in a game |
-| [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a camera law of your own, a movement module, the fade's look, another layout, a seam, a reserved part of the screen |
+| [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a camera law of your own, a movement module, the fade's look, another layout, a seam and how deep seams are drawn, things in an area, a reserved part of the screen |
 
 ### Reference
 
@@ -64,7 +64,7 @@ screen.
 | What is solid: the collision map, off the map, the way out through an exit, the next area past a seam | available | camera.md |
 | A scroll to the next area, sliding along the exit's axis, carrying the thing through | available | camera.md |
 | A fade to the next area, landing at the entrance | available | camera.md |
-| A seamless join: the next area drawn beyond the wall, walked into with nothing moving on screen | available | camera.md |
+| A seamless join: the next area drawn beyond the wall, walked into with nothing moving on screen; areas drawn through chains of seams, as deep as the layout says | available | camera.md |
 | The camera within an area through `CameraKit::follow` or a law of the game's own; following only where there is room, and only as the thing moves | available | areas.md, camera.md |
 | One tile layer per area on screen, confined to the view; the fade as a frame region | available | drawing.md |
 | Openings that open and close (a locked door, a shutter) | not provided — see [how-to.md](how-to.md#shut-a-door) | how-to.md |

@@ -121,9 +121,14 @@ wall whenever its rectangle is in view; the solid query continues into it past t
 span; the camera's law reaches straight across the seam, so the camera follows the thing up to and over
 the wall without stopping. When the thing's center crosses the wall, the next area becomes current on
 that tick: the move is the change into its pixels, the camera makes the same change so nothing on
-screen moves, nothing runs, and `entered` is the place. Walking back crosses the same way. What is
-shown and what the law reaches across is one seam deep: an area joined to the next area is not drawn
-until the next area is current.
+screen moves, nothing runs, and `entered` is the place. Walking back crosses the same way.
+
+What is drawn reaches through seams: the areas joined to the current one, the areas joined to those,
+and so on, each drawn where the chain of seams attaches it whenever it is in view — so a room hanging
+off a small room's side is there in the view from the big room beside them. The layout's `seamDepth`
+limits how many seams away that reaches (0, the default, for any number). What the camera's law reaches
+across and what is solid stay one seam deep: the thing followed only ever touches the next area, and
+crossing into it makes that area current.
 
 ## The camera and its law
 
@@ -144,8 +149,8 @@ camera holds still from one transition to the next.
 
 ## Drawing
 
-The areas on screen are tile layers: one for the current area, one for each area joined to it
-seamlessly that is in view, one for the next area during a scroll, each assembled from its map through
+The areas on screen are tile layers: one for the current area, one for each area reached through
+seams that is in view, one for the next area during a scroll, each assembled from its map through
 its art, keyed `"area:<layout>:<area>"`, placed by the camera's scroll for that area, and confined to
 the layout's view — the part of the screen the world is given; the rest is the game's. A game's own
 layers of things placed in the world take `camera.scroll(world)`. The fade is one region over the whole

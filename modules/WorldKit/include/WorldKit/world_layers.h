@@ -6,8 +6,9 @@
 // Each area's layer is keyed "area:<layout>:<area>" and assembled from its tile map through its art,
 // placed by the camera's scroll for that area, and confined to the layout's view: outside that
 // rectangle of the screen — a HUD strip, a border, a panel — the world draws nothing, whatever the
-// camera looks at. Beside the current area there is a layer for each area joined to it seamlessly
-// that is in view, and during a scroll one for the area scrolling in. The fade is one frame-wide
+// camera looks at. Beside the current area there is a layer for each area reached through seams that
+// is in view, as many seams away as the layout's `seamDepth` allows, and during a scroll one for the
+// area scrolling in. The fade is one frame-wide
 // color fill, returned only while a fade runs. This is the only WorldKit header that builds draw
 // types.
 #pragma once

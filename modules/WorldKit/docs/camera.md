@@ -47,7 +47,7 @@ public:
 | `follow(world, box)` | One tick ([`Step`](#step)). While nothing runs: follows `box` as below, and the box's center going out through an opening that leads somewhere starts its transition — past a wall within a gap's span, or into a spot from outside it — or, through a seam, makes the next place current at once with the move the change into its pixels. While a scroll runs: the camera slides, and the move is this tick's share of the carry, plus on the last tick the change into the next area's pixels. While a fade runs: the screen darkens, then at the layout's `fadeTicks` the move is the jump to the entrance and the place changes, then the screen lightens over the next layout's `fadeTicks`. |
 | `position()` | The camera's position, in the current area's pixels (the area being left, during a scroll). |
 | `scroll(world)` | The scroll for a layer of things placed in the current area's pixels: the position less the view's origin. |
-| `shown(world)` | The areas on screen with each layer's scroll ([`Shown`](#shown)): the current area; each area joined to it seamlessly whose attached rectangle is in view, once each; and during a scroll the next area. |
+| `shown(world)` | The areas on screen with each layer's scroll ([`Shown`](#shown)): the current area; each area reached through seams — joined to it, or to an area joined to it, and so on, up to the layout's `seamDepth` seams away (any number when it is 0) — whose attached rectangle is in view, once each, nearer areas first; and during a scroll the next area. An area out of view is still passed through, so an area beyond it is found. |
 | `fade(world)` | How dark the screen is, 0 to 1: rising to 1 at the middle of a fade and back to 0 at its end; 0 otherwise. |
 
 **How it follows.** The law says where the camera should be for the box, over the current area's
@@ -102,7 +102,9 @@ struct Shown {
 ```
 
 The current area's scroll is `camera.scroll(world)`; another area's is that less the offset the area
-sits at. `WorldLayers` builds a layer from each.
+sits at, through the chain of seams that reaches it. `WorldLayers` builds a layer from each, and a game
+draws the things of each area on a layer that takes the same scroll
+([how-to.md](how-to.md#put-things-in-an-area)).
 
 ## `AreaSolids`
 

@@ -13,6 +13,7 @@ Recipes for the questions a game asks once it has more than one area.
 - [Change the fade's look and the scroll's pace](#change-the-fades-look-and-the-scrolls-pace)
 - [Lead into another layout](#lead-into-another-layout)
 - [Join two maps seamlessly](#join-two-maps-seamlessly)
+- [Put things in an area](#put-things-in-an-area)
 - [Keep part of the screen for something else](#keep-part-of-the-screen-for-something-else)
 
 ## Scroll between the screens of a side-scroller
@@ -169,6 +170,50 @@ an `offset`, each the opposite of the other:
 
 The doorway cells on each map are what the spans say, so a seam along a whole edge means a whole edge of
 doorway cells.
+
+Areas joined in a chain are drawn through it: from a big room, a small room hanging off the side of the
+room beside it is in view where it hangs. To draw fewer, set the layout's `seamDepth` — 1 draws only the
+areas joined to the current one, 2 those and the areas joined to them:
+
+```cpp
+WorldKit::Layout layout{..., .seamDepth = 1};
+```
+
+## Put things in an area
+
+The module draws the areas and nothing else. A game's things — the player, an area's inhabitants, a
+chest, a sign — live in the game's state, each with a position in its own area's pixels, and are drawn
+by the game's components on its own sprite layers.
+
+Which things are where is the game's to keep: a table keyed by the place (`WorldKit::Place`, or the
+layout and area). `step.entered` says when the place changes, so that is where an area's things come into
+being, wake or are put away; `camera.layout()` and `camera.area()` say where the screen is at any
+moment. What the things make solid or passable is the game's own solid query wrapping
+`camera.solids(world)` ([Shut a door](#shut-a-door)).
+
+Across a seam the next area is on screen before the thing followed crosses, so its things are too. Draw
+the things of every area `shown` lists, each area's on a layer that takes that area's scroll, not the
+current area's alone:
+
+```cpp
+// The game's things, by area; each position is in that area's pixels.
+std::map<std::pair<int, int>, std::vector<Thing>> things;
+
+// Each frame, after the world's layers: one sprite layer per area on screen that has things.
+for (const WorldKit::Shown& area : camera.shown(world)) {
+    const auto found = things.find({area.layout, area.area});
+    if (found == things.end()) {
+        continue;
+    }
+    const std::string key = "things:" + WorldKit::AreaLayerKey(area.layout, area.area);
+    frame.layers.push_back(LayerKit::SpriteLayer(key, kThingsZ, {Things(found->second)}, {.scroll = area.scroll}));
+}
+```
+
+`Things` is the game's component for a list of them. Each layer's key names its area, so a neighbor's
+layer keeps its key from the frame it comes into view to the frame it leaves, and the current area's
+from before a crossing to after it. During a scroll `shown` also lists the next area, so its things slide
+in with it.
 
 ## Keep part of the screen for something else
 

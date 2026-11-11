@@ -164,6 +164,41 @@ WorldKit::World worldOver(const Maps& maps) {
     }};
 }
 
+// One layout of three areas joined only by seams, the third two seams from the first: 0 is bigger than
+// the view both ways, with a seam in its north wall; 1 is smaller than the view, hung above 0 by its
+// south wall, with a seam in its east wall; 2 hangs off 1's east side. In area 0's pixels, area 1's
+// top-left is (88, −80) and area 2's is (184, −80); in area 2's pixels, area 1's is (−96, 0) and area
+// 0's is (−184, 80).
+struct Chain {
+    retropp::IndexGrid c0 = room(30, 20, row(0, 12, 21));
+    retropp::IndexGrid c1 = room(12, 10, both(row(9, 1, 10), column(11, 1, 8)));
+    retropp::IndexGrid c2 = room(16, 10, column(0, 1, 8));
+};
+
+WorldKit::World chainOver(const Chain& maps, std::uint32_t seamDepth = 0) {
+    return WorldKit::World{.layouts = {
+        WorldKit::Layout{
+            .areas = {
+                WorldKit::Area{.tiles = &maps.c0, .art = art(), .collision = &maps.c0,
+                               .openings = {{.name = "north", .side = Side::North, .span = {12, 21},
+                                             .transition = Transition::Seamless, .leadsTo = {.area = 1, .opening = "south"}}}},
+                WorldKit::Area{.tiles = &maps.c1, .art = art(), .collision = &maps.c1,
+                               .openings = {{.name = "south", .side = Side::South, .span = {1, 10},
+                                             .transition = Transition::Seamless, .leadsTo = {.area = 0, .opening = "north"}},
+                                            {.name = "east", .side = Side::East, .span = {1, 8},
+                                             .transition = Transition::Seamless, .leadsTo = {.area = 2, .opening = "west"}}}},
+                WorldKit::Area{.tiles = &maps.c2, .art = art(), .collision = &maps.c2,
+                               .openings = {{.name = "west", .side = Side::West, .span = {1, 8},
+                                             .transition = Transition::Seamless, .leadsTo = {.area = 1, .opening = "east"}}}},
+            },
+            .cellSize = kCell,
+            .open = Cell::Open,
+            .view = kView,
+            .seamDepth = seamDepth,
+        },
+    }};
+}
+
 // A 10×8 box at (x, y): the usual collision box of a 16×16 walker.
 IntRect box(int x, int y) {
     return IntRect{.x = x, .y = y, .width = 10, .height = 8};
@@ -894,6 +929,88 @@ TEST(Seamless, AnAreaSmallerThanTheViewHoldsStill) {
     EXPECT_EQ(camera.position(), (Vec2i{-32, -24}));
     (void)camera.follow(world, box(12, 12));
     EXPECT_EQ(camera.position(), (Vec2i{-32, -24}));
+}
+
+// ── Seams deep ───────────────────────────────────────────────────────────────────────────────
+
+TEST(SeamDepth, AnAreaTwoSeamsAwayIsShownWhenItIsInView) {
+    const Chain maps;
+    const WorldKit::World world = chainOver(maps);
+    EXPECT_NO_THROW(WorldKit::validate(world));
+    WorldKit::Camera camera{0, 0};
+    camera.place(world, box(175, 36));   // center (180, 40): the camera at (80, −24), up past area 1's east wall
+    EXPECT_EQ(camera.position(), (Vec2i{80, -24}));
+    std::vector<WorldKit::Shown> shown = camera.shown(world);
+    ASSERT_EQ(shown.size(), 3u);
+    EXPECT_EQ(shown[0].area, 0);
+    EXPECT_EQ(shown[0].scroll, (retropp::LayerScroll{.x = 80, .y = -40}));
+    EXPECT_EQ(shown[1].area, 1);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = 80 - 88, .y = -40 + 80}));
+    EXPECT_EQ(shown[2].layout, 0);
+    EXPECT_EQ(shown[2].area, 2);
+    EXPECT_EQ(shown[2].scroll, (retropp::LayerScroll{.x = 80 - 184, .y = -40 + 80}));
+
+    camera.place(world, box(95, 36));    // center (100, 40): the view ends at x = 180, short of area 2
+    EXPECT_EQ(camera.position(), (Vec2i{20, -24}));
+    shown = camera.shown(world);
+    ASSERT_EQ(shown.size(), 2u);
+    EXPECT_EQ(shown[1].area, 1);
+
+    const LayerKit::Layers layers = WorldKit::WorldLayers(camera, world, 0);
+    ASSERT_EQ(layers.size(), 2u);
+    camera.place(world, box(175, 36));
+    const LayerKit::Layers deeper = WorldKit::WorldLayers(camera, world, 0);
+    ASSERT_EQ(deeper.size(), 3u);
+    EXPECT_EQ(std::string_view{deeper[2].key}, "area:0:2");
+    EXPECT_EQ(deeper[2].scroll, (retropp::LayerScroll{.x = -104, .y = 40}));
+}
+
+// From the far end the same chain is walked the other way: area 0 is two seams from area 2, below
+// area 1 and in view.
+TEST(SeamDepth, IsCountedFromTheCurrentArea) {
+    const Chain maps;
+    const WorldKit::World world = chainOver(maps);
+    WorldKit::Camera camera{0, 2};
+    camera.place(world, box(100, 30));   // area 2 is shorter than the view: centered up and down at −24
+    EXPECT_EQ(camera.position(), (Vec2i{-32, -24}));
+    const std::vector<WorldKit::Shown> shown = camera.shown(world);
+    ASSERT_EQ(shown.size(), 3u);
+    EXPECT_EQ(shown[0].area, 2);
+    EXPECT_EQ(shown[1].area, 1);
+    EXPECT_EQ(shown[1].scroll, (retropp::LayerScroll{.x = -32 + 96, .y = -40}));
+    EXPECT_EQ(shown[2].area, 0);
+    EXPECT_EQ(shown[2].scroll, (retropp::LayerScroll{.x = -32 + 184, .y = -40 - 80}));
+}
+
+TEST(SeamDepth, LimitsHowManySeamsAwayAnAreaIsShown) {
+    const Chain maps;
+    for (const std::uint32_t depth : {0u, 1u, 2u, 3u}) {
+        const WorldKit::World world = chainOver(maps, depth);
+        WorldKit::Camera camera{0, 0};
+        camera.place(world, box(175, 36));   // areas 1 and 2 both in view
+        const std::vector<WorldKit::Shown> shown = camera.shown(world);
+        ASSERT_EQ(shown.size(), depth == 1 ? 2u : 3u) << depth;
+        EXPECT_EQ(shown[1].area, 1) << depth;
+    }
+}
+
+// The law's rectangle reaches one seam whatever the depth: from area 2 it takes in area 1 alongside, and
+// not area 0 below area 1, so area 2's rows stay shorter than the view and the camera holds still up and
+// down.
+TEST(SeamDepth, TheLawsBoundsStayOneSeamDeep) {
+    const Chain maps;
+    const WorldKit::World world = chainOver(maps);
+    WorldKit::Camera camera{0, 2};
+    camera.place(world, box(100, 30));
+    for (int y = 31; y <= 60; ++y) {
+        (void)camera.follow(world, box(100, y));
+        EXPECT_EQ(camera.position().y, -24) << y;
+    }
+    for (int x = 99; x >= 20; --x) {     // west: the camera follows into area 1's columns
+        (void)camera.follow(world, box(x, 60));
+    }
+    EXPECT_EQ(camera.position(), (Vec2i{-55, -24}));
+    EXPECT_EQ(camera.area(), 2);
 }
 
 // ── Layers and the fade region ───────────────────────────────────────────────────────────────

@@ -152,9 +152,12 @@ public:
         return camera_.scroll(world.layouts[static_cast<std::size_t>(layout_)].view);
     }
 
-    // The areas on screen with the scroll each one's layer takes: the current area; every area joined
-    // to it seamlessly whose attached rectangle is in view, each once; and during a scroll the next
-    // area, lined up with the opening being gone through.
+    // The areas on screen with the scroll each one's layer takes: the current area; every area reached
+    // through seams — the areas joined to it, then the areas joined to those, as many seams out as the
+    // layout's `seamDepth` allows — whose attached rectangle is in view, each once; and during a scroll
+    // the next area, lined up with the opening being gone through. An area out of view is still passed
+    // through, so an area beyond it that is in view is found. Each area is placed by the first chain of
+    // seams that reaches it, the shortest.
     [[nodiscard]] std::vector<Shown> shown(const World& world) const {
         const Layout& here = world.layouts[static_cast<std::size_t>(layout_)];
         const retropp::LayerScroll mine = scroll(world);
@@ -173,12 +176,34 @@ public:
                                     .y = camera_.position().y,
                                     .width = here.view.size.width,
                                     .height = here.view.size.height};
-        detail::eachSeamless(world, layout_, area_, [&](const Opening&, const detail::Link& link) {
-            const retropp::IntRect next = attached(world, link);
-            if (detail::overlap(view, next)) {
-                add(link.to, link.origin);
+
+        // Every area reached so far, with its top-left in the current area's pixels and how many seams
+        // away it is, in the order reached: nearer areas first.
+        struct Reached {
+            Place place{};
+            retropp::Vec2i origin{};
+            std::uint32_t seams = 0;
+        };
+        std::vector<Reached> reached{Reached{.place = {.layout = layout_, .area = area_}}};
+        for (std::size_t i = 0; i < reached.size(); ++i) {
+            const Reached from = reached[i];
+            if (here.seamDepth != 0 && from.seams >= here.seamDepth) {
+                continue;
             }
-        });
+            detail::eachSeamless(world, from.place.layout, from.place.area,
+                                 [&](const Opening&, const detail::Link& link) {
+                for (const Reached& already : reached) {
+                    if (already.place == link.to) {
+                        return;
+                    }
+                }
+                const retropp::Vec2i origin{.x = from.origin.x + link.origin.x, .y = from.origin.y + link.origin.y};
+                reached.push_back(Reached{.place = link.to, .origin = origin, .seams = from.seams + 1});
+                if (detail::overlap(view, attached(world, link.to, origin))) {
+                    add(link.to, origin);
+                }
+            });
+        }
         if (const auto* scroll = std::get_if<Scrolling>(&transition_)) {
             add(scroll->to, scroll->origin);
         }
@@ -223,11 +248,10 @@ private:
         return retropp::Vec2i{.x = box.x + box.width / 2, .y = box.y + box.height / 2};
     }
 
-    // The rectangle a link's area occupies in the current area's pixels.
-    [[nodiscard]] static retropp::IntRect attached(const World& world, const detail::Link& link) noexcept {
-        const retropp::IntRect there =
-            detail::bounds(world.layouts[static_cast<std::size_t>(link.to.layout)], link.to.area);
-        return retropp::IntRect{.x = link.origin.x, .y = link.origin.y, .width = there.width, .height = there.height};
+    // The rectangle area `to` occupies in the current area's pixels, its top-left at `origin`.
+    [[nodiscard]] static retropp::IntRect attached(const World& world, Place to, retropp::Vec2i origin) noexcept {
+        const retropp::IntRect there = detail::bounds(world.layouts[static_cast<std::size_t>(to.layout)], to.area);
+        return retropp::IntRect{.x = origin.x, .y = origin.y, .width = there.width, .height = there.height};
     }
 
     // The rectangle the law may show: the current area, extended along the axis of each seamless
@@ -239,7 +263,7 @@ private:
         int right = mine.x + mine.width;
         int bottom = mine.y + mine.height;
         detail::eachSeamless(world, layout_, area_, [&](const Opening& opening, const detail::Link& link) {
-            const retropp::IntRect next = attached(world, link);
+            const retropp::IntRect next = attached(world, link.to, link.origin);
             if (detail::runsAcross(opening.side)) {
                 top = std::min(top, next.y);
                 bottom = std::max(bottom, next.y + next.height);
@@ -308,7 +332,7 @@ private:
         // view; across that axis it does not move, unless the layout's scrolls align and the next area
         // is at least as big as the view there.
         const Layout& here = world.layouts[static_cast<std::size_t>(layout_)];
-        const retropp::IntRect next = attached(world, link);
+        const retropp::IntRect next = attached(world, link.to, link.origin);
         const retropp::PixelSize view = here.view.size;
         retropp::Vec2i to = camera_.position();
         if (detail::runsAcross(exit.side)) {

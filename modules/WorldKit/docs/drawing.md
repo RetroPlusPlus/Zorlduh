@@ -21,8 +21,9 @@ that builds draw types.
 LayerKit::Layers WorldLayers(const Camera& camera, const World& world, std::int32_t z);
 ```
 
-One tile layer at depth `z` for each area the camera shows: the current area, each area joined to it
-seamlessly that is in view, and during a scroll the next area. Each is built through
+One tile layer at depth `z` for each area the camera shows: the current area, each area reached
+through seams that is in view (as many seams away as the layout's `seamDepth` allows), and during a
+scroll the next area. Each is built through
 `LayerKit::TileLayer` under the key `AreaLayerKey(layout, area)`, with the area's map assembled through
 its art (`retropp::assembleTilemap`), the map's size in tiles, the scroll the camera gives that area, and
 the regions `ViewStencil(view)` for the current layout's view, so the kit keeps each layer's cells until
@@ -82,4 +83,6 @@ frame.layers.push_back(LayerKit::SpriteLayer("actors", kActorsZ, {Player(state)}
 
 During a scroll the thing being carried is still in the old area's pixels, and so is the camera until
 the last tick, so the same scroll keeps it on the right pixel throughout. Across a seam the thing and
-the camera change pixels on the same tick, so the same holds.
+the camera change pixels on the same tick, so the same holds. Things that belong to an area other than
+the current one — in a neighbor across a seam, already in view — go on a layer taking that area's
+scroll from `shown` ([how-to.md](how-to.md#put-things-in-an-area)).

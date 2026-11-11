@@ -47,6 +47,12 @@ zorlduh::Assets headlessAssets() {
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
+    assets.forest = retropp::AtlasManifest{
+        .atlasId = retropp::AtlasId{9},
+        .slots = retropp::sliceLayout({.width = 32, .height = 8}, {.width = 8, .height = 8},
+                                      retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
+        .kind = retropp::ContentKind::Tileset,
+    };
     zorlduh::OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
     overworld.meadow.collision = retropp::loadMapPng("assets/maps/overworld/meadow/collision.png");
@@ -69,6 +75,21 @@ zorlduh::Assets headlessAssets() {
     dungeon.eastWing.collision = retropp::loadMapPng("assets/maps/dungeon-one/east-wing/collision.png");
     dungeon.treasury.tiles = retropp::loadMapPng("assets/maps/dungeon-one/treasury/tiles.png");
     dungeon.treasury.collision = retropp::loadMapPng("assets/maps/dungeon-one/treasury/collision.png");
+    zorlduh::SeamlessForestMaps& forest = assets.areas.seamlessForest;
+    forest.edge.tiles = retropp::loadMapPng("assets/maps/seamless-forest/edge/tiles.png");
+    forest.edge.collision = retropp::loadMapPng("assets/maps/seamless-forest/edge/collision.png");
+    forest.glade.tiles = retropp::loadMapPng("assets/maps/seamless-forest/glade/tiles.png");
+    forest.glade.collision = retropp::loadMapPng("assets/maps/seamless-forest/glade/collision.png");
+    forest.thicket.tiles = retropp::loadMapPng("assets/maps/seamless-forest/thicket/tiles.png");
+    forest.thicket.collision = retropp::loadMapPng("assets/maps/seamless-forest/thicket/collision.png");
+    forest.bower.tiles = retropp::loadMapPng("assets/maps/seamless-forest/bower/tiles.png");
+    forest.bower.collision = retropp::loadMapPng("assets/maps/seamless-forest/bower/collision.png");
+    forest.hollow.tiles = retropp::loadMapPng("assets/maps/seamless-forest/hollow/tiles.png");
+    forest.hollow.collision = retropp::loadMapPng("assets/maps/seamless-forest/hollow/collision.png");
+    forest.brook.tiles = retropp::loadMapPng("assets/maps/seamless-forest/brook/tiles.png");
+    forest.brook.collision = retropp::loadMapPng("assets/maps/seamless-forest/brook/collision.png");
+    forest.clearing.tiles = retropp::loadMapPng("assets/maps/seamless-forest/clearing/tiles.png");
+    forest.clearing.collision = retropp::loadMapPng("assets/maps/seamless-forest/clearing/collision.png");
     return assets;
 }
 

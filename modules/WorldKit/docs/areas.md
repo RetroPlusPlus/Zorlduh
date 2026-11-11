@@ -122,6 +122,7 @@ struct Layout {
     bool scrollAligns = false;               // whether a scroll also moves the camera across the exit's axis
     std::uint32_t fadeTicks = 16;            // a fade's length each way
     retropp::Rgba8 fadeColor{};              // what the screen fades to
+    std::uint32_t seamDepth = 0;             // how many seams away an area in view is drawn; 0 for any number
 };
 ```
 
@@ -130,7 +131,10 @@ enumerator (`Cell::Open`) or a number. A scroll slides the camera along the exit
 `scrollAligns` it also moves across that axis, as it slides, the least it must for the view to lie
 within the next area when that area is at least as big as the view there — a smaller area lands where
 the opening lines it up either way. The scroll settings are those of the layout being left; a fade
-darkens in the layout being left and lightens in the one entered. A layout is a plain value: it copies,
+darkens in the layout being left and lightens in the one entered. `seamDepth` is how far through seams
+the camera looks for areas to show: 1 for the areas joined to the current one, 2 for those and the areas
+joined to them, and so on, and 0 for every area a chain of seams reaches; the camera's law and the solid
+query reach one seam whatever it is. A layout is a plain value: it copies,
 and the camera reads it on every call rather than keeping a pointer to it.
 
 ## `World`, `Place`

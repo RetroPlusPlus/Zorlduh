@@ -91,6 +91,20 @@ std::vector<AreaFiles> areas() {
                    retropp::loadMapPng("assets/maps/dungeon-one/east-wing/collision.png"), 12, 10});
     all.push_back({"treasury", retropp::loadMapPng("assets/maps/dungeon-one/treasury/tiles.png"),
                    retropp::loadMapPng("assets/maps/dungeon-one/treasury/collision.png"), 30, 16});
+    all.push_back({"edge", retropp::loadMapPng("assets/maps/seamless-forest/edge/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/edge/collision.png"), 20, 16});
+    all.push_back({"glade", retropp::loadMapPng("assets/maps/seamless-forest/glade/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/glade/collision.png"), 30, 20});
+    all.push_back({"thicket", retropp::loadMapPng("assets/maps/seamless-forest/thicket/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/thicket/collision.png"), 12, 10});
+    all.push_back({"bower", retropp::loadMapPng("assets/maps/seamless-forest/bower/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/bower/collision.png"), 16, 10});
+    all.push_back({"hollow", retropp::loadMapPng("assets/maps/seamless-forest/hollow/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/hollow/collision.png"), 20, 8});
+    all.push_back({"brook", retropp::loadMapPng("assets/maps/seamless-forest/brook/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/brook/collision.png"), 20, 8});
+    all.push_back({"clearing", retropp::loadMapPng("assets/maps/seamless-forest/clearing/tiles.png"),
+                   retropp::loadMapPng("assets/maps/seamless-forest/clearing/collision.png"), 20, 16});
     return all;
 }
 
@@ -112,7 +126,7 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 32);
+    EXPECT_EQ(files, 49);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
@@ -124,6 +138,15 @@ TEST(Assets, TerrainSheetIsOneTilePerWorldCell) {
     expectIndicesOnly(sheet);
     EXPECT_EQ(slotCount(sheet, {.width = 8, .height = 8}, ContentKind::Tileset),
               static_cast<std::size_t>(zorlduh::TerrainTile::Stairs) + 1);
+}
+
+TEST(Assets, ForestSheetIsOneTilePerForestTile) {
+    const LoadedImage sheet = decode("gfx/tiles/forest.png");
+    EXPECT_EQ(sheet.width, 32);
+    EXPECT_EQ(sheet.height, 8);
+    expectIndicesOnly(sheet);
+    EXPECT_EQ(slotCount(sheet, {.width = 8, .height = 8}, ContentKind::Tileset),
+              static_cast<std::size_t>(zorlduh::ForestTile::Trodden) + 1);
 }
 
 TEST(Assets, PlayerSheetIsFourFacingsOfTwoWalkFrames) {
@@ -178,7 +201,8 @@ TEST(Assets, SpriteSheetsAreTransparentAtTheirCorners) {
 // ── Palettes ─────────────────────────────────────────────────────────────────────────────────
 
 TEST(Assets, TerrainPalettesAreFourOpaqueColors) {
-    for (const char* path : {"palettes/tiles/floor.png", "palettes/tiles/wall.png", "palettes/tiles/water.png"}) {
+    for (const char* path : {"palettes/tiles/floor.png", "palettes/tiles/wall.png", "palettes/tiles/water.png",
+                             "palettes/tiles/grass.png", "palettes/tiles/leaf.png"}) {
         const std::vector<retropp::Rgba16> entries = retropp::slicePaletteImage(decode(path));
         ASSERT_EQ(entries.size(), 4u) << path;
         for (const retropp::Rgba16& entry : entries) {
@@ -283,6 +307,70 @@ TEST(Assets, TheDungeonsRoomsHaveTheirDoorsAndOpenWalls) {
     EXPECT_EQ(hall.at(19, 0), value(WorldCell::Wall));
     EXPECT_EQ(treasury.at(5, 15), value(WorldCell::Wall));
     EXPECT_EQ(treasury.at(24, 15), value(WorldCell::Wall));
+}
+
+// The field's forest path, and each forest room's open walls: whole edges where the hollow and the brook
+// meet, a span short of the corners everywhere else.
+TEST(Assets, TheForestsRoomsAreOpenAlongTheirSeamsAndTheFieldHasItsForestPath) {
+    const std::vector<AreaFiles> all = areas();
+    const retropp::IndexGrid& field = all[2].tiles;
+    for (int x = 13; x <= 16; ++x) {
+        EXPECT_EQ(field.at(x, 15), value(WorldCell::Doorway));   // the forest path
+    }
+    EXPECT_EQ(field.at(12, 15), value(WorldCell::Wall));
+    EXPECT_EQ(field.at(17, 15), value(WorldCell::Wall));
+
+    const retropp::IndexGrid& edge = all[10].tiles;
+    const retropp::IndexGrid& glade = all[11].tiles;
+    const retropp::IndexGrid& thicket = all[12].tiles;
+    const retropp::IndexGrid& bower = all[13].tiles;
+    const retropp::IndexGrid& hollow = all[14].tiles;
+    const retropp::IndexGrid& brook = all[15].tiles;
+    const retropp::IndexGrid& clearing = all[16].tiles;
+    const auto open = [](const retropp::IndexGrid& map, int x, int y) { return map.at(x, y) == value(WorldCell::Doorway); };
+    for (int x = 8; x <= 11; ++x) {
+        EXPECT_TRUE(open(edge, x, 0)) << x;   // the path back up to the field
+    }
+    for (int y = 1; y <= 14; ++y) {
+        EXPECT_TRUE(open(edge, 19, y)) << y;
+    }
+    for (int y = 3; y <= 16; ++y) {
+        EXPECT_TRUE(open(glade, 0, y)) << y;
+    }
+    for (int x = 12; x <= 21; ++x) {
+        EXPECT_TRUE(open(glade, x, 0)) << x;
+    }
+    for (int y = 8; y <= 15; ++y) {
+        EXPECT_TRUE(open(glade, 29, y)) << y;
+    }
+    for (int x = 5; x <= 22; ++x) {
+        EXPECT_TRUE(open(glade, x, 19)) << x;
+    }
+    for (int x = 1; x <= 10; ++x) {
+        EXPECT_TRUE(open(thicket, x, 9)) << x;
+    }
+    for (int y = 1; y <= 8; ++y) {
+        EXPECT_TRUE(open(thicket, 11, y)) << y;
+        EXPECT_TRUE(open(bower, 0, y)) << y;
+    }
+    for (int y = 0; y <= 7; ++y) {
+        EXPECT_TRUE(open(hollow, 0, y)) << y;   // whole edges, corners included
+        EXPECT_TRUE(open(hollow, 19, y)) << y;
+        EXPECT_TRUE(open(brook, 0, y)) << y;
+    }
+    for (int x = 1; x <= 18; ++x) {
+        EXPECT_TRUE(open(clearing, x, 0)) << x;
+    }
+    EXPECT_EQ(edge.at(19, 0), value(WorldCell::Wall));
+    EXPECT_EQ(edge.at(19, 15), value(WorldCell::Wall));
+    EXPECT_EQ(glade.at(0, 0), value(WorldCell::Wall));
+    EXPECT_EQ(glade.at(29, 19), value(WorldCell::Wall));
+    EXPECT_EQ(thicket.at(11, 9), value(WorldCell::Wall));
+    EXPECT_EQ(thicket.at(0, 9), value(WorldCell::Wall));
+    EXPECT_EQ(bower.at(0, 9), value(WorldCell::Wall));
+    EXPECT_EQ(clearing.at(0, 0), value(WorldCell::Wall));
+    EXPECT_EQ(clearing.at(19, 0), value(WorldCell::Wall));
+    EXPECT_EQ(brook.at(19, 0), value(WorldCell::Wall));
 }
 
 TEST(Assets, CollisionIsSolidExactlyWhereTheAreaIsWallOrWater) {
