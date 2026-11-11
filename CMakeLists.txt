@@ -58,7 +58,9 @@ endif()
 # ---------------------------------------------------------------------------
 add_library(zorlduh-lib STATIC
     src/assets/assets.cpp
-    src/config/config.cpp)
+    src/config/config.cpp
+    src/game/world.cpp
+    src/render/world.cpp)
 target_include_directories(zorlduh-lib PUBLIC src)
 target_compile_features(zorlduh-lib PUBLIC cxx_std_20)
 target_compile_options(zorlduh-lib PRIVATE ${_zorlduh_warn})
@@ -119,6 +121,7 @@ zorlduh_add_test(smoke)
 zorlduh_add_test(layers)
 zorlduh_add_test(raster_layers)
 zorlduh_add_test(assets)
+zorlduh_add_test(world)
 # The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE
