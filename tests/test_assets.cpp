@@ -71,16 +71,26 @@ struct AreaFiles {
 
 std::vector<AreaFiles> areas() {
     std::vector<AreaFiles> all;
-    all.push_back({"meadow", retropp::loadMapPng("assets/maps/meadow/tiles.png"),
-                   retropp::loadMapPng("assets/maps/meadow/collision.png"), 20, 16});
-    all.push_back({"lake", retropp::loadMapPng("assets/maps/lake/tiles.png"),
-                   retropp::loadMapPng("assets/maps/lake/collision.png"), 40, 16});
-    all.push_back({"field", retropp::loadMapPng("assets/maps/field/tiles.png"),
-                   retropp::loadMapPng("assets/maps/field/collision.png"), 30, 16});
-    all.push_back({"shrine", retropp::loadMapPng("assets/maps/shrine/tiles.png"),
-                   retropp::loadMapPng("assets/maps/shrine/collision.png"), 12, 10});
-    all.push_back({"cave", retropp::loadMapPng("assets/maps/cave/tiles.png"),
-                   retropp::loadMapPng("assets/maps/cave/collision.png"), 12, 10});
+    all.push_back({"meadow", retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png"),
+                   retropp::loadMapPng("assets/maps/overworld/meadow/collision.png"), 20, 16});
+    all.push_back({"lake", retropp::loadMapPng("assets/maps/overworld/lake/tiles.png"),
+                   retropp::loadMapPng("assets/maps/overworld/lake/collision.png"), 40, 16});
+    all.push_back({"field", retropp::loadMapPng("assets/maps/overworld/field/tiles.png"),
+                   retropp::loadMapPng("assets/maps/overworld/field/collision.png"), 30, 16});
+    all.push_back({"shrine", retropp::loadMapPng("assets/maps/overworld/shrine/tiles.png"),
+                   retropp::loadMapPng("assets/maps/overworld/shrine/collision.png"), 12, 10});
+    all.push_back({"cave", retropp::loadMapPng("assets/maps/overworld/cave/tiles.png"),
+                   retropp::loadMapPng("assets/maps/overworld/cave/collision.png"), 12, 10});
+    all.push_back({"entrance", retropp::loadMapPng("assets/maps/dungeon-one/entrance/tiles.png"),
+                   retropp::loadMapPng("assets/maps/dungeon-one/entrance/collision.png"), 20, 16});
+    all.push_back({"hall", retropp::loadMapPng("assets/maps/dungeon-one/hall/tiles.png"),
+                   retropp::loadMapPng("assets/maps/dungeon-one/hall/collision.png"), 20, 16});
+    all.push_back({"west-wing", retropp::loadMapPng("assets/maps/dungeon-one/west-wing/tiles.png"),
+                   retropp::loadMapPng("assets/maps/dungeon-one/west-wing/collision.png"), 12, 10});
+    all.push_back({"east-wing", retropp::loadMapPng("assets/maps/dungeon-one/east-wing/tiles.png"),
+                   retropp::loadMapPng("assets/maps/dungeon-one/east-wing/collision.png"), 12, 10});
+    all.push_back({"treasury", retropp::loadMapPng("assets/maps/dungeon-one/treasury/tiles.png"),
+                   retropp::loadMapPng("assets/maps/dungeon-one/treasury/collision.png"), 30, 16});
     return all;
 }
 
@@ -102,7 +112,7 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 22);
+    EXPECT_EQ(files, 32);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
@@ -223,7 +233,7 @@ TEST(Assets, EachAreaIsRingedByWallExceptItsDoorways) {
     }
 }
 
-TEST(Assets, TheMeadowHasItsDoorsRoadAndCaveMouthAndTheLakeItsPond) {
+TEST(Assets, TheMeadowHasItsDoorsRoadAndCaveMouthAndTheLakeItsPondAndDungeonDoor) {
     const std::vector<AreaFiles> all = areas();
     const retropp::IndexGrid& meadow = all[0].tiles;
     for (int y = 6; y <= 9; ++y) {
@@ -240,7 +250,39 @@ TEST(Assets, TheMeadowHasItsDoorsRoadAndCaveMouthAndTheLakeItsPond) {
     EXPECT_EQ(meadow.at(13, 4), value(WorldCell::Stairs));
     EXPECT_EQ(meadow.at(5, 5), value(WorldCell::Floor));
     EXPECT_EQ(all[1].tiles.at(20, 7), value(WorldCell::Water));   // the pond
+    EXPECT_EQ(all[1].tiles.at(30, 2), value(WorldCell::Stairs));  // the dungeon door
+    EXPECT_EQ(all[1].tiles.at(31, 2), value(WorldCell::Stairs));
+    EXPECT_EQ(all[1].tiles.at(29, 2), value(WorldCell::Floor));
     EXPECT_EQ(all[4].tiles.at(5, 4), value(WorldCell::Stairs));   // the cave's way back up
+}
+
+TEST(Assets, TheDungeonsRoomsHaveTheirDoorsAndOpenWalls) {
+    const std::vector<AreaFiles> all = areas();
+    const retropp::IndexGrid& entrance = all[5].tiles;
+    const retropp::IndexGrid& hall = all[6].tiles;
+    const retropp::IndexGrid& treasury = all[9].tiles;
+    EXPECT_EQ(entrance.at(9, 13), value(WorldCell::Stairs));    // the door back up to the lake
+    EXPECT_EQ(entrance.at(10, 13), value(WorldCell::Stairs));
+    for (int x = 8; x <= 11; ++x) {
+        EXPECT_EQ(entrance.at(x, 0), value(WorldCell::Doorway));   // the entrance's north door
+        EXPECT_EQ(hall.at(x, 15), value(WorldCell::Doorway));      // the hall's south door
+    }
+    for (int y = 6; y <= 9; ++y) {
+        EXPECT_EQ(hall.at(0, y), value(WorldCell::Doorway));       // the hall's west door
+        EXPECT_EQ(hall.at(19, y), value(WorldCell::Doorway));      // and east door
+    }
+    for (int y = 3; y <= 6; ++y) {
+        EXPECT_EQ(all[7].tiles.at(11, y), value(WorldCell::Doorway));   // the west wing's east door
+        EXPECT_EQ(all[8].tiles.at(0, y), value(WorldCell::Doorway));    // the east wing's west door
+    }
+    for (int x = 1; x <= 18; ++x) {
+        EXPECT_EQ(hall.at(x, 0), value(WorldCell::Doorway));           // the hall's open north wall
+        EXPECT_EQ(treasury.at(x + 5, 15), value(WorldCell::Doorway));  // the treasury's open south wall, centered
+    }
+    EXPECT_EQ(hall.at(0, 0), value(WorldCell::Wall));
+    EXPECT_EQ(hall.at(19, 0), value(WorldCell::Wall));
+    EXPECT_EQ(treasury.at(5, 15), value(WorldCell::Wall));
+    EXPECT_EQ(treasury.at(24, 15), value(WorldCell::Wall));
 }
 
 TEST(Assets, CollisionIsSolidExactlyWhereTheAreaIsWallOrWater) {

@@ -8,8 +8,8 @@ and collision map.
     assets/palettes/tiles/{floor,wall,water}.png
     assets/palettes/sprites/{player,enemy,sword}.png
     assets/palettes/hud/hearts.png
-    assets/maps/<area>/tiles.png                  one world id per cell, for each area
-    assets/maps/<area>/collision.png              one collision id per cell, for each area
+    assets/maps/<layout>/<area>/tiles.png         one world id per cell, for each area of each layout
+    assets/maps/<layout>/<area>/collision.png     one collision id per cell, for each area of each layout
 
 A sheet is atlas art: a 2-bit grayscale PNG whose samples are palette indices 0-3, so an image viewer
 shows its four indices as black, dark gray, light gray and white. It carries no color. Color comes
@@ -391,7 +391,7 @@ HUD = side_by_side(HEART_FULL, HEART_HALF, HEART_EMPTY)
 #
 # Each area is its own map, one pixel per cell, ringed by wall except its doorways. The openings
 # between areas are declared in src/game/areas.cpp; the doorway and stairs cells here are where those
-# openings say they are.
+# openings say they are. The areas are grouped by layout: the overworld, and the rooms of DungeonOne.
 
 # World ids, as WorldCell in src/assets/assets.h, spread from near black (stairs) to white (floor).
 STAIRS_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 32, 64, 128, 192, 255
@@ -412,17 +412,31 @@ def row(y, first, last):
 POND_TOP = 5
 POND_ROWS = [(18, 21), (17, 22), (16, 23), (16, 23), (17, 22), (18, 21)]
 
-AREAS = {
-    # The start: exactly one play area, with a door east, a road south and the cave mouth inside.
-    "meadow": dict(size=(20, 16), doorways=column(19, 6, 9) + row(15, 8, 11), stairs=[(12, 4), (13, 4)]),
-    # Two play areas wide, with a pond; the camera follows across it.
-    "lake": dict(size=(40, 16), doorways=column(0, 6, 9), pond=True),
-    # One and a half play areas wide: not a multiple of the screen.
-    "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6)),
-    # Smaller than the play area on both axes: centered on screen.
-    "shrine": dict(size=(12, 10), doorways=column(0, 3, 6)),
-    # Reached by a fade from the meadow's cave mouth; the stairs lead back up.
-    "cave": dict(size=(12, 10), stairs=[(5, 4), (6, 4)]),
+LAYOUTS = {
+    "overworld": {
+        # The start: exactly one play area, with a door east, a road south and the cave mouth inside.
+        "meadow": dict(size=(20, 16), doorways=column(19, 6, 9) + row(15, 8, 11), stairs=[(12, 4), (13, 4)]),
+        # Two play areas wide, with a pond; the camera follows across it. The dungeon door, past the
+        # pond, fades down into DungeonOne.
+        "lake": dict(size=(40, 16), doorways=column(0, 6, 9), stairs=[(30, 2), (31, 2)], pond=True),
+        # One and a half play areas wide: not a multiple of the screen.
+        "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6)),
+        # Smaller than the play area on both axes: centered on screen.
+        "shrine": dict(size=(12, 10), doorways=column(0, 3, 6)),
+        # Reached by a fade from the meadow's cave mouth; the stairs lead back up.
+        "cave": dict(size=(12, 10), stairs=[(5, 4), (6, 4)]),
+    },
+    "dungeon-one": {
+        # The way in: the door back up to the lake, and a door north into the hall.
+        "entrance": dict(size=(20, 16), doorways=row(0, 8, 11), stairs=[(9, 13), (10, 13)]),
+        # Doors south, west and east; its whole north wall open, joined seamlessly to the treasury.
+        "hall": dict(size=(20, 16), doorways=row(15, 8, 11) + column(0, 6, 9) + column(19, 6, 9) + row(0, 1, 18)),
+        # Each wing is smaller than the play area, with its door back to the hall.
+        "west-wing": dict(size=(12, 10), doorways=column(11, 3, 6)),
+        "east-wing": dict(size=(12, 10), doorways=column(0, 3, 6)),
+        # One and a half play areas wide; its south wall open over the hall's width, centered.
+        "treasury": dict(size=(30, 16), doorways=row(15, 6, 23)),
+    },
 }
 
 
@@ -465,10 +479,11 @@ def files():
         "palettes/sprites/sword.png": palette_png(SWORD_PAL),
         "palettes/hud/hearts.png": palette_png(HEARTS_PAL),
     }
-    for name, spec in AREAS.items():
-        area = area_cells(**spec)
-        out[f"maps/{name}/tiles.png"] = map_png(area)
-        out[f"maps/{name}/collision.png"] = map_png(collision_cells(area))
+    for layout, areas in LAYOUTS.items():
+        for name, spec in areas.items():
+            area = area_cells(**spec)
+            out[f"maps/{layout}/{name}/tiles.png"] = map_png(area)
+            out[f"maps/{layout}/{name}/collision.png"] = map_png(collision_cells(area))
     return out
 
 

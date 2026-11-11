@@ -1,7 +1,7 @@
 // Zorlduh's entry point. It activates the game's engine configuration, creates the four engine
 // objects, loads the game's art and maps, and runs the loop until the window is closed. Each tick the
-// player walks the world; each displayed frame is the area (or two) on screen, the actors on top, and
-// the fade over everything, placed under the HUD strip.
+// player walks the world; each displayed frame is the areas on screen, the actors on top, and the
+// fade over everything, placed under the HUD strip.
 
 #include "retropp/clock.h"
 #include "retropp/draw_state.h"
@@ -36,7 +36,7 @@ int main() {
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
     const zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView);
     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
-    state.camera.place(config.layout, state.player.collision(config.player).bounds());
+    state.camera.place(config.world, state.player.collision(config.player).bounds());
 
     loop.simTick([&](const retropp::InputState& in) {
         zorlduh::tick(state, zorlduh::readInput(in), config);
@@ -44,11 +44,11 @@ int main() {
 
     retropp::FrameDrawState frame;
     loop.renderLoop([&]() {
-        frame.layers = WorldKit::WorldLayers(state.camera, config.layout, zorlduh::kWorldZ);
+        frame.layers = WorldKit::WorldLayers(state.camera, config.world, zorlduh::kWorldZ);
         frame.layers.push_back(LayerKit::SpriteLayer(zorlduh::kActorsLayer, zorlduh::kActorsZ,
                                                      {zorlduh::Player(state, config.player)},
-                                                     {.scroll = state.camera.scroll(config.layout)}));
-        frame.regions = WorldKit::Fade(state.camera, config.layout);
+                                                     {.scroll = state.camera.scroll(config.world)}));
+        frame.regions = WorldKit::Fade(state.camera, config.world);
         renderer.renderFrame(frame);
     });
 

@@ -56,16 +56,29 @@ Assets loadAssets(retropp::Renderer& renderer) {
     assets.palettes.sword = renderer.loadPaletteImage("assets/palettes/sprites/sword.png");
     assets.palettes.hearts = renderer.loadPaletteImage("assets/palettes/hud/hearts.png");
 
-    assets.areas.meadow.tiles = retropp::loadMapPng("assets/maps/meadow/tiles.png");
-    assets.areas.meadow.collision = retropp::loadMapPng("assets/maps/meadow/collision.png");
-    assets.areas.lake.tiles = retropp::loadMapPng("assets/maps/lake/tiles.png");
-    assets.areas.lake.collision = retropp::loadMapPng("assets/maps/lake/collision.png");
-    assets.areas.field.tiles = retropp::loadMapPng("assets/maps/field/tiles.png");
-    assets.areas.field.collision = retropp::loadMapPng("assets/maps/field/collision.png");
-    assets.areas.shrine.tiles = retropp::loadMapPng("assets/maps/shrine/tiles.png");
-    assets.areas.shrine.collision = retropp::loadMapPng("assets/maps/shrine/collision.png");
-    assets.areas.cave.tiles = retropp::loadMapPng("assets/maps/cave/tiles.png");
-    assets.areas.cave.collision = retropp::loadMapPng("assets/maps/cave/collision.png");
+    OverworldMaps& overworld = assets.areas.overworld;
+    overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
+    overworld.meadow.collision = retropp::loadMapPng("assets/maps/overworld/meadow/collision.png");
+    overworld.lake.tiles = retropp::loadMapPng("assets/maps/overworld/lake/tiles.png");
+    overworld.lake.collision = retropp::loadMapPng("assets/maps/overworld/lake/collision.png");
+    overworld.field.tiles = retropp::loadMapPng("assets/maps/overworld/field/tiles.png");
+    overworld.field.collision = retropp::loadMapPng("assets/maps/overworld/field/collision.png");
+    overworld.shrine.tiles = retropp::loadMapPng("assets/maps/overworld/shrine/tiles.png");
+    overworld.shrine.collision = retropp::loadMapPng("assets/maps/overworld/shrine/collision.png");
+    overworld.cave.tiles = retropp::loadMapPng("assets/maps/overworld/cave/tiles.png");
+    overworld.cave.collision = retropp::loadMapPng("assets/maps/overworld/cave/collision.png");
+
+    DungeonOneMaps& dungeon = assets.areas.dungeonOne;
+    dungeon.entrance.tiles = retropp::loadMapPng("assets/maps/dungeon-one/entrance/tiles.png");
+    dungeon.entrance.collision = retropp::loadMapPng("assets/maps/dungeon-one/entrance/collision.png");
+    dungeon.hall.tiles = retropp::loadMapPng("assets/maps/dungeon-one/hall/tiles.png");
+    dungeon.hall.collision = retropp::loadMapPng("assets/maps/dungeon-one/hall/collision.png");
+    dungeon.westWing.tiles = retropp::loadMapPng("assets/maps/dungeon-one/west-wing/tiles.png");
+    dungeon.westWing.collision = retropp::loadMapPng("assets/maps/dungeon-one/west-wing/collision.png");
+    dungeon.eastWing.tiles = retropp::loadMapPng("assets/maps/dungeon-one/east-wing/tiles.png");
+    dungeon.eastWing.collision = retropp::loadMapPng("assets/maps/dungeon-one/east-wing/collision.png");
+    dungeon.treasury.tiles = retropp::loadMapPng("assets/maps/dungeon-one/treasury/tiles.png");
+    dungeon.treasury.collision = retropp::loadMapPng("assets/maps/dungeon-one/treasury/collision.png");
 
     // Each facing walks through its own row of the player sheet: two frames, 8 ticks each.
     constexpr auto kWalkFrame =

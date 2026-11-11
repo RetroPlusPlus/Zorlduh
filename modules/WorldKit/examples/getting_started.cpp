@@ -1,8 +1,9 @@
-// A complete program built on the WorldKit module: three areas joined by their openings — a hall with
-// a door in its east wall that scrolls into a wider hall, and stairs in that hall that fade down to a
-// small cellar with stairs back up — and a marker steered with the arrow keys, WASD or a d-pad. The
-// marker's own movement is a few lines here; WorldKit tells it what is solid, carries it through each
-// opening, and draws whatever is on screen.
+// A complete program built on the WorldKit module: four areas joined by their openings — a hall with
+// a door in its east wall that scrolls into a wider hall; stairs in that hall that fade down to a small
+// cellar with stairs back up; and a garden joined seamlessly along the wider hall's north wall, so it
+// is simply there beyond the wall and walking into it changes nothing on screen — and a marker steered
+// with the arrow keys, WASD or a d-pad. The marker's own movement is a few lines here; WorldKit tells
+// it what is solid, takes it through each opening, and draws whatever is on screen.
 //
 // docs/getting-started.md walks through it part by part.
 
@@ -39,8 +40,9 @@ namespace {
 
 enum class Action : std::uint8_t { Up, Down, Left, Right };
 
-// The program's areas, by index in the layout.
-enum Area : std::uint8_t { Hall, WideHall, Cellar };
+// The program's one layout, by index in the world, and its areas, by index in the layout.
+enum Layout : std::uint8_t { Castle };
+enum Area : std::uint8_t { Hall, WideHall, Cellar, Garden };
 
 constexpr int kCell = 8;
 
@@ -49,6 +51,28 @@ constexpr CameraKit::View kView{.size = {.width = 160, .height = 144}};
 
 // The values in a map, drawn as the tiles of the same name.
 enum class Cell : std::uint16_t { Floor = 0, Wall = 1, Stairs = 2 };
+
+// The cells of one wall from `first` to `last` along it: a doorway list for Room.
+std::vector<retropp::Vec2i> Across(int y, int first, int last) {
+    std::vector<retropp::Vec2i> cells;
+    for (int x = first; x <= last; ++x) {
+        cells.push_back({.x = x, .y = y});
+    }
+    return cells;
+}
+
+std::vector<retropp::Vec2i> Down(int x, int first, int last) {
+    std::vector<retropp::Vec2i> cells;
+    for (int y = first; y <= last; ++y) {
+        cells.push_back({.x = x, .y = y});
+    }
+    return cells;
+}
+
+std::vector<retropp::Vec2i> Both(std::vector<retropp::Vec2i> a, const std::vector<retropp::Vec2i>& b) {
+    a.insert(a.end(), b.begin(), b.end());
+    return a;
+}
 
 // A map ringed by wall, floor inside, with doorways opened in the ring and stairs placed inside.
 retropp::IndexGrid Room(int width, int height, const std::vector<retropp::Vec2i>& doorways,
@@ -74,12 +98,13 @@ retropp::IndexGrid Room(int width, int height, const std::vector<retropp::Vec2i>
     return map;
 }
 
-// The art: one sheet of four 8×8 tiles (floor, wall, stairs, the marker) and two palettes, one for
-// the halls and one for the cellar.
+// The art: one sheet of four 8×8 tiles (floor, wall, stairs, the marker) and three palettes, one for
+// the halls, one for the cellar and one for the garden.
 struct Art {
     retropp::AtlasId tiles{};
     retropp::PaletteId hall{};
     retropp::PaletteId cellar{};
+    retropp::PaletteId garden{};
 };
 
 Art uploadArt(retropp::Renderer& renderer) {
@@ -95,9 +120,11 @@ Art uploadArt(retropp::Renderer& renderer) {
     }
     const std::array<retropp::Rgba8, 4> hall{{{20, 24, 40}, {60, 90, 70}, {110, 140, 120}, {240, 230, 200}}};
     const std::array<retropp::Rgba8, 4> cellar{{{10, 10, 20}, {60, 50, 70}, {120, 100, 130}, {230, 210, 240}}};
+    const std::array<retropp::Rgba8, 4> garden{{{10, 30, 10}, {40, 110, 50}, {90, 170, 80}, {220, 240, 180}}};
     return Art{.tiles = renderer.uploadAtlas(sheet.data(), 32, 8).atlasId,
                .hall = renderer.uploadPalette(std::span<const retropp::Rgba8>(hall)),
-               .cellar = renderer.uploadPalette(std::span<const retropp::Rgba8>(cellar))};
+               .cellar = renderer.uploadPalette(std::span<const retropp::Rgba8>(cellar)),
+               .garden = renderer.uploadPalette(std::span<const retropp::Rgba8>(garden))};
 }
 
 // How an area's map values are drawn: each value's tile, through one palette.
@@ -109,14 +136,17 @@ retropp::TileCatalog CatalogThrough(const Art& art, retropp::PaletteId palette) 
     }};
 }
 
-// The three maps. Every map is its own pixel space; the openings below say how they join.
+// The four maps. Every map is its own pixel space; the openings below say how they join. The wide
+// hall's north wall and the garden's south wall are open along their whole length but the corners,
+// so the two meet along the full width.
 struct Maps {
-    retropp::IndexGrid hall = Room(20, 18, {{19, 7}, {19, 8}, {19, 9}, {19, 10}}, {});
-    retropp::IndexGrid wideHall = Room(30, 18, {{0, 7}, {0, 8}, {0, 9}, {0, 10}}, {{20, 5}, {21, 5}});
+    retropp::IndexGrid hall = Room(20, 18, Down(19, 7, 10), {});
+    retropp::IndexGrid wideHall = Room(30, 18, Both(Down(0, 7, 10), Across(0, 1, 28)), {{20, 5}, {21, 5}});
     retropp::IndexGrid cellar = Room(12, 10, {}, {{5, 4}, {6, 4}});
+    retropp::IndexGrid garden = Room(30, 12, Across(11, 1, 28), {});
 };
 
-WorldKit::Layout World(const Maps& maps, const Art& art) {
+WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
     using WorldKit::Side;
     using WorldKit::Transition;
     return WorldKit::Layout{
@@ -131,11 +161,18 @@ WorldKit::Layout World(const Maps& maps, const Art& art) {
                                          .leadsTo = {.area = Area::Hall, .opening = "east door"}},
                                         {.name = "stairs down", .at = {.x = 20, .y = 5, .width = 2, .height = 1},
                                          .transition = Transition::Fade,
-                                         .leadsTo = {.area = Area::Cellar, .opening = "stairs up"}}}},
+                                         .leadsTo = {.area = Area::Cellar, .opening = "stairs up"}},
+                                        {.name = "north edge", .side = Side::North, .span = {1, 28},
+                                         .transition = Transition::Seamless,
+                                         .leadsTo = {.area = Area::Garden, .opening = "south edge"}}}},
             WorldKit::Area{.tiles = &maps.cellar, .art = CatalogThrough(art, art.cellar), .collision = &maps.cellar,
                            .openings = {{.name = "stairs up", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
                                          .transition = Transition::Fade,
                                          .leadsTo = {.area = Area::WideHall, .opening = "stairs down"}}}},
+            WorldKit::Area{.tiles = &maps.garden, .art = CatalogThrough(art, art.garden), .collision = &maps.garden,
+                           .openings = {{.name = "south edge", .side = Side::South, .span = {1, 28},
+                                         .transition = Transition::Seamless,
+                                         .leadsTo = {.area = Area::WideHall, .opening = "north edge"}}}},
         },
         .cellSize = kCell,
         .open = Cell::Floor,   // stairs are walked on, so only a wall is solid
@@ -161,18 +198,18 @@ int main() {
 
     const Art art = uploadArt(renderer);
     const Maps maps;
-    const WorldKit::Layout layout = World(maps, art);
-    WorldKit::validate(layout);
+    const WorldKit::World world{.layouts = {CastleLayout(maps, art)}};
+    WorldKit::validate(world);
 
     // The marker: an 8×8 box that moves a pixel per tick on each axis held, if the box there is clear.
     retropp::IntRect marker{.x = 76, .y = 68, .width = kCell, .height = kCell};
-    WorldKit::Camera camera{Area::Hall};
-    camera.place(layout, marker);
+    WorldKit::Camera camera{Layout::Castle, Area::Hall};
+    camera.place(world, marker);
 
     loop.simTick([&](const retropp::InputState& input) {
         // The stairs are not solid, but the marker's own rules are its own: WorldKit only answers.
         if (!camera.transitioning()) {
-            const WorldKit::AreaSolids solids = camera.solids(layout);
+            const WorldKit::AreaSolids solids = camera.solids(world);
             const int dx = (input.isHeld(retropp::actionId(Action::Right)) ? 1 : 0) -
                            (input.isHeld(retropp::actionId(Action::Left)) ? 1 : 0);
             const int dy = (input.isHeld(retropp::actionId(Action::Down)) ? 1 : 0) -
@@ -189,15 +226,16 @@ int main() {
             }
         }
 
-        // Through a door, WorldKit scrolls and carries the marker; onto the stairs, it fades and jumps it.
-        const WorldKit::Step step = camera.follow(layout, marker);
+        // Through a door, WorldKit scrolls and carries the marker; onto the stairs, it fades and jumps
+        // it; across the seam into the garden, it only changes the marker's pixels to the garden's.
+        const WorldKit::Step step = camera.follow(world, marker);
         marker.x += step.move.x;
         marker.y += step.move.y;
     });
 
     retropp::FrameDrawState frame;
     loop.renderLoop([&] {
-        frame.layers = WorldKit::WorldLayers(camera, layout, 0);
+        frame.layers = WorldKit::WorldLayers(camera, world, 0);
         frame.layers.push_back(LayerKit::SpriteLayer(
             "marker", 10,
             {{retropp::Sprite{.key = "marker",
@@ -207,8 +245,8 @@ int main() {
                               .atlas = art.tiles,
                               .tile = 3,
                               .palette = art.hall}}},
-            {.scroll = camera.scroll(layout)}));
-        frame.regions = WorldKit::Fade(camera, layout);
+            {.scroll = camera.scroll(world)}));
+        frame.regions = WorldKit::Fade(camera, world);
         renderer.renderFrame(frame);
     });
 

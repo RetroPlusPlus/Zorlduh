@@ -37,7 +37,7 @@ using retropp::Vec2i;
 
 constexpr retropp::TimingProfile kHz60{.tickPeriodNs = retropp::TickPeriodNs::Hz60};
 
-// The real maps, with the sheets and palettes as handles the test makes up. The config's layout points
+// The real maps, with the sheets and palettes as handles the test makes up. The config's world points
 // at the maps, so the assets outlive it.
 zorlduh::Assets headlessAssets() {
     zorlduh::Assets assets;
@@ -47,16 +47,28 @@ zorlduh::Assets headlessAssets() {
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
-    assets.areas.meadow.tiles = retropp::loadMapPng("assets/maps/meadow/tiles.png");
-    assets.areas.meadow.collision = retropp::loadMapPng("assets/maps/meadow/collision.png");
-    assets.areas.lake.tiles = retropp::loadMapPng("assets/maps/lake/tiles.png");
-    assets.areas.lake.collision = retropp::loadMapPng("assets/maps/lake/collision.png");
-    assets.areas.field.tiles = retropp::loadMapPng("assets/maps/field/tiles.png");
-    assets.areas.field.collision = retropp::loadMapPng("assets/maps/field/collision.png");
-    assets.areas.shrine.tiles = retropp::loadMapPng("assets/maps/shrine/tiles.png");
-    assets.areas.shrine.collision = retropp::loadMapPng("assets/maps/shrine/collision.png");
-    assets.areas.cave.tiles = retropp::loadMapPng("assets/maps/cave/tiles.png");
-    assets.areas.cave.collision = retropp::loadMapPng("assets/maps/cave/collision.png");
+    zorlduh::OverworldMaps& overworld = assets.areas.overworld;
+    overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
+    overworld.meadow.collision = retropp::loadMapPng("assets/maps/overworld/meadow/collision.png");
+    overworld.lake.tiles = retropp::loadMapPng("assets/maps/overworld/lake/tiles.png");
+    overworld.lake.collision = retropp::loadMapPng("assets/maps/overworld/lake/collision.png");
+    overworld.field.tiles = retropp::loadMapPng("assets/maps/overworld/field/tiles.png");
+    overworld.field.collision = retropp::loadMapPng("assets/maps/overworld/field/collision.png");
+    overworld.shrine.tiles = retropp::loadMapPng("assets/maps/overworld/shrine/tiles.png");
+    overworld.shrine.collision = retropp::loadMapPng("assets/maps/overworld/shrine/collision.png");
+    overworld.cave.tiles = retropp::loadMapPng("assets/maps/overworld/cave/tiles.png");
+    overworld.cave.collision = retropp::loadMapPng("assets/maps/overworld/cave/collision.png");
+    zorlduh::DungeonOneMaps& dungeon = assets.areas.dungeonOne;
+    dungeon.entrance.tiles = retropp::loadMapPng("assets/maps/dungeon-one/entrance/tiles.png");
+    dungeon.entrance.collision = retropp::loadMapPng("assets/maps/dungeon-one/entrance/collision.png");
+    dungeon.hall.tiles = retropp::loadMapPng("assets/maps/dungeon-one/hall/tiles.png");
+    dungeon.hall.collision = retropp::loadMapPng("assets/maps/dungeon-one/hall/collision.png");
+    dungeon.westWing.tiles = retropp::loadMapPng("assets/maps/dungeon-one/west-wing/tiles.png");
+    dungeon.westWing.collision = retropp::loadMapPng("assets/maps/dungeon-one/west-wing/collision.png");
+    dungeon.eastWing.tiles = retropp::loadMapPng("assets/maps/dungeon-one/east-wing/tiles.png");
+    dungeon.eastWing.collision = retropp::loadMapPng("assets/maps/dungeon-one/east-wing/collision.png");
+    dungeon.treasury.tiles = retropp::loadMapPng("assets/maps/dungeon-one/treasury/tiles.png");
+    dungeon.treasury.collision = retropp::loadMapPng("assets/maps/dungeon-one/treasury/collision.png");
     return assets;
 }
 
@@ -69,7 +81,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 
 zorlduh::GameState start(const zorlduh::Config& config) {
     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
-    state.camera.place(config.layout, state.player.collision(config.player).bounds());
+    state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }
 
@@ -84,8 +96,9 @@ TEST(Player, StartsCenteredInTheMeadowClearOfEverySolidCell) {
     const zorlduh::Config config = headlessConfig(assets);
     const zorlduh::GameState state = start(config);
     EXPECT_EQ(zorlduh::kPlayerStart, (Vec2i{72, 56}));
+    EXPECT_EQ(state.camera.layout(), zorlduh::Layout::Overworld);
     EXPECT_EQ(state.camera.area(), zorlduh::Area::Meadow);
-    EXPECT_FALSE(config.player.collision.hits(state.camera.solids(config.layout), zorlduh::kPlayerStart));
+    EXPECT_FALSE(config.player.collision.hits(state.camera.solids(config.world), zorlduh::kPlayerStart));
 }
 
 TEST(Player, CollidesWithTheBottomHalfOfItsFrame) {

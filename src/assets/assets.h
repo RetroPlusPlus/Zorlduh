@@ -25,8 +25,9 @@ class Renderer;
 
 namespace zorlduh {
 
-// The value of a cell in an area's tile map, assets/maps/<area>/tiles.png. The values are spread across
-// the 8-bit grayscale range so the map reads by eye: stairs are near black, floor is white.
+// The value of a cell in an area's tile map, assets/maps/<layout>/<area>/tiles.png. The values are
+// spread across the 8-bit grayscale range so the map reads by eye: stairs are near black, floor is
+// white.
 enum class WorldCell : std::uint16_t {
     Stairs = 32,    // a way down or up: a spot opening
     Wall = 64,
@@ -35,8 +36,8 @@ enum class WorldCell : std::uint16_t {
     Floor = 255,
 };
 
-// The value of a cell in an area's collision map, assets/maps/<area>/collision.png: solid is black,
-// open is white. Wall and water are solid.
+// The value of a cell in an area's collision map, assets/maps/<layout>/<area>/collision.png: solid is
+// black, open is white. Wall and water are solid.
 enum class CollisionCell : std::uint16_t {
     Solid = 0,
     Open = 255,
@@ -87,13 +88,28 @@ struct AreaMaps {
     retropp::IndexGrid collision;
 };
 
-// Every area's maps, from assets/maps/<area>/.
-struct AreaMapSet {
+// The overworld's areas' maps, from assets/maps/overworld/<area>/.
+struct OverworldMaps {
     AreaMaps meadow;  // 20×16 cells: the start
-    AreaMaps lake;    // 40×16, with a pond
+    AreaMaps lake;    // 40×16, with a pond and the dungeon door
     AreaMaps field;   // 30×16
     AreaMaps shrine;  // 12×10
     AreaMaps cave;    // 12×10
+};
+
+// DungeonOne's rooms' maps, from assets/maps/dungeon-one/<room>/.
+struct DungeonOneMaps {
+    AreaMaps entrance;  // 20×16: the door back to the lake
+    AreaMaps hall;      // 20×16: doors to the wings, open along its north wall to the treasury
+    AreaMaps westWing;  // 12×10
+    AreaMaps eastWing;  // 12×10
+    AreaMaps treasury;  // 30×16: open along its south wall to the hall
+};
+
+// Every area's maps, by layout.
+struct AreaMapSet {
+    OverworldMaps overworld;
+    DungeonOneMaps dungeonOne;
 };
 
 struct Assets {

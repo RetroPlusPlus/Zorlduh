@@ -3,7 +3,7 @@
 //
 //     const zorlduh::Config config = zorlduh::gameConfig(assets, kView);
 //     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
-//     state.camera.place(config.layout, state.player.collision(config.player).bounds());
+//     state.camera.place(config.world, state.player.collision(config.player).bounds());
 //     zorlduh::tick(state, zorlduh::readInput(in), config);   // once per tick
 #pragma once
 
@@ -28,21 +28,22 @@ struct Input {
 
 // What the tick says happened. Presentation and audio read these; the tick clears them first.
 struct AreaChanged {
-    Area area;  // the area the player is now in
+    Layout layout;  // the layout the player is now in
+    int area;       // the area in it: an Area in the overworld, a Room in DungeonOne
 };
 using GameEvent = std::variant<AreaChanged>;
 
 // What the game is: the player's walker config and the world. Built once from the loaded assets.
 struct Config {
     TopDownMovement::WalkerConfig player;
-    WorldKit::Layout layout;
+    WorldKit::World world;
 };
 
 [[nodiscard]] Config gameConfig(const Assets& assets, CameraKit::View view);
 
 struct GameState {
     TopDownMovement::Walker player;
-    WorldKit::Camera camera{kStartArea};  // which area, where the screen looks, any scroll or fade running
+    WorldKit::Camera camera{kStartLayout, kStartArea};  // which area, where the screen looks, any scroll or fade running
     std::vector<GameEvent> events;
 };
 
