@@ -9,7 +9,7 @@ the first column. Status changes are logged in `docs/features/CHANGELOG.md`.
 |---|---|---|
 | build-system | ✅ complete | CMake with `add_subdirectory(engine)`; `zorlduh-lib`, the `zorlduh` executable, one GoogleTest executable per test file; a Release-by-default, dead-stripped, symbol-stripped binary that opens a 60 Hz Game Boy Color window |
 | layer-kit | 🧪 testing | The return types (with `Raster`), `LayerOptions` and `RasterLayerOptions`, and one aggregate per kind of layer content — `SpriteLayer`, `TileLayer`, `RasterLayer`, `ImageLayer`: a header-only module in `modules/layers/` that depends on the engine alone, with its own guide (`modules/layers/docs/`) and a compiled getting-started program |
-| assets | ⬜ planned | Generated placeholder art and the struct that loads every sheet, palette and map |
+| assets | 🧪 testing | Placeholder art written by `tools/placeholder_art.py` under `assets/` — 2-bit grayscale index sheets, palette images, and viewable grayscale tile and collision maps — and `zorlduh::loadAssets`, which uploads every sheet and palette and decodes both maps, all baked into the executable |
 | world | ⬜ planned | The world map, its collision grid and room table, on screen as one tile layer |
 | player | ⬜ planned | Eight-direction movement, tile collision that slides along walls, four facings, walk animation |
 | rooms-and-camera | ⬜ planned | The camera that follows the player within a room, and the scroll between rooms |
