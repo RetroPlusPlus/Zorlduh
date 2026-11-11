@@ -67,7 +67,8 @@ is added to the other.
   layer's content scrolls under it. To confine a scrolling layer to a part of the screen, give the region
   that part of the screen.
 - **A region on one layer affects that layer only.** A clip that should crop two layers goes on both; a
-  region on the whole frame (`FrameDrawState::regions`) affects everything beneath it.
+  region on the whole frame (`FrameDrawState::regions`) applies to the composited frame, every layer at
+  once.
 - **Effect parameters do not ease.** An animated effect is recomputed each tick from the state and
   resubmitted.
 

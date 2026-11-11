@@ -1,7 +1,7 @@
 # Getting started
 
 This page builds a complete program on the kit: a walled floor of tiles, a player you steer with the arrow
-keys or a d-pad, a full-colour badge in the corner, and a meter painted on the CPU that fills as the player
+keys or a d-pad, a full-color badge in the corner, and a meter painted on the CPU that fills as the player
 crosses the floor. All four kinds of layer are in it, and the whole frame is one function's return value.
 
 The full source is [`examples/getting_started.cpp`](../examples/getting_started.cpp). It builds as the

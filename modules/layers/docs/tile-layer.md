@@ -73,4 +73,4 @@ layers::TileLayer("textbox", kTextboxZ, TextboxFrame(assets), 18, 4, {.scroll = 
 
 - Engine `docs/guide/draw-state.md` — `TileContent`, wrap modes, the per-cell fields.
 - Engine `docs/guide/tilemaps.md` — assembling cells from a map PNG through a catalog.
-- Engine `docs/guide/tiles-and-color.md` — atlases, palettes and recolouring.
+- Engine `docs/guide/tiles-and-color.md` — atlases, palettes and recoloring.

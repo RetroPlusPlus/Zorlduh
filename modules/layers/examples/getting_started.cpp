@@ -1,5 +1,5 @@
 // A complete program built on the layer kit: a walled floor of tiles, a player sprite steered with the
-// arrow keys or a d-pad, a full-colour badge in the corner, and a meter painted on the CPU that shows how
+// arrow keys or a d-pad, a full-color badge in the corner, and a meter painted on the CPU that shows how
 // far across the floor the player is. Each frame is the list of layers Scene() returns.
 //
 // docs/getting-started.md walks through it line by line.
@@ -172,7 +172,7 @@ Art uploadArt(retropp::Renderer& renderer) {
         {{20, 24, 40}, {60, 90, 70}, {110, 140, 120}, {240, 230, 200}}};
     art.palette = renderer.uploadPalette(std::span<const retropp::Rgba8>(colors));
 
-    // A 16×16 full-colour badge: a red-to-blue gradient with a transparent corner cut.
+    // A 16×16 full-color badge: a red-to-blue gradient with a transparent corner cut.
     std::array<retropp::Rgba8, 16 * 16> badge{};
     for (int y = 0; y < 16; ++y) {
         for (int x = 0; x < 16; ++x) {

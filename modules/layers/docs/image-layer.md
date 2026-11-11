@@ -50,7 +50,7 @@ bits per channel, a 16-bit PNG at 16). Keep the `ImageId` with the rest of the g
 ## Examples
 
 ```cpp
-// A title card centred on a 160×144 screen, 144×112, fading in by the state's fade value.
+// A 144×112 title card centered on the 160×144 screen, fading in by the state's fade value.
 layers::ImageLayer("title-card", kTitleZ, assets.titleCard,
                    {.scroll = {-8, -16}, .alpha = state.titleFade});
 
@@ -65,7 +65,7 @@ layers::ImageLayer("backdrop", kBackdropZ, assets.backdrop,
   a second call with the same key invalidates nothing — though the engine still requires layer keys to be
   unique within a frame.
 - **Indexed art stays indexed.** Tiles and sprites draw from indexed atlases through palettes; an image is
-  full colour and is shown only by a raster layer.
+  full color and is shown only by a raster layer.
 
 ## See also
 

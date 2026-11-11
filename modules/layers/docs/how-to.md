@@ -13,7 +13,7 @@ Recipes for common screen tasks. Each is a component or a screen fragment; the s
 - [Draw nearer actors in front](#draw-nearer-actors-in-front)
 - [Show a layer only sometimes](#show-a-layer-only-sometimes)
 - [Paint a raster that uploads only when it changes](#paint-a-raster-that-uploads-only-when-it-changes)
-- [Show a full-colour image at a fixed size](#show-a-full-colour-image-at-a-fixed-size)
+- [Show a full-color image at a fixed size](#show-a-full-color-image-at-a-fixed-size)
 - [Write an aggregate of your own](#write-an-aggregate-of-your-own)
 
 ## Put a HUD strip across the top
@@ -93,12 +93,12 @@ To fade the whole screen instead, put a `ColorFill` region on the frame (engine:
 A tint is a `ColorFill` region with an empty shape — the whole layer — combined by `Multiply`:
 
 ```cpp
-layers::Regions Tint(retropp::Rgba8 colour) {
+layers::Regions Tint(retropp::Rgba8 color) {
     return {retropp::Region{
         .key = "tint",
         .shape = {},
         .effects = {retropp::ScreenSpaceEffect{.kind = retropp::ScreenSpaceEffectKind::ColorFill,
-                                               .fill = colour}},
+                                               .fill = color}},
         .blend = retropp::BlendMode::Multiply,
     }};
 }
@@ -167,7 +167,7 @@ Start the generation at 1: generation 0 uploads every frame. The upload is saved
 a picture that is expensive to paint is painted in the tick and held in the state
 ([raster-layer.md](raster-layer.md#generation)).
 
-## Show a full-colour image at a fixed size
+## Show a full-color image at a fixed size
 
 Load it once, then name it with `fit` set to the size it should take on screen:
 
