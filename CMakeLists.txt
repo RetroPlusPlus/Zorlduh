@@ -57,7 +57,8 @@ endif()
 # test executable link the same code.
 # ---------------------------------------------------------------------------
 add_library(zorlduh-lib STATIC
-    src/config.cpp)
+    src/assets/assets.cpp
+    src/config/config.cpp)
 target_include_directories(zorlduh-lib PUBLIC src)
 target_compile_features(zorlduh-lib PUBLIC cxx_std_20)
 target_compile_options(zorlduh-lib PRIVATE ${_zorlduh_warn})
@@ -117,3 +118,13 @@ endfunction()
 zorlduh_add_test(smoke)
 zorlduh_add_test(layers)
 zorlduh_add_test(raster_layers)
+zorlduh_add_test(assets)
+# The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
+# the test binary.
+target_compile_definitions(zorlduh-test-assets PRIVATE
+    ZORLDUH_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+
+# The committed files under assets/ are exactly what tools/placeholder_art.py writes.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME zorlduh-placeholder-art-matches-script
+    COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/tools/placeholder_art.py" --check)

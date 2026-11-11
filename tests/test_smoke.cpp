@@ -5,7 +5,7 @@
 #include "retropp/engine_config.h"
 #include "retropp/version.h"
 
-#include "config.h"
+#include "config/config.h"
 
 namespace {
 
