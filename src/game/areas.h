@@ -1,11 +1,12 @@
-// The game's layouts and areas: their names, and the world they make with their maps, art and
+// The game's layouts and areas: their names, and the world they make with their maps, art, layers and
 // openings.
 //
-//     const WorldKit::World world = zorlduh::gameWorld(assets, kView);
+//     const WorldKit::World world = zorlduh::gameWorld(assets, kView, kAreaDepths);
 //     WorldKit::Camera camera{zorlduh::kStartLayout, zorlduh::kStartArea};
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 #include "retropp/tilemap.h"
 
@@ -32,6 +33,20 @@ enum Woods : std::uint8_t { Edge, Glade, Thicket, Bower, Hollow, Brook, Clearing
 // The side of one map cell, in pixels.
 inline constexpr int kCellSize = 8;
 
+// The depths every area's layers and its actor slot are built at: the ground, what lies on it under
+// the player's feet, the actors, and what hangs over them. Handed in by whoever owns the game's depth
+// table, as the view is.
+struct AreaDepths {
+    std::int32_t ground = 0;
+    std::int32_t underfoot = 0;
+    std::int32_t actors = 0;
+    std::int32_t overhead = 0;
+};
+
+// The name of the actor slot every area has: where the player, and everything else that walks the
+// world, is drawn.
+inline constexpr std::string_view kActorSlot = "actors";
+
 // The layout and area the game starts in.
 inline constexpr Layout kStartLayout = Layout::Overworld;
 inline constexpr Area kStartArea = Area::Meadow;
@@ -45,8 +60,11 @@ inline constexpr Area kStartArea = Area::Meadow;
 // open along its whole length into the treasury, joined seamlessly. The forest's rooms are joined only
 // seamlessly: the edge, the thicket, the hollow and the clearing to the glade's four walls, the bower
 // to the thicket's east wall, and the brook to the hollow's east wall, two cells lower. Every opening
-// has one leading back. Validated before it is returned.
-[[nodiscard]] WorldKit::World gameWorld(const Assets& assets, CameraKit::View view);
+// has one leading back. Every area has a ground layer at `depths.ground` and the actor slot
+// kActorSlot at `depths.actors`; the meadow has rock over its cave mouth and the forest's glade a band
+// of canopy, both at `depths.overhead`, and the forest's edge a path at `depths.underfoot`. Validated
+// before it is returned.
+[[nodiscard]] WorldKit::World gameWorld(const Assets& assets, CameraKit::View view, const AreaDepths& depths);
 
 // How an overworld area's map values are drawn: each kind of cell from its terrain tile through the
 // palette of its kind; doorways and stairs through the floor palette.
@@ -59,6 +77,11 @@ inline constexpr Area kStartArea = Area::Meadow;
 // How a dungeon room's map values are drawn: the same tiles, floor and doorways in stone gray, walls
 // in the water's blue, and stairs in the floor's brown.
 [[nodiscard]] retropp::TileCatalog DungeonArt(const Assets& assets);
+
+// How the map of a layer over or under the player is drawn, from the overlay sheet: a canopy cell as
+// leaves through the canopy palette, a path cell as trodden earth through the floor palette, a roof
+// cell as rock through the wall palette, and every other cell as the slot that draws nothing.
+[[nodiscard]] retropp::TileCatalog OverlayArt(const Assets& assets);
 
 // How a forest room's map values are drawn, from the forest sheet: floor as grass and doorways as
 // trodden grass through the grass palette, walls as trees through the leaf palette, water as a stream

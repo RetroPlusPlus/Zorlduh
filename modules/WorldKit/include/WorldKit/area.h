@@ -4,7 +4,12 @@
 //     const WorldKit::World world{.layouts = {
 //         WorldKit::Layout{
 //             .areas = {
-//                 WorldKit::Area{.tiles = &meadowTiles, .art = overworldArt, .collision = &meadowCollision,
+//                 WorldKit::Area{.layers = {{.name = "ground", .tiles = &meadowTiles, .art = overworldArt,
+//                                            .z = depths.ground},
+//                                           {.name = "overhang", .tiles = &meadowRock, .art = overlayArt,
+//                                            .z = depths.overhead}},
+//                                .actorSlots = {{.name = "actors", .z = depths.actors}},
+//                                .collision = &meadowCollision,
 //                                .openings = {{.name = "east door", .side = WorldKit::Side::East, .span = {6, 9},
 //                                              .transition = WorldKit::Transition::Scroll,
 //                                              .leadsTo = {.area = Area::Lake, .opening = "west door"}},
@@ -18,13 +23,14 @@
 //     }};
 //     WorldKit::validate(world);
 //
-// An area is a dungeon room, an overworld screen, a cave: any place with a tile map, the art that map is
-// drawn through, and a collision map. A layout is a set of areas that share a cell size, a view and the
-// settings of their transitions; a world is one or more layouts. Areas have no position in a larger
-// world. An opening in one leads to an opening in another, in the same layout or in any other, and that
-// link is the only thing joining them; two areas sit side by side only while a scroll between them runs,
-// or for as long as they are joined seamlessly. Every position inside an area is in that area's own
-// pixels, from its map's top-left.
+// An area is a dungeon room, an overworld screen, a cave: any place with a collision map, one or more
+// tile maps each drawn through its own art on a layer of its own, and the slots its moving things are
+// drawn at, every layer and slot at a depth the game gives it. A layout is a set of areas that share a
+// cell size, a view and the settings of their transitions; a world is one or more layouts. Areas have
+// no position in a larger world. An opening in one leads to an opening in another, in the same layout
+// or in any other, and that link is the only thing joining them; two areas sit side by side only while
+// a scroll between them runs, or for as long as they are joined seamlessly. Every position inside an
+// area is in that area's own pixels, from its map's top-left.
 #pragma once
 
 #include <cstddef>
@@ -32,7 +38,9 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "retropp/geometry.h"
@@ -105,11 +113,33 @@ struct CellValue {
     constexpr CellValue(E cell) : value(static_cast<std::uint16_t>(cell)) {}
 };
 
-// One area: its tile map, the catalog its map values are drawn through, its collision map and its
-// openings. The maps are the game's and must outlive the world; the two are the same size.
-struct Area {
+// One tile map of an area, drawn on a layer of its own: its name, which is part of the layer's key;
+// the map, one value per cell, the size of the area's collision map; the catalog its values are drawn
+// through; and the layer's depth on the engine's z axis, where lower is below. A map that covers only
+// part of an area draws nothing in its other cells: their catalog entries name a slot whose every
+// pixel is in the sheet's transparent-index set, and what is below shows through.
+struct MapLayer {
+    std::string name;
     const retropp::IndexGrid* tiles = nullptr;
     retropp::TileCatalog art{};
+    std::int32_t z = 0;
+};
+
+// A named depth in an area for the things that move in it — the player, the people and creatures in
+// it. A slot holds nothing: a game draws its sprites there through Actors (world_layers.h), or reads
+// the depth through ActorZ, and they land among the area's map layers, over those below the slot and
+// under those above it. An area has as many slots as it needs, or none.
+struct ActorSlot {
+    std::string name;
+    std::int32_t z = 0;
+};
+
+// One area: its map layers, its actor slots, its collision map and its openings. The layers and slots
+// are in no required order; each one's `z` places it. The maps are the game's and must outlive the
+// world; every one is the size of the collision map, which is the area's size.
+struct Area {
+    std::vector<MapLayer> layers;
+    std::vector<ActorSlot> actorSlots;
     const retropp::IndexGrid* collision = nullptr;
     std::vector<Opening> openings;
 };
@@ -348,15 +378,17 @@ void eachSeamless(const World& world, int layout, int area, Fn&& fn) {
 
 }  // namespace detail
 
-// Checks the world and throws std::invalid_argument, naming the layout, the area and the opening, for:
-// a cell size of zero or less; an area with no map, or maps of two sizes; an opening with no name or a
-// name used twice in its area; an opening that is neither in a wall nor a spot, or both; a span off its
-// wall or a spot off the map; two openings that overlap; a destination naming a layout, an area or an
-// opening that does not exist; a fade with an offset; a scroll that is not from a wall to the facing
-// wall of the next area through a span of the same length; a seamless join from a spot, or that is not
-// wall to facing wall through spans of one length, into a layout of another cell size, or whose far
-// end is not seamless, does not lead back to it, or does not carry the negated offset. A game calls it
-// once, after building the world.
+// Checks the world and throws std::invalid_argument, naming the layout, the area and the layer, slot
+// or opening, for: a cell size of zero or less; an area with no collision map or no map layers; a map
+// layer or an actor slot with no name, or with the name of another layer or slot of its area; a map
+// layer with no map, or a map of another size than the collision map; a layer or slot at the depth of
+// another of its area; an opening with no name or a name used twice in its area; an opening that is
+// neither in a wall nor a spot, or both; a span off its wall or a spot off the map; two openings that
+// overlap; a destination naming a layout, an area or an opening that does not exist; a fade with an
+// offset; a scroll that is not from a wall to the facing wall of the next area through a span of the
+// same length; a seamless join from a spot, or that is not wall to facing wall through spans of one
+// length, into a layout of another cell size, or whose far end is not seamless, does not lead back to
+// it, or does not carry the negated offset. A game calls it once, after building the world.
 inline void validate(const World& world) {
     for (std::size_t l = 0; l < world.layouts.size(); ++l) {
         const Layout& layout = world.layouts[l];
@@ -366,11 +398,44 @@ inline void validate(const World& world) {
         for (std::size_t a = 0; a < layout.areas.size(); ++a) {
             const Area& area = layout.areas[a];
             const std::string here = detail::where(static_cast<int>(l), static_cast<int>(a));
-            if (area.tiles == nullptr || area.collision == nullptr) {
-                throw std::invalid_argument(here + " has no tile map or no collision map");
+            if (area.collision == nullptr) {
+                throw std::invalid_argument(here + " has no collision map");
             }
-            if (area.tiles->width != area.collision->width || area.tiles->height != area.collision->height) {
-                throw std::invalid_argument(here + "'s tile map and collision map differ in size");
+            if (area.layers.empty()) {
+                throw std::invalid_argument(here + " has no layers");
+            }
+            // Every map layer and actor slot of the area, by name and depth.
+            std::vector<std::pair<const std::string*, std::int32_t>> seen;
+            const auto add = [&](const std::string& name, std::int32_t z) {
+                const std::string named = here + " layer '" + name + "'";
+                for (const auto& [otherName, otherZ] : seen) {
+                    if (*otherName == name) {
+                        throw std::invalid_argument(named + " is named twice");
+                    }
+                    if (otherZ == z) {
+                        throw std::invalid_argument(named + " is at the same depth as layer '" + *otherName + "'");
+                    }
+                }
+                seen.emplace_back(&name, z);
+            };
+            for (const MapLayer& layer : area.layers) {
+                if (layer.name.empty()) {
+                    throw std::invalid_argument(here + " has a layer with no name");
+                }
+                const std::string named = here + " layer '" + layer.name + "'";
+                if (layer.tiles == nullptr) {
+                    throw std::invalid_argument(named + " has no map");
+                }
+                if (layer.tiles->width != area.collision->width || layer.tiles->height != area.collision->height) {
+                    throw std::invalid_argument(named + "'s map differs in size from the collision map");
+                }
+                add(layer.name, layer.z);
+            }
+            for (const ActorSlot& slot : area.actorSlots) {
+                if (slot.name.empty()) {
+                    throw std::invalid_argument(here + " has an actor slot with no name");
+                }
+                add(slot.name, slot.z);
             }
             for (std::size_t i = 0; i < area.openings.size(); ++i) {
                 const Opening& opening = area.openings[i];
@@ -469,6 +534,18 @@ inline void validate(const World& world) {
             }
         }
     }
+}
+
+// The depth of the actor slot named `slot` in the area at `place`. Throws std::out_of_range, naming the
+// layout, the area and the slot, when the area has no slot by that name.
+[[nodiscard]] inline std::int32_t ActorZ(const World& world, Place place, std::string_view slot) {
+    const Area& area = world.layouts[static_cast<std::size_t>(place.layout)].areas[static_cast<std::size_t>(place.area)];
+    for (const ActorSlot& candidate : area.actorSlots) {
+        if (candidate.name == slot) {
+            return candidate.z;
+        }
+    }
+    throw std::out_of_range(detail::where(place.layout, place.area) + " has no actor slot '" + std::string{slot} + "'");
 }
 
 }  // namespace WorldKit

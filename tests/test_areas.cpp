@@ -1,11 +1,11 @@
-// The game's world: the three layouts over the real maps, every opening's cells on the map it names,
-// every way out having a way back, the four art catalogs, and the player going from area to area
-// through the tick: the scroll east into the lake, the fade down into the cave, the camera following
-// across the lake, input ignored while a transition runs; the dungeon — down from the lake, up into
-// the hall, across the seam into the treasury and back, the wings, and out; and the forest — down from
-// the field, then across every seam both ways, each crossing a case of how the camera follows. No
-// renderer is needed: the maps are decoded from the bytes baked into the test binary and the art
-// catalogs name handles the test makes up.
+// The game's world: the three layouts over the real maps, every area's layers and actor slot, every
+// opening's cells on the map it names, every way out having a way back, the five art catalogs, and the
+// player going from area to area through the tick: the scroll east into the lake, the fade down into
+// the cave, the camera following across the lake, input ignored while a transition runs; the dungeon —
+// down from the lake, up into the hall, across the seam into the treasury and back, the wings, and
+// out; and the forest — down from the field, then across every seam both ways, each crossing a case of
+// how the camera follows. No renderer is needed: the maps are decoded from the bytes baked into the
+// test binary and the art catalogs name handles the test makes up.
 
 #include <gtest/gtest.h>
 
@@ -44,6 +44,9 @@ using zorlduh::Woods;
 
 constexpr retropp::TimingProfile kHz60{.tickPeriodNs = retropp::TickPeriodNs::Hz60};
 
+// The depths the world is built at, written out rather than read from the game's depth table.
+constexpr zorlduh::AreaDepths kDepths{.ground = 0, .underfoot = 5, .actors = 10, .overhead = 15};
+
 // The real maps, with the sheets and palettes as handles the test makes up.
 zorlduh::Assets headlessAssets() {
     zorlduh::Assets assets;
@@ -59,16 +62,24 @@ zorlduh::Assets headlessAssets() {
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
+    assets.overlay = retropp::AtlasManifest{
+        .atlasId = retropp::AtlasId{11},
+        .slots = retropp::sliceLayout({.width = 32, .height = 8}, {.width = 8, .height = 8},
+                                      retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
+        .kind = retropp::ContentKind::Tileset,
+    };
     assets.palettes = zorlduh::Palettes{
         .floor = retropp::PaletteId{4},
         .wall = retropp::PaletteId{8},
         .water = retropp::PaletteId{12},
         .grass = retropp::PaletteId{16},
         .leaf = retropp::PaletteId{20},
+        .canopy = retropp::PaletteId{24},
     };
     zorlduh::OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
     overworld.meadow.collision = retropp::loadMapPng("assets/maps/overworld/meadow/collision.png");
+    overworld.meadowOverhang = retropp::loadMapPng("assets/maps/overworld/meadow/overhang.png");
     overworld.lake.tiles = retropp::loadMapPng("assets/maps/overworld/lake/tiles.png");
     overworld.lake.collision = retropp::loadMapPng("assets/maps/overworld/lake/collision.png");
     overworld.field.tiles = retropp::loadMapPng("assets/maps/overworld/field/tiles.png");
@@ -91,8 +102,10 @@ zorlduh::Assets headlessAssets() {
     zorlduh::SeamlessForestMaps& forest = assets.areas.seamlessForest;
     forest.edge.tiles = retropp::loadMapPng("assets/maps/seamless-forest/edge/tiles.png");
     forest.edge.collision = retropp::loadMapPng("assets/maps/seamless-forest/edge/collision.png");
+    forest.edgePath = retropp::loadMapPng("assets/maps/seamless-forest/edge/path.png");
     forest.glade.tiles = retropp::loadMapPng("assets/maps/seamless-forest/glade/tiles.png");
     forest.glade.collision = retropp::loadMapPng("assets/maps/seamless-forest/glade/collision.png");
+    forest.gladeCanopy = retropp::loadMapPng("assets/maps/seamless-forest/glade/canopy.png");
     forest.thicket.tiles = retropp::loadMapPng("assets/maps/seamless-forest/thicket/tiles.png");
     forest.thicket.collision = retropp::loadMapPng("assets/maps/seamless-forest/thicket/collision.png");
     forest.bower.tiles = retropp::loadMapPng("assets/maps/seamless-forest/bower/tiles.png");
@@ -107,7 +120,7 @@ zorlduh::Assets headlessAssets() {
 }
 
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, kDepths);
     config.player.timing = kHz60;
     return config;
 }
@@ -154,32 +167,32 @@ std::uint16_t value(CollisionCell cell) {
 
 TEST(Areas, OneLayoutPerNameAndOneAreaPerNameInOrderOverItsOwnMaps) {
     const zorlduh::Assets assets = headlessAssets();
-    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView);
+    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView, kDepths);
     ASSERT_EQ(world.layouts.size(), 3u);
     const WorldKit::Layout& overworld = world.layouts[Layout::Overworld];
     ASSERT_EQ(overworld.areas.size(), 5u);
-    EXPECT_EQ(overworld.areas[Area::Meadow].tiles, &assets.areas.overworld.meadow.tiles);
+    EXPECT_EQ(overworld.areas[Area::Meadow].layers[0].tiles, &assets.areas.overworld.meadow.tiles);
     EXPECT_EQ(overworld.areas[Area::Meadow].collision, &assets.areas.overworld.meadow.collision);
-    EXPECT_EQ(overworld.areas[Area::Lake].tiles, &assets.areas.overworld.lake.tiles);
-    EXPECT_EQ(overworld.areas[Area::Field].tiles, &assets.areas.overworld.field.tiles);
-    EXPECT_EQ(overworld.areas[Area::Shrine].tiles, &assets.areas.overworld.shrine.tiles);
+    EXPECT_EQ(overworld.areas[Area::Lake].layers[0].tiles, &assets.areas.overworld.lake.tiles);
+    EXPECT_EQ(overworld.areas[Area::Field].layers[0].tiles, &assets.areas.overworld.field.tiles);
+    EXPECT_EQ(overworld.areas[Area::Shrine].layers[0].tiles, &assets.areas.overworld.shrine.tiles);
     EXPECT_EQ(overworld.areas[Area::Cave].collision, &assets.areas.overworld.cave.collision);
     const WorldKit::Layout& dungeon = world.layouts[Layout::DungeonOne];
     ASSERT_EQ(dungeon.areas.size(), 5u);
-    EXPECT_EQ(dungeon.areas[Room::Entrance].tiles, &assets.areas.dungeonOne.entrance.tiles);
+    EXPECT_EQ(dungeon.areas[Room::Entrance].layers[0].tiles, &assets.areas.dungeonOne.entrance.tiles);
     EXPECT_EQ(dungeon.areas[Room::Hall].collision, &assets.areas.dungeonOne.hall.collision);
-    EXPECT_EQ(dungeon.areas[Room::WestWing].tiles, &assets.areas.dungeonOne.westWing.tiles);
-    EXPECT_EQ(dungeon.areas[Room::EastWing].tiles, &assets.areas.dungeonOne.eastWing.tiles);
-    EXPECT_EQ(dungeon.areas[Room::Treasury].tiles, &assets.areas.dungeonOne.treasury.tiles);
+    EXPECT_EQ(dungeon.areas[Room::WestWing].layers[0].tiles, &assets.areas.dungeonOne.westWing.tiles);
+    EXPECT_EQ(dungeon.areas[Room::EastWing].layers[0].tiles, &assets.areas.dungeonOne.eastWing.tiles);
+    EXPECT_EQ(dungeon.areas[Room::Treasury].layers[0].tiles, &assets.areas.dungeonOne.treasury.tiles);
     const WorldKit::Layout& forest = world.layouts[Layout::SeamlessForest];
     ASSERT_EQ(forest.areas.size(), 7u);
-    EXPECT_EQ(forest.areas[Woods::Edge].tiles, &assets.areas.seamlessForest.edge.tiles);
+    EXPECT_EQ(forest.areas[Woods::Edge].layers[0].tiles, &assets.areas.seamlessForest.edge.tiles);
     EXPECT_EQ(forest.areas[Woods::Glade].collision, &assets.areas.seamlessForest.glade.collision);
-    EXPECT_EQ(forest.areas[Woods::Thicket].tiles, &assets.areas.seamlessForest.thicket.tiles);
-    EXPECT_EQ(forest.areas[Woods::Bower].tiles, &assets.areas.seamlessForest.bower.tiles);
-    EXPECT_EQ(forest.areas[Woods::Hollow].tiles, &assets.areas.seamlessForest.hollow.tiles);
+    EXPECT_EQ(forest.areas[Woods::Thicket].layers[0].tiles, &assets.areas.seamlessForest.thicket.tiles);
+    EXPECT_EQ(forest.areas[Woods::Bower].layers[0].tiles, &assets.areas.seamlessForest.bower.tiles);
+    EXPECT_EQ(forest.areas[Woods::Hollow].layers[0].tiles, &assets.areas.seamlessForest.hollow.tiles);
     EXPECT_EQ(forest.areas[Woods::Brook].collision, &assets.areas.seamlessForest.brook.collision);
-    EXPECT_EQ(forest.areas[Woods::Clearing].tiles, &assets.areas.seamlessForest.clearing.tiles);
+    EXPECT_EQ(forest.areas[Woods::Clearing].layers[0].tiles, &assets.areas.seamlessForest.clearing.tiles);
     for (const WorldKit::Layout& layout : world.layouts) {
         EXPECT_EQ(layout.cellSize, kCellSize);
         EXPECT_EQ(layout.open.value, value(CollisionCell::Open));
@@ -190,9 +203,55 @@ TEST(Areas, OneLayoutPerNameAndOneAreaPerNameInOrderOverItsOwnMaps) {
     EXPECT_EQ(zorlduh::kStartArea, Area::Meadow);
 }
 
+// Every area is its ground at the ground's depth with the actor slot at the actors' depth; the meadow,
+// the edge and the glade each have one more layer, at the depth of what it is.
+TEST(Areas, EveryAreaHasItsGroundAndTheActorSlotAndThreeHaveAnOverlay) {
+    const zorlduh::Assets assets = headlessAssets();
+    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView, kDepths);
+    struct Over {
+        Layout layout;
+        int area;
+        const char* name;
+        const retropp::IndexGrid* tiles;
+        std::int32_t z;
+    };
+    const std::vector<Over> overlays{
+        {Layout::Overworld, Area::Meadow, "overhang", &assets.areas.overworld.meadowOverhang, kDepths.overhead},
+        {Layout::SeamlessForest, Woods::Edge, "path", &assets.areas.seamlessForest.edgePath, kDepths.underfoot},
+        {Layout::SeamlessForest, Woods::Glade, "canopy", &assets.areas.seamlessForest.gladeCanopy, kDepths.overhead},
+    };
+    int layered = 0;
+    for (std::size_t l = 0; l < world.layouts.size(); ++l) {
+        for (std::size_t a = 0; a < world.layouts[l].areas.size(); ++a) {
+            const WorldKit::Area& area = world.layouts[l].areas[a];
+            const std::string name = std::to_string(l) + ":" + std::to_string(a);
+            ASSERT_GE(area.layers.size(), 1u) << name;
+            EXPECT_EQ(area.layers[0].name, "ground") << name;
+            EXPECT_EQ(area.layers[0].z, kDepths.ground) << name;
+            ASSERT_EQ(area.actorSlots.size(), 1u) << name;
+            EXPECT_EQ(area.actorSlots[0].name, zorlduh::kActorSlot) << name;
+            EXPECT_EQ(area.actorSlots[0].z, kDepths.actors) << name;
+            std::size_t expected = 1;
+            for (const Over& over : overlays) {
+                if (static_cast<std::size_t>(over.layout) == l && static_cast<std::size_t>(over.area) == a) {
+                    expected = 2;
+                    ++layered;
+                    ASSERT_EQ(area.layers.size(), 2u) << name;
+                    EXPECT_EQ(area.layers[1].name, over.name) << name;
+                    EXPECT_EQ(area.layers[1].tiles, over.tiles) << name;
+                    EXPECT_EQ(area.layers[1].z, over.z) << name;
+                    EXPECT_EQ(area.layers[1].art.entries[0].sheet, assets.overlay.atlasId) << name;
+                }
+            }
+            EXPECT_EQ(area.layers.size(), expected) << name;
+        }
+    }
+    EXPECT_EQ(layered, 3);
+}
+
 TEST(Areas, EveryWayOutHasAWayBack) {
     const zorlduh::Assets assets = headlessAssets();
-    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView);
+    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView, kDepths);
     int exits = 0;
     for (std::size_t l = 0; l < world.layouts.size(); ++l) {
         const WorldKit::Layout& layout = world.layouts[l];
@@ -221,11 +280,11 @@ TEST(Areas, EveryWayOutHasAWayBack) {
 // The doorway and stairs cells on each map are exactly where its openings say.
 TEST(Areas, EveryOpeningIsOnItsMap) {
     const zorlduh::Assets assets = headlessAssets();
-    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView);
+    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView, kDepths);
     for (std::size_t l = 0; l < world.layouts.size(); ++l) {
         for (std::size_t a = 0; a < world.layouts[l].areas.size(); ++a) {
             const WorldKit::Area& area = world.layouts[l].areas[a];
-            const retropp::IndexGrid& tiles = *area.tiles;
+            const retropp::IndexGrid& tiles = *area.layers[0].tiles;
             const std::string name = std::to_string(l) + ":" + std::to_string(a);
             std::set<std::pair<int, int>> openingCells;
             for (const WorldKit::Opening& opening : area.openings) {
@@ -310,15 +369,49 @@ TEST(Areas, TheArtDrawsEveryKindOfCellFromItsTileThroughItsPalette) {
     EXPECT_EQ(entry(forest, WorldCell::Stairs).slot, 4);
     EXPECT_EQ(entry(forest, WorldCell::Stairs).palette, assets.palettes.floor);
     // Every value any map holds has an entry in all four.
-    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView);
+    const WorldKit::World world = zorlduh::gameWorld(assets, zorlduh::kView, kDepths);
     for (const WorldKit::Layout& layout : world.layouts) {
         for (const WorldKit::Area& area : layout.areas) {
-            for (const std::uint16_t cell : area.tiles->values) {
+            for (const std::uint16_t cell : area.layers[0].tiles->values) {
                 EXPECT_NE(entry(overworld, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
                 EXPECT_NE(entry(cave, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
                 EXPECT_NE(entry(dungeon, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
                 EXPECT_NE(entry(forest, static_cast<WorldCell>(cell)).sheet, retropp::AtlasId{}) << cell;
             }
+        }
+    }
+}
+
+TEST(Areas, TheOverlayArtDrawsEachOverlayCellFromItsSlotThroughItsPalette) {
+    const zorlduh::Assets assets = headlessAssets();
+    const retropp::TileCatalog art = zorlduh::OverlayArt(assets);
+    using zorlduh::OverlayCell;
+    using zorlduh::OverlayTile;
+    const auto entry = [&](OverlayCell cell) {
+        for (const retropp::TileCatalogEntry& e : art.entries) {
+            if (e.id == static_cast<std::uint16_t>(cell)) {
+                return e;
+            }
+        }
+        return retropp::TileCatalogEntry{};
+    };
+    const auto slot = [&](OverlayTile tile) { return assets.overlay[static_cast<std::size_t>(tile)].tile; };
+    ASSERT_EQ(art.entries.size(), 4u);
+    for (const retropp::TileCatalogEntry& e : art.entries) {
+        EXPECT_EQ(e.sheet, assets.overlay.atlasId) << e.id;
+    }
+    EXPECT_EQ(entry(OverlayCell::None).slot, slot(OverlayTile::Nothing));
+    EXPECT_EQ(entry(OverlayCell::Canopy).slot, slot(OverlayTile::Canopy));
+    EXPECT_EQ(entry(OverlayCell::Canopy).palette, assets.palettes.canopy);
+    EXPECT_EQ(entry(OverlayCell::Path).slot, slot(OverlayTile::Path));
+    EXPECT_EQ(entry(OverlayCell::Path).palette, assets.palettes.floor);
+    EXPECT_EQ(entry(OverlayCell::Roof).slot, slot(OverlayTile::Roof));
+    EXPECT_EQ(entry(OverlayCell::Roof).palette, assets.palettes.wall);
+    // Every value the three overlay maps hold has an entry.
+    for (const retropp::IndexGrid* map : {&assets.areas.overworld.meadowOverhang, &assets.areas.seamlessForest.edgePath,
+                                          &assets.areas.seamlessForest.gladeCanopy}) {
+        for (const std::uint16_t cell : map->values) {
+            EXPECT_NE(entry(static_cast<OverlayCell>(cell)).sheet, retropp::AtlasId{}) << cell;
         }
     }
 }

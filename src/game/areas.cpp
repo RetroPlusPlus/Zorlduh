@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -28,15 +30,41 @@ retropp::TileCatalogEntry forest(const Assets& assets, WorldCell cell, ForestTil
     };
 }
 
-WorldKit::Layout overworld(const Assets& assets, CameraKit::View view) {
+retropp::TileCatalogEntry overlay(const Assets& assets, OverlayCell cell, OverlayTile tile, retropp::PaletteId palette) {
+    return retropp::TileCatalogEntry{
+        .id = static_cast<std::uint16_t>(cell),
+        .sheet = assets.overlay.atlasId,
+        .slot = assets.overlay[static_cast<std::size_t>(tile)].tile,
+        .palette = palette,
+    };
+}
+
+// An area's ground: its tile map through its art, at the bottom of the area.
+WorldKit::MapLayer ground(const retropp::IndexGrid& tiles, retropp::TileCatalog art, const AreaDepths& depths) {
+    return WorldKit::MapLayer{.name = "ground", .tiles = &tiles, .art = std::move(art), .z = depths.ground};
+}
+
+// A layer over or under the player at depth `z`, drawn through the overlay sheet.
+WorldKit::MapLayer overlayLayer(std::string name, const retropp::IndexGrid& tiles, const Assets& assets,
+                                std::int32_t z) {
+    return WorldKit::MapLayer{.name = std::move(name), .tiles = &tiles, .art = OverlayArt(assets), .z = z};
+}
+
+// The actor slot every area has.
+std::vector<WorldKit::ActorSlot> actorSlotsAt(const AreaDepths& depths) {
+    return {WorldKit::ActorSlot{.name = std::string{kActorSlot}, .z = depths.actors}};
+}
+
+WorldKit::Layout overworld(const Assets& assets, CameraKit::View view, const AreaDepths& depths) {
     using WorldKit::Side;
     using WorldKit::Transition;
     const OverworldMaps& maps = assets.areas.overworld;
     return WorldKit::Layout{
         .areas = {
             WorldKit::Area{
-                .tiles = &maps.meadow.tiles,
-                .art = OverworldArt(assets),
+                .layers = {ground(maps.meadow.tiles, OverworldArt(assets), depths),
+                           overlayLayer("overhang", maps.meadowOverhang, assets, depths.overhead)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.meadow.collision,
                 .openings = {
                     {.name = "east door", .side = Side::East, .span = {6, 9}, .transition = Transition::Scroll,
@@ -47,8 +75,8 @@ WorldKit::Layout overworld(const Assets& assets, CameraKit::View view) {
                      .transition = Transition::Fade, .leadsTo = {.area = Area::Cave, .opening = "cave exit"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.lake.tiles,
-                .art = OverworldArt(assets),
+                .layers = {ground(maps.lake.tiles, OverworldArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.lake.collision,
                 .openings = {
                     {.name = "west door", .side = Side::West, .span = {6, 9}, .transition = Transition::Scroll,
@@ -58,8 +86,8 @@ WorldKit::Layout overworld(const Assets& assets, CameraKit::View view) {
                      .leadsTo = {.layout = Layout::DungeonOne, .area = Room::Entrance, .opening = "door"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.field.tiles,
-                .art = OverworldArt(assets),
+                .layers = {ground(maps.field.tiles, OverworldArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.field.collision,
                 .openings = {
                     {.name = "north road", .side = Side::North, .span = {8, 11}, .transition = Transition::Scroll,
@@ -70,16 +98,16 @@ WorldKit::Layout overworld(const Assets& assets, CameraKit::View view) {
                      .leadsTo = {.layout = Layout::SeamlessForest, .area = Woods::Edge, .opening = "north path"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.shrine.tiles,
-                .art = OverworldArt(assets),
+                .layers = {ground(maps.shrine.tiles, OverworldArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.shrine.collision,
                 .openings = {
                     {.name = "west door", .side = Side::West, .span = {3, 6}, .transition = Transition::Scroll,
                      .leadsTo = {.area = Area::Field, .opening = "east door"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.cave.tiles,
-                .art = CaveArt(assets),
+                .layers = {ground(maps.cave.tiles, CaveArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.cave.collision,
                 .openings = {
                     {.name = "cave exit", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
@@ -92,15 +120,15 @@ WorldKit::Layout overworld(const Assets& assets, CameraKit::View view) {
     };
 }
 
-WorldKit::Layout dungeonOne(const Assets& assets, CameraKit::View view) {
+WorldKit::Layout dungeonOne(const Assets& assets, CameraKit::View view, const AreaDepths& depths) {
     using WorldKit::Side;
     using WorldKit::Transition;
     const DungeonOneMaps& maps = assets.areas.dungeonOne;
     return WorldKit::Layout{
         .areas = {
             WorldKit::Area{
-                .tiles = &maps.entrance.tiles,
-                .art = DungeonArt(assets),
+                .layers = {ground(maps.entrance.tiles, DungeonArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.entrance.collision,
                 .openings = {
                     {.name = "door", .at = {.x = 9, .y = 13, .width = 2, .height = 1}, .transition = Transition::Fade,
@@ -109,8 +137,8 @@ WorldKit::Layout dungeonOne(const Assets& assets, CameraKit::View view) {
                      .leadsTo = {.area = Room::Hall, .opening = "south door"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.hall.tiles,
-                .art = DungeonArt(assets),
+                .layers = {ground(maps.hall.tiles, DungeonArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.hall.collision,
                 .openings = {
                     {.name = "south door", .side = Side::South, .span = {8, 11}, .transition = Transition::Scroll,
@@ -125,24 +153,24 @@ WorldKit::Layout dungeonOne(const Assets& assets, CameraKit::View view) {
                      .leadsTo = {.area = Room::Treasury, .opening = "south wall"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.westWing.tiles,
-                .art = DungeonArt(assets),
+                .layers = {ground(maps.westWing.tiles, DungeonArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.westWing.collision,
                 .openings = {
                     {.name = "east door", .side = Side::East, .span = {3, 6}, .transition = Transition::Scroll,
                      .leadsTo = {.area = Room::Hall, .opening = "west door"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.eastWing.tiles,
-                .art = DungeonArt(assets),
+                .layers = {ground(maps.eastWing.tiles, DungeonArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.eastWing.collision,
                 .openings = {
                     {.name = "west door", .side = Side::West, .span = {3, 6}, .transition = Transition::Scroll,
                      .leadsTo = {.area = Room::Hall, .opening = "east door"}},
                 }},
             WorldKit::Area{
-                .tiles = &maps.treasury.tiles,
-                .art = DungeonArt(assets),
+                .layers = {ground(maps.treasury.tiles, DungeonArt(assets), depths)},
+                .actorSlots = actorSlotsAt(depths),
                 .collision = &maps.treasury.collision,
                 .openings = {
                     {.name = "south wall", .side = Side::South, .span = {6, 23}, .transition = Transition::Seamless,
@@ -155,14 +183,17 @@ WorldKit::Layout dungeonOne(const Assets& assets, CameraKit::View view) {
     };
 }
 
-WorldKit::Layout seamlessForest(const Assets& assets, CameraKit::View view) {
+WorldKit::Layout seamlessForest(const Assets& assets, CameraKit::View view, const AreaDepths& depths) {
     using WorldKit::Side;
     using WorldKit::Transition;
     const SeamlessForestMaps& maps = assets.areas.seamlessForest;
-    const auto room = [&](const AreaMaps& area, std::vector<WorldKit::Opening> openings) {
+    const auto room = [&](const AreaMaps& area, std::vector<WorldKit::Opening> openings,
+                          std::vector<WorldKit::MapLayer> over = {}) {
+        std::vector<WorldKit::MapLayer> layers{ground(area.tiles, ForestArt(assets), depths)};
+        layers.insert(layers.end(), std::make_move_iterator(over.begin()), std::make_move_iterator(over.end()));
         return WorldKit::Area{
-            .tiles = &area.tiles,
-            .art = ForestArt(assets),
+            .layers = std::move(layers),
+            .actorSlots = actorSlotsAt(depths),
             .collision = &area.collision,
             .openings = std::move(openings),
         };
@@ -175,7 +206,8 @@ WorldKit::Layout seamlessForest(const Assets& assets, CameraKit::View view) {
                       .leadsTo = {.layout = Layout::Overworld, .area = Area::Field, .opening = "forest path"}},
                      {.name = "east wall", .side = Side::East, .span = {1, 14}, .transition = Transition::Seamless,
                       .leadsTo = {.area = Woods::Glade, .opening = "west wall"}},
-                 }),
+                 },
+                 {overlayLayer("path", maps.edgePath, assets, depths.underfoot)}),
             room(maps.glade,
                  {
                      {.name = "west wall", .side = Side::West, .span = {3, 16}, .transition = Transition::Seamless,
@@ -186,7 +218,8 @@ WorldKit::Layout seamlessForest(const Assets& assets, CameraKit::View view) {
                       .leadsTo = {.area = Woods::Hollow, .opening = "west wall"}},
                      {.name = "south wall", .side = Side::South, .span = {5, 22}, .transition = Transition::Seamless,
                       .leadsTo = {.area = Woods::Clearing, .opening = "north wall"}},
-                 }),
+                 },
+                 {overlayLayer("canopy", maps.gladeCanopy, assets, depths.overhead)}),
             room(maps.thicket,
                  {
                      {.name = "south wall", .side = Side::South, .span = {1, 10}, .transition = Transition::Seamless,
@@ -260,6 +293,16 @@ retropp::TileCatalog DungeonArt(const Assets& assets) {
     }};
 }
 
+retropp::TileCatalog OverlayArt(const Assets& assets) {
+    const Palettes& palettes = assets.palettes;
+    return retropp::TileCatalog{.entries = {
+        overlay(assets, OverlayCell::None, OverlayTile::Nothing, palettes.floor),
+        overlay(assets, OverlayCell::Path, OverlayTile::Path, palettes.floor),
+        overlay(assets, OverlayCell::Roof, OverlayTile::Roof, palettes.wall),
+        overlay(assets, OverlayCell::Canopy, OverlayTile::Canopy, palettes.canopy),
+    }};
+}
+
 retropp::TileCatalog ForestArt(const Assets& assets) {
     const Palettes& palettes = assets.palettes;
     return retropp::TileCatalog{.entries = {
@@ -271,8 +314,9 @@ retropp::TileCatalog ForestArt(const Assets& assets) {
     }};
 }
 
-WorldKit::World gameWorld(const Assets& assets, CameraKit::View view) {
-    WorldKit::World world{.layouts = {overworld(assets, view), dungeonOne(assets, view), seamlessForest(assets, view)}};
+WorldKit::World gameWorld(const Assets& assets, CameraKit::View view, const AreaDepths& depths) {
+    WorldKit::World world{.layouts = {overworld(assets, view, depths), dungeonOne(assets, view, depths),
+                                      seamlessForest(assets, view, depths)}};
     WorldKit::validate(world);
     return world;
 }

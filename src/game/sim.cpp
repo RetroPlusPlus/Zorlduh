@@ -6,8 +6,8 @@
 
 namespace zorlduh {
 
-Config gameConfig(const Assets& assets, CameraKit::View view) {
-    return Config{.player = PlayerConfig(assets), .world = gameWorld(assets, view)};
+Config gameConfig(const Assets& assets, CameraKit::View view, const AreaDepths& depths) {
+    return Config{.player = PlayerConfig(assets), .world = gameWorld(assets, view, depths)};
 }
 
 void tick(GameState& state, const Input& input, const Config& config) {

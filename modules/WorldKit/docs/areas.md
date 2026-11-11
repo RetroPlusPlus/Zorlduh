@@ -4,7 +4,8 @@ What a world is made of, and the check that it holds together. The types are in
 `include/WorldKit/area.h`.
 
 ```cpp
-#include "WorldKit/area.h"   // Side, Transition, Span, Destination, Opening, CellValue, Area, CameraLaw, Layout, World, Place, validate
+#include "WorldKit/area.h"   // Side, Transition, Span, Destination, Opening, CellValue, MapLayer, ActorSlot, Area,
+                             // CameraLaw, Layout, World, Place, validate, ActorZ
 ```
 
 ## Contents
@@ -12,11 +13,14 @@ What a world is made of, and the check that it holds together. The types are in
 - [`Side`, `Transition`, `Span`](#side-transition-span)
 - [`Destination`](#destination)
 - [`Opening`](#opening)
+- [`MapLayer`](#maplayer)
+- [`ActorSlot`](#actorslot)
 - [`Area`](#area)
 - [`CameraLaw`](#cameralaw)
 - [`Layout`](#layout)
 - [`World`, `Place`](#world-place)
 - [`validate`](#validate)
+- [`ActorZ`](#actorz)
 
 ## `Side`, `Transition`, `Span`
 
@@ -82,19 +86,65 @@ A scroll opening is in a wall and leads to an opening in the facing wall of the 
 the same length. A seam is the same, and its far end is a seam that leads back to it with the opposite
 offset. A fade opening is either kind and leads to either kind.
 
+## `MapLayer`
+
+```cpp
+struct MapLayer {
+    std::string name;                            // part of the layer's key; unique within its area
+    const retropp::IndexGrid* tiles = nullptr;   // one map value per cell, the collision map's size
+    retropp::TileCatalog art{};                  // which tile and palette each map value draws as
+    std::int32_t z = 0;                          // the layer's depth on the engine's z axis: lower is below
+};
+```
+
+One tile map of an area, drawn on a layer of its own at its own depth. The ground is a layer like any
+other; a path under the player's feet, a canopy over the player's head and the inside of a cave mouth
+are more of them. `art` is an engine `TileCatalog`, so two areas drawn from the same map values can
+look different, and one layer can draw from several sheets.
+
+Every layer's map is the size of the area. A layer that covers only part of the area draws nothing in
+its other cells: their catalog entries name a slot whose every pixel is in the sheet's
+transparent-index set (`retropp::TransparentIndices`, given when the sheet is uploaded), so what is
+below shows through. The same goes for gaps inside a tile, such as the space between a canopy's
+leaves.
+
+```cpp
+{.name = "ground", .tiles = &maps.glade.tiles, .art = ForestArt(assets), .z = depths.ground},
+{.name = "canopy", .tiles = &maps.gladeCanopy, .art = OverlayArt(assets), .z = depths.overhead},
+```
+
+## `ActorSlot`
+
+```cpp
+struct ActorSlot {
+    std::string name;   // what a game asks for it by; unique among the area's layers and slots
+    std::int32_t z = 0; // its depth on the same axis as the map layers
+};
+```
+
+A named depth in an area for the things that move in it: the player, the people and creatures in it.
+A slot holds nothing and WorldKit draws nothing at it; a game draws its sprites there through
+[`Actors`](drawing.md#actors), or reads the depth through [`ActorZ`](#actorz), and they land among the
+area's map layers — over every map layer below the slot's depth and under every one above it. An area
+has as many slots as it needs, or none: an `"actors"` slot over the ground and under a canopy, a
+`"flyers"` slot above the canopy, a `"swimmers"` slot under a water surface.
+
 ## `Area`
 
 ```cpp
 struct Area {
-    const retropp::IndexGrid* tiles = nullptr;       // one map value per cell
-    retropp::TileCatalog art{};                      // which tile and palette each map value draws as
-    const retropp::IndexGrid* collision = nullptr;   // the same size; one value is open
+    std::vector<MapLayer> layers;                    // at least one
+    std::vector<ActorSlot> actorSlots;               // any number
+    const retropp::IndexGrid* collision = nullptr;   // the area's size; one value is open
     std::vector<Opening> openings;
 };
 ```
 
-The maps are the game's and must outlive the world. `art` is an engine `TileCatalog`, so two areas
-drawn from the same map values can look different, and one area can draw from several sheets.
+The layers and slots are in no required order; each one's `z` places it. The maps are the game's and
+must outlive the world. Every depth is the game's: it hands them in when it builds the world, from the
+one table it keeps its depths in, so that the sprite layers it draws and the layers above the world
+(see [`TopZ`](drawing.md#topz)) are placed against the same numbers. Collision, the openings and the
+camera read the collision map alone; the layers are only drawn.
 
 ## `CameraLaw`
 
@@ -166,8 +216,14 @@ Each message names the layout and area by index and, where there is one, the ope
 | Rejected | Message ends |
 |---|---|
 | a cell size of zero or less | `'s cell size must be positive` |
-| an area with either map missing | `has no tile map or no collision map` |
-| an area whose maps differ in size | `'s tile map and collision map differ in size` |
+| an area with no collision map | `has no collision map` |
+| an area with no map layers | `has no layers` |
+| a map layer with no name | `has a layer with no name` |
+| an actor slot with no name | `has an actor slot with no name` |
+| two map layers or slots in one area with one name | `layer '…' is named twice` |
+| a map layer with no map | `layer '…' has no map` |
+| a map layer whose map is not the collision map's size | `layer '…''s map differs in size from the collision map` |
+| two map layers or slots in one area at one depth | `layer '…' is at the same depth as layer '…'` |
 | an opening with no name | `has an opening with no name` |
 | two openings in one area with one name | `is named twice` |
 | an opening neither in a wall nor at a spot, or both | `must be in one wall or at one spot` |
@@ -187,5 +243,16 @@ Each message names the layout and area by index and, where there is one, the ope
 | a seam whose far end's offset is not the opposite of its own | `joins seamlessly into '…', whose offset is not the negation of its own` |
 
 Not checked: that the map's cells agree with the openings (a doorway cell at each span, open in the
-collision map), or that a scroll or a fade leads back. A game that wants either tests its own data for
-it.
+collision map), that a scroll or a fade leads back, or that two areas joined by a seam give a slot the
+same depth. A game that wants any of these tests its own data for it.
+
+## `ActorZ`
+
+```cpp
+std::int32_t ActorZ(const World& world, Place place, std::string_view slot);
+```
+
+The depth of the actor slot named `slot` in the area at `place`. Throws `std::out_of_range`, naming the
+layout, the area and the slot, when the area has no slot by that name. [`Actors`](drawing.md#actors)
+reads it for the current area; a game reads it for anything else it places at a slot, such as a
+neighbor's inhabitants across a seam ([how-to.md](how-to.md#put-things-in-an-area)).

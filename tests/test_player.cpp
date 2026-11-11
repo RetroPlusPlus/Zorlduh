@@ -1,6 +1,7 @@
 // The player: its walker config, where it starts, walking the real world map through the tick, the
-// controls read into Input, and the Player component. The config and the component use the game's real
-// assets, loaded through a renderer on a GPU device.
+// depths it is drawn at among the world's layers, the controls read into Input, and the Player
+// component. The config and the component use the game's real assets, loaded through a renderer on a
+// GPU device.
 
 #include <gtest/gtest.h>
 
@@ -27,6 +28,9 @@
 #include "game/sim.h"
 #include "input/input.h"
 #include "TopDownMovement/walker.h"
+#include "WorldKit/area.h"
+#include "WorldKit/world_layers.h"
+#include "render/layers.h"
 #include "render/layout.h"
 #include "render/player.h"
 
@@ -53,9 +57,16 @@ zorlduh::Assets headlessAssets() {
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
+    assets.overlay = retropp::AtlasManifest{
+        .atlasId = retropp::AtlasId{11},
+        .slots = retropp::sliceLayout({.width = 32, .height = 8}, {.width = 8, .height = 8},
+                                      retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
+        .kind = retropp::ContentKind::Tileset,
+    };
     zorlduh::OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
     overworld.meadow.collision = retropp::loadMapPng("assets/maps/overworld/meadow/collision.png");
+    overworld.meadowOverhang = retropp::loadMapPng("assets/maps/overworld/meadow/overhang.png");
     overworld.lake.tiles = retropp::loadMapPng("assets/maps/overworld/lake/tiles.png");
     overworld.lake.collision = retropp::loadMapPng("assets/maps/overworld/lake/collision.png");
     overworld.field.tiles = retropp::loadMapPng("assets/maps/overworld/field/tiles.png");
@@ -78,8 +89,10 @@ zorlduh::Assets headlessAssets() {
     zorlduh::SeamlessForestMaps& forest = assets.areas.seamlessForest;
     forest.edge.tiles = retropp::loadMapPng("assets/maps/seamless-forest/edge/tiles.png");
     forest.edge.collision = retropp::loadMapPng("assets/maps/seamless-forest/edge/collision.png");
+    forest.edgePath = retropp::loadMapPng("assets/maps/seamless-forest/edge/path.png");
     forest.glade.tiles = retropp::loadMapPng("assets/maps/seamless-forest/glade/tiles.png");
     forest.glade.collision = retropp::loadMapPng("assets/maps/seamless-forest/glade/collision.png");
+    forest.gladeCanopy = retropp::loadMapPng("assets/maps/seamless-forest/glade/canopy.png");
     forest.thicket.tiles = retropp::loadMapPng("assets/maps/seamless-forest/thicket/tiles.png");
     forest.thicket.collision = retropp::loadMapPng("assets/maps/seamless-forest/thicket/collision.png");
     forest.bower.tiles = retropp::loadMapPng("assets/maps/seamless-forest/bower/tiles.png");
@@ -93,9 +106,9 @@ zorlduh::Assets headlessAssets() {
     return assets;
 }
 
-// The game as gameConfig makes it.
+// The game as main makes it: the view and the depths from the render side.
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths);
     config.player.timing = kHz60;
     return config;
 }
@@ -157,6 +170,32 @@ TEST(Player, KeepsWalkingAndAnimatingThroughTicksThatMoveItNowhereElse) {
     // The stride is not reset by the camera's empty move: twelve ticks in, the second walk frame shows.
     EXPECT_TRUE(state.player.moving());
     EXPECT_EQ(state.player.position(), (Vec2i{72, 68}));
+}
+
+// ── Its depth among the world's layers ──────────────────────────────────────────────────────
+
+// The depth table is the one the world is built at: the actors between what lies underfoot and what
+// hangs overhead in every area, and the effects and the HUD over the world's top.
+TEST(Player, IsDrawnAtTheActorsDepthInEveryAreaBetweenUnderfootAndOverhead) {
+    EXPECT_LT(zorlduh::kGroundZ, zorlduh::kUnderfootZ);
+    EXPECT_LT(zorlduh::kUnderfootZ, zorlduh::kActorsZ);
+    EXPECT_LT(zorlduh::kActorsZ, zorlduh::kOverheadZ);
+    EXPECT_EQ(zorlduh::kAreaDepths.ground, zorlduh::kGroundZ);
+    EXPECT_EQ(zorlduh::kAreaDepths.underfoot, zorlduh::kUnderfootZ);
+    EXPECT_EQ(zorlduh::kAreaDepths.actors, zorlduh::kActorsZ);
+    EXPECT_EQ(zorlduh::kAreaDepths.overhead, zorlduh::kOverheadZ);
+
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    for (std::size_t l = 0; l < config.world.layouts.size(); ++l) {
+        for (std::size_t a = 0; a < config.world.layouts[l].areas.size(); ++a) {
+            const WorldKit::Place place{.layout = static_cast<int>(l), .area = static_cast<int>(a)};
+            EXPECT_EQ(WorldKit::ActorZ(config.world, place, zorlduh::kActorSlot), zorlduh::kActorsZ) << l << ":" << a;
+        }
+    }
+    EXPECT_EQ(WorldKit::TopZ(config.world), zorlduh::kOverheadZ);
+    EXPECT_GT(zorlduh::EffectsZ(config.world), zorlduh::kOverheadZ);
+    EXPECT_GT(zorlduh::HudZ(config.world), zorlduh::EffectsZ(config.world));
 }
 
 // ── The controls ─────────────────────────────────────────────────────────────────────────────

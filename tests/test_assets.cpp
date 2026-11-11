@@ -1,8 +1,9 @@
 // The files under assets/: every one is baked into any binary that links the game's library; each
 // sheet decodes to the size and carve the game loads it with and holds palette indices only; each
 // palette image holds four colors; each area's maps are the same size, hold only world and collision
-// ids, are ringed by wall except their doorways, and are solid exactly where the area is wall or water.
-// No renderer is needed.
+// ids, are ringed by wall except their doorways, and are solid exactly where the area is wall or water;
+// each further layer's map is its area's size and holds overlay ids exactly where the layer draws. No
+// renderer is needed.
 
 #include <gtest/gtest.h>
 
@@ -126,7 +127,7 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 49);
+    EXPECT_EQ(files, 54);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
@@ -147,6 +148,32 @@ TEST(Assets, ForestSheetIsOneTilePerForestTile) {
     expectIndicesOnly(sheet);
     EXPECT_EQ(slotCount(sheet, {.width = 8, .height = 8}, ContentKind::Tileset),
               static_cast<std::size_t>(zorlduh::ForestTile::Trodden) + 1);
+}
+
+// The overlay sheet's index 0 is its transparent index: the Nothing slot holds only index 0, the canopy
+// has gaps of 0 the ground shows through, and the path and the roof have none.
+TEST(Assets, OverlaySheetIsNothingThenCanopyPathAndRoof) {
+    const LoadedImage sheet = decode("gfx/tiles/overlay.png");
+    EXPECT_EQ(sheet.width, 32);
+    EXPECT_EQ(sheet.height, 8);
+    expectIndicesOnly(sheet);
+    EXPECT_EQ(slotCount(sheet, {.width = 8, .height = 8}, ContentKind::Tileset),
+              static_cast<std::size_t>(zorlduh::OverlayTile::Roof) + 1);
+    const auto holes = [&](zorlduh::OverlayTile tile) {
+        int count = 0;
+        const int left = static_cast<int>(tile) * 8;
+        for (int y = 0; y < 8; ++y) {
+            for (int x = left; x < left + 8; ++x) {
+                count += sheet.indices[static_cast<std::size_t>(y * sheet.width + x)] == 0 ? 1 : 0;
+            }
+        }
+        return count;
+    };
+    EXPECT_EQ(holes(zorlduh::OverlayTile::Nothing), 64);
+    EXPECT_GT(holes(zorlduh::OverlayTile::Canopy), 0);
+    EXPECT_LT(holes(zorlduh::OverlayTile::Canopy), 16);
+    EXPECT_EQ(holes(zorlduh::OverlayTile::Path), 0);
+    EXPECT_EQ(holes(zorlduh::OverlayTile::Roof), 0);
 }
 
 TEST(Assets, PlayerSheetIsFourFacingsOfTwoWalkFrames) {
@@ -211,9 +238,10 @@ TEST(Assets, TerrainPalettesAreFourOpaqueColors) {
     }
 }
 
-TEST(Assets, SpritePalettesLeaveEntryZeroUndrawn) {
+// The palettes drawn through a sheet whose index 0 is transparent: the sprites, the HUD, and the canopy.
+TEST(Assets, PalettesOfSheetsWithAHoleLeaveEntryZeroUndrawn) {
     for (const char* path : {"palettes/sprites/player.png", "palettes/sprites/enemy.png",
-                             "palettes/sprites/sword.png", "palettes/hud/hearts.png"}) {
+                             "palettes/sprites/sword.png", "palettes/hud/hearts.png", "palettes/tiles/canopy.png"}) {
         const std::vector<retropp::Rgba16> entries = retropp::slicePaletteImage(decode(path));
         ASSERT_EQ(entries.size(), 4u) << path;
         EXPECT_EQ(entries[0].a, 0) << path;
@@ -371,6 +399,39 @@ TEST(Assets, TheForestsRoomsAreOpenAlongTheirSeamsAndTheFieldHasItsForestPath) {
     EXPECT_EQ(clearing.at(0, 0), value(WorldCell::Wall));
     EXPECT_EQ(clearing.at(19, 0), value(WorldCell::Wall));
     EXPECT_EQ(brook.at(19, 0), value(WorldCell::Wall));
+}
+
+// Each further layer is drawn over a whole area, so its map is the area's size: the named OverlayCell in
+// exactly the cells the layer covers, None everywhere else.
+TEST(Assets, EachLayerMapIsItsAreasSizeAndDrawsExactlyItsCells) {
+    using zorlduh::OverlayCell;
+    struct LayerFile {
+        const char* path;
+        retropp::IndexGrid map;
+        int width;
+        int height;
+        OverlayCell cell;
+        bool (*covers)(int x, int y);
+    };
+    const std::vector<LayerFile> layers{
+        {"overhang", retropp::loadMapPng("assets/maps/overworld/meadow/overhang.png"), 20, 16, OverlayCell::Roof,
+         [](int x, int y) { return x >= 12 && x <= 13 && y >= 3 && y <= 4; }},
+        {"path", retropp::loadMapPng("assets/maps/seamless-forest/edge/path.png"), 20, 16, OverlayCell::Path,
+         [](int x, int y) { return (x >= 9 && x <= 10 && y >= 1 && y <= 7) || (x >= 9 && x <= 18 && y >= 7 && y <= 8); }},
+        {"canopy", retropp::loadMapPng("assets/maps/seamless-forest/glade/canopy.png"), 30, 20, OverlayCell::Canopy,
+         [](int x, int y) { return x >= 4 && x <= 25 && y >= 6 && y <= 9; }},
+    };
+    for (const LayerFile& layer : layers) {
+        const retropp::IndexGrid& map = layer.map;
+        ASSERT_EQ(map.width, layer.width) << layer.path;
+        ASSERT_EQ(map.height, layer.height) << layer.path;
+        for (int y = 0; y < map.height; ++y) {
+            for (int x = 0; x < map.width; ++x) {
+                const OverlayCell expected = layer.covers(x, y) ? layer.cell : OverlayCell::None;
+                EXPECT_EQ(map.at(x, y), static_cast<std::uint16_t>(expected)) << layer.path << " " << x << "," << y;
+            }
+        }
+    }
 }
 
 TEST(Assets, CollisionIsSolidExactlyWhereTheAreaIsWallOrWater) {

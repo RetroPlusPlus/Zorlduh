@@ -4,13 +4,16 @@ and collision map.
 
     assets/gfx/tiles/terrain.png                  the terrain tiles, one per world id
     assets/gfx/tiles/forest.png                   the forest's tiles: grass, tree, stream, trodden
+    assets/gfx/tiles/overlay.png                  what lies over or under the player: nothing, canopy,
+                                                  path, roof
     assets/gfx/sprites/{player,enemy,sword}.png   the sprite sheets
     assets/gfx/hud/hearts.png                     the HUD's hearts
-    assets/palettes/tiles/{floor,wall,water,grass,leaf}.png
+    assets/palettes/tiles/{floor,wall,water,grass,leaf,canopy}.png
     assets/palettes/sprites/{player,enemy,sword}.png
     assets/palettes/hud/hearts.png
     assets/maps/<layout>/<area>/tiles.png         one world id per cell, for each area of each layout
     assets/maps/<layout>/<area>/collision.png     one collision id per cell, for each area of each layout
+    assets/maps/<layout>/<area>/<layer>.png       one overlay id per cell, for each further layer of an area
 
 A sheet is atlas art: a 2-bit grayscale PNG whose samples are palette indices 0-3, so an image viewer
 shows its four indices as black, dark gray, light gray and white. It carries no color. Color comes
@@ -18,9 +21,11 @@ from a palette image chosen when a tile or sprite is drawn: a 4×1 truecolor RGB
 palette entry, dark at entry 0 to light at entry 3 like the gray levels.
 
 A map is an 8-bit grayscale PNG whose sample value is a cell's id: a world id (WorldCell in
-src/assets/assets.h) or a collision id (CollisionCell). The ids are spread across the sample range so
-a map reads by eye in an image viewer: stairs are near black, and floor and open cells are light. Each
-area is its own pair of maps; nothing outside an area exists.
+src/assets/assets.h), a collision id (CollisionCell) or an overlay id (OverlayCell). The ids are spread
+across the sample range so a map reads by eye in an image viewer: stairs are near black, floor and open
+cells are light, and an overlay map is black wherever it draws nothing. Each area is its own pair of
+maps, and an area drawn in more than one layer has one more map per further layer; nothing outside an
+area exists.
 
 The output is deterministic. The zlib stream is written as stored (uncompressed) blocks, so the bytes
 do not depend on the zlib build, and running the script again writes identical files.
@@ -110,6 +115,9 @@ WALL_PAL = [(32, 32, 48, 255), (88, 88, 112, 255), (144, 144, 168, 255), (208, 2
 WATER_PAL = [(16, 48, 88, 255), (40, 104, 176, 255), (88, 168, 224, 255), (176, 224, 248, 255)]
 GRASS_PAL = [(40, 56, 16, 255), (96, 128, 40, 255), (152, 184, 72, 255), (208, 224, 128, 255)]   # yellowish greens
 LEAF_PAL = [(8, 24, 24, 255), (24, 64, 56, 255), (48, 104, 88, 255), (96, 152, 120, 255)]       # darker, bluish greens
+# The canopy over the player: deeper greens than the trees around it, so what is overhead reads darker.
+# Its entry 0 is the overlay sheet's transparent index and is never drawn.
+CANOPY_PAL = [UNUSED, (8, 32, 16, 255), (24, 64, 32, 255), (56, 104, 56, 255)]
 
 PLAYER_PAL = [UNUSED, (40, 24, 32, 255), (200, 80, 56, 255), (248, 224, 192, 255)]   # outline, cloak, face
 ENEMY_PAL = [UNUSED, (32, 8, 48, 255), (128, 64, 192, 255), (240, 240, 160, 255)]    # outline, body, eyes
@@ -254,6 +262,48 @@ TRODDEN = parse([
 ], 8, 8)
 
 FOREST = side_by_side(GRASS, TREE, STREAM, TRODDEN)
+
+# What lies over or under the player, one 8×8 tile per OverlayTile in src/assets/assets.h. The overlay
+# sheet's index 0 is transparent, so Nothing (every pixel 0) draws nothing and the gaps in the canopy
+# show what is below; the path and the roof have no gaps. The canopy is drawn through the canopy
+# palette, the path through the floor palette and the roof through the wall palette.
+
+NOTHING = parse(["........"] * 8, 8, 8)
+
+CANOPY = parse([
+    "1232.321",
+    "23332332",
+    "3.233223",
+    "23322.32",
+    "12332321",
+    "232.3323",
+    "33223.32",
+    ".2321232",
+], 8, 8)
+
+PATH = parse([
+    "21221212",
+    "12112121",
+    "22121222",
+    "11212112",
+    "21222121",
+    "12121212",
+    "22112122",
+    "12221211",
+], 8, 8)
+
+ROOF = parse([
+    "33333333",
+    "22232222",
+    "22232221",
+    "11111111",
+    "23222232",
+    "22222321",
+    "12222221",
+    "11111111",
+], 8, 8)
+
+OVERLAY = side_by_side(NOTHING, CANOPY, PATH, ROOF)
 
 # The player: a hooded traveler in a cloak. Rows Down, Up, Left, Right; two walk frames each. The
 # second Down and Up frames are the first mirrored, and Right is Left mirrored.
@@ -454,6 +504,9 @@ STAIRS_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 32, 64, 128, 192, 255
 # Collision ids, as CollisionCell in src/assets/assets.h: solid is black, open is white.
 SOLID_ID, OPEN_ID = 0, 255
 
+# Overlay ids, as OverlayCell in src/assets/assets.h: None, where the layer draws nothing, is black.
+NONE_ID, PATH_ID, ROOF_ID, CANOPY_ID = 0, 96, 160, 255
+
 
 def column(x, first, last):
     return [(x, y) for y in range(first, last + 1)]
@@ -463,14 +516,21 @@ def row(y, first, last):
     return [(x, y) for x in range(first, last + 1)]
 
 
+def block(left, top, right, bottom):
+    """Every cell from (left, top) to (right, bottom), inclusive."""
+    return [(x, y) for y in range(top, bottom + 1) for x in range(left, right + 1)]
+
+
 # The pond in the lake's interior: rows of (first column, last column), from its top row down.
 POND_TOP = 5
 POND_ROWS = [(18, 21), (17, 22), (16, 23), (16, 23), (17, 22), (18, 21)]
 
 LAYOUTS = {
     "overworld": {
-        # The start: exactly one play area, with a door east, a road south and the cave mouth inside.
-        "meadow": dict(size=(20, 16), doorways=column(19, 6, 9) + row(15, 8, 11), stairs=[(12, 4), (13, 4)]),
+        # The start: exactly one play area, with a door east, a road south and the cave mouth inside,
+        # under an overhang of rock over the mouth and the row above it.
+        "meadow": dict(size=(20, 16), doorways=column(19, 6, 9) + row(15, 8, 11), stairs=[(12, 4), (13, 4)],
+                       layers={"overhang": (ROOF_ID, block(12, 3, 13, 4))}),
         # Two play areas wide, with a pond; the camera follows across it. The dungeon door, past the
         # pond, fades down into DungeonOne.
         "lake": dict(size=(40, 16), doorways=column(0, 6, 9), stairs=[(30, 2), (31, 2)], pond=True),
@@ -496,11 +556,15 @@ LAYOUTS = {
     # Seven rooms joined only by seams, each a different case of how the camera follows.
     "seamless-forest": {
         # Exactly one play area: the path north back up to the field, and its east wall open into the
-        # glade. It follows on both axes and comes into its own place only as the player walks.
-        "edge": dict(size=(20, 16), doorways=row(0, 8, 11) + column(19, 1, 14)),
+        # glade. It follows on both axes and comes into its own place only as the player walks. A path
+        # runs under the player's feet from the north door down and east to the glade.
+        "edge": dict(size=(20, 16), doorways=row(0, 8, 11) + column(19, 1, 14),
+                     layers={"path": (PATH_ID, block(9, 1, 10, 7) + block(9, 7, 18, 8))}),
         # Bigger than the play area both ways, with a seam in every wall: into the edge, the thicket,
-        # the hollow and the clearing.
-        "glade": dict(size=(30, 20), doorways=column(0, 3, 16) + row(0, 12, 21) + column(29, 8, 15) + row(19, 5, 22)),
+        # the hollow and the clearing. A band of canopy across it, which the player walks under on the
+        # way from the edge to the hollow.
+        "glade": dict(size=(30, 20), doorways=column(0, 3, 16) + row(0, 12, 21) + column(29, 8, 15) + row(19, 5, 22),
+                      layers={"canopy": (CANOPY_ID, block(4, 6, 25, 9))}),
         # Smaller than the play area both ways, with two seams: the glade below and the bower beside it
         # make it big enough to follow on both axes.
         "thicket": dict(size=(12, 10), doorways=row(9, 1, 10) + column(11, 1, 8)),
@@ -536,6 +600,15 @@ def collision_cells(area):
     return [[SOLID_ID if cell in solid else OPEN_ID for cell in r] for r in area]
 
 
+def layer_cells(size, value, cells):
+    """An overlay map of the area's size: `value` at `cells`, nothing everywhere else."""
+    width, height = size
+    out = [[NONE_ID] * width for _ in range(height)]
+    for (x, y) in cells:
+        out[y][x] = value
+    return out
+
+
 # ── Output ───────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -544,6 +617,7 @@ def files():
     out = {
         "gfx/tiles/terrain.png": sheet_png(TILES),
         "gfx/tiles/forest.png": sheet_png(FOREST),
+        "gfx/tiles/overlay.png": sheet_png(OVERLAY),
         "gfx/sprites/player.png": sheet_png(PLAYER),
         "gfx/sprites/enemy.png": sheet_png(ENEMY),
         "gfx/sprites/sword.png": sheet_png(SWORD),
@@ -553,6 +627,7 @@ def files():
         "palettes/tiles/water.png": palette_png(WATER_PAL),
         "palettes/tiles/grass.png": palette_png(GRASS_PAL),
         "palettes/tiles/leaf.png": palette_png(LEAF_PAL),
+        "palettes/tiles/canopy.png": palette_png(CANOPY_PAL),
         "palettes/sprites/player.png": palette_png(PLAYER_PAL),
         "palettes/sprites/enemy.png": palette_png(ENEMY_PAL),
         "palettes/sprites/sword.png": palette_png(SWORD_PAL),
@@ -560,9 +635,13 @@ def files():
     }
     for layout, areas in LAYOUTS.items():
         for name, spec in areas.items():
+            spec = dict(spec)
+            layers = spec.pop("layers", {})
             area = area_cells(**spec)
             out[f"maps/{layout}/{name}/tiles.png"] = map_png(area)
             out[f"maps/{layout}/{name}/collision.png"] = map_png(collision_cells(area))
+            for layer, (value, cells) in layers.items():
+                out[f"maps/{layout}/{name}/{layer}.png"] = map_png(layer_cells(spec["size"], value, cells))
     return out
 
 

@@ -1,6 +1,7 @@
-// The player on screen: its walker's sprite, keyed "player", in world pixels for the actors layer.
+// The player on screen: its walker's sprite, keyed "player", in the current area's pixels, for the
+// sprite layer at the area's actor slot.
 //
-//     LayerKit::SpriteLayer(kActorsLayer, kActorsZ, {Player(state, player)}, {.scroll = camera});
+//     WorldKit::Actors(state.camera, world, kActorSlot, {Player(state, player)});
 #pragma once
 
 #include "game/sim.h"

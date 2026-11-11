@@ -1,6 +1,6 @@
 // The game's art and maps: every sheet uploaded as an atlas, every palette uploaded from its palette
-// image, and each area's tile and collision maps, loaded once at startup and handed to whatever draws
-// or reads them.
+// image, and each area's tile and collision maps and the maps of its further layers, loaded once at
+// startup and handed to whatever draws or reads them.
 //
 //     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
 //
@@ -43,6 +43,15 @@ enum class CollisionCell : std::uint16_t {
     Open = 255,
 };
 
+// The value of a cell in a map drawn over or under the player, assets/maps/<layout>/<area>/<layer>.png:
+// None, where the layer draws nothing, is black, so a viewer shows only what the layer draws.
+enum class OverlayCell : std::uint16_t {
+    None = 0,
+    Path = 96,    // a trodden path, under the player's feet
+    Roof = 160,   // rock overhead
+    Canopy = 255, // leaves overhead
+};
+
 // The slots of the terrain sheet: one 8×8 tile per WorldCell.
 enum class TerrainTile : std::size_t {
     Floor = 0,
@@ -59,6 +68,15 @@ enum class ForestTile : std::size_t {
     Tree = 1,
     Stream = 2,
     Trodden = 3,
+};
+
+// The slots of the overlay sheet: one 8×8 tile per OverlayCell. Index 0 is the sheet's transparent
+// index, so Nothing draws nothing and the gaps in the canopy show what is below.
+enum class OverlayTile : std::size_t {
+    Nothing = 0,
+    Canopy = 1,
+    Path = 2,
+    Roof = 3,
 };
 
 // The animations of the player sheet: one row of two walk frames per facing. A standing player
@@ -84,8 +102,9 @@ struct Palettes {
     retropp::PaletteId floor{};  // Floor and Doorway tiles
     retropp::PaletteId wall{};
     retropp::PaletteId water{};
-    retropp::PaletteId grass{};  // the forest's ground and doorways
-    retropp::PaletteId leaf{};   // the forest's trees
+    retropp::PaletteId grass{};   // the forest's ground and doorways
+    retropp::PaletteId leaf{};    // the forest's trees
+    retropp::PaletteId canopy{};  // leaves overhead; entry 0 is never drawn
     retropp::PaletteId player{};
     retropp::PaletteId enemy{};
     retropp::PaletteId sword{};
@@ -101,11 +120,12 @@ struct AreaMaps {
 
 // The overworld's areas' maps, from assets/maps/overworld/<area>/.
 struct OverworldMaps {
-    AreaMaps meadow;  // 20×16 cells: the start
-    AreaMaps lake;    // 40×16, with a pond and the dungeon door
-    AreaMaps field;   // 30×16
-    AreaMaps shrine;  // 12×10
-    AreaMaps cave;    // 12×10
+    AreaMaps meadow;                    // 20×16 cells: the start
+    retropp::IndexGrid meadowOverhang;  // the meadow's size, OverlayCell values: rock over the cave mouth
+    AreaMaps lake;                      // 40×16, with a pond and the dungeon door
+    AreaMaps field;                     // 30×16
+    AreaMaps shrine;                    // 12×10
+    AreaMaps cave;                      // 12×10
 };
 
 // DungeonOne's rooms' maps, from assets/maps/dungeon-one/<room>/.
@@ -119,13 +139,15 @@ struct DungeonOneMaps {
 
 // SeamlessForest's rooms' maps, from assets/maps/seamless-forest/<room>/.
 struct SeamlessForestMaps {
-    AreaMaps edge;      // 20×16: the path up to the field, open along its east wall to the glade
-    AreaMaps glade;     // 30×20: open in every wall
-    AreaMaps thicket;   // 12×10: open along its south and east walls
-    AreaMaps bower;     // 16×10: open along its west wall
-    AreaMaps hollow;    // 20×8: open along both side walls
-    AreaMaps brook;     // 20×8: open along its west wall
-    AreaMaps clearing;  // 20×16: open along its north wall
+    AreaMaps edge;                   // 20×16: the path up to the field, open along its east wall to the glade
+    retropp::IndexGrid edgePath;     // the edge's size, OverlayCell values: a path from the north door to the glade
+    AreaMaps glade;                  // 30×20: open in every wall
+    retropp::IndexGrid gladeCanopy;  // the glade's size, OverlayCell values: a band of leaves across it
+    AreaMaps thicket;                // 12×10: open along its south and east walls
+    AreaMaps bower;                  // 16×10: open along its west wall
+    AreaMaps hollow;                 // 20×8: open along both side walls
+    AreaMaps brook;                  // 20×8: open along its west wall
+    AreaMaps clearing;               // 20×16: open along its north wall
 };
 
 // Every area's maps, by layout.
@@ -138,6 +160,7 @@ struct AreaMapSet {
 struct Assets {
     retropp::AtlasManifest terrain;  // Tileset of 8×8 tiles, slots in TerrainTile order
     retropp::AtlasManifest forest;   // Tileset of 8×8 tiles, slots in ForestTile order
+    retropp::AtlasManifest overlay;  // Tileset of 8×8 tiles, slots in OverlayTile order
     retropp::AtlasManifest player;   // AnimationSeries of 16×16 frames, animations in PlayerWalk order
     TopDownMovement::DirectionalAnimations playerWalk;  // each facing's row of the player sheet, two
                                                         // frames of 8 ticks each, through the player palette
@@ -149,9 +172,8 @@ struct Assets {
 };
 
 // Uploads every sheet and palette to `renderer` and decodes every area's maps. Index 0 is transparent
-// on the player, enemy, sword and hearts sheets; the terrain and forest sheets have no transparent
-// index. Throws
-// std::runtime_error when a file cannot be decoded or uploaded.
+// on the overlay, player, enemy, sword and hearts sheets; the terrain and forest sheets have no
+// transparent index. Throws std::runtime_error when a file cannot be decoded or uploaded.
 [[nodiscard]] Assets loadAssets(retropp::Renderer& renderer);
 
 }  // namespace zorlduh

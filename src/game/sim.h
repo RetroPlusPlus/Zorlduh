@@ -1,7 +1,7 @@
 // The simulation: the game's whole state, what it is configured by, and the tick that advances it. The
 // tick changes the state; everything on screen only reads it.
 //
-//     const zorlduh::Config config = zorlduh::gameConfig(assets, kView);
+//     const zorlduh::Config config = zorlduh::gameConfig(assets, kView, kAreaDepths);
 //     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
 //     state.camera.place(config.world, state.player.collision(config.player).bounds());
 //     zorlduh::tick(state, zorlduh::readInput(in), config);   // once per tick
@@ -29,7 +29,8 @@ struct Input {
 // What the tick says happened. Presentation and audio read these; the tick clears them first.
 struct AreaChanged {
     Layout layout;  // the layout the player is now in
-    int area;       // the area in it: an Area in the overworld, a Room in DungeonOne
+    int area;       // the area in it: an Area in the overworld, a Room in DungeonOne, a Woods in
+                    // SeamlessForest
 };
 using GameEvent = std::variant<AreaChanged>;
 
@@ -39,7 +40,9 @@ struct Config {
     WorldKit::World world;
 };
 
-[[nodiscard]] Config gameConfig(const Assets& assets, CameraKit::View view);
+// The game's config over `assets`, with the world shown in `view` and its areas' layers and actor
+// slots at `depths`.
+[[nodiscard]] Config gameConfig(const Assets& assets, CameraKit::View view, const AreaDepths& depths);
 
 struct GameState {
     TopDownMovement::Walker player;

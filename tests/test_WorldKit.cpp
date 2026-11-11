@@ -1,6 +1,7 @@
 // The WorldKit module: what validate rejects, what is solid in an area, the camera within an area, a
 // scroll and a fade tick by tick — within a layout and into another — a seamless join, the areas
-// shown and their layers, and the fade region. The world is built in code; no window or GPU is needed.
+// shown and their map layers, the world's top depth, the actor slots and the sprite layer drawn at
+// one, and the fade region. The world is built in code; no window or GPU is needed.
 
 #include <gtest/gtest.h>
 
@@ -9,6 +10,8 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <variant>
 #include <vector>
 
 #include "retropp/draw_state.h"
@@ -55,6 +58,16 @@ retropp::IndexGrid room(int width, int height, const std::vector<Vec2i>& doorway
     return map;
 }
 
+// A map of value 0 with value 1 in the given cells: a layer over part of an area.
+retropp::IndexGrid patches(int width, int height, const std::vector<Vec2i>& cells) {
+    retropp::IndexGrid map{.width = width, .height = height};
+    map.values.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+    for (const Vec2i cell : cells) {
+        map.values[static_cast<std::size_t>(cell.y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(cell.x)] = 1;
+    }
+    return map;
+}
+
 std::vector<Vec2i> column(int x, int first, int last) {
     std::vector<Vec2i> cells;
     for (int y = first; y <= last; ++y) {
@@ -84,19 +97,21 @@ retropp::TileCatalog art() {
     }};
 }
 
-// Two layouts. Layout 0 is four areas: 0 is one screen with an east door to 1, a south road to 2 and
-// a stairs spot fading to 3; 1 is two screens wide, with a well that fades into layout 1; 2 is one and
-// a half wide, with its north road two cells left of 0's south one, a south door scrolling into layout
-// 1 one cell askew, an east door that is only an entrance, and a west door joined seamlessly to layout
-// 1's area 1; 3 is smaller than the screen in both axes, with a ledge in its north wall that is only
-// an entrance. Layout 1 is two maps joined seamlessly along their whole east and west edges, the
-// second two cells lower than the first: 0 is one screen, 1 is wider, with the door east to layout 0's
-// area 2.
+// Two layouts. Every area has a ground layer at depth 0. Layout 0 is four areas: 0 is one screen with
+// an east door to 1, a south road to 2 and a stairs spot fading to 3, with a canopy layer at depth 7
+// and an actor slot at depth 5; 1 is two screens wide, with a well that fades into layout 1 and an
+// actor slot at depth 3; 2 is one and a half wide, with its north road two cells left of 0's south
+// one, a south door scrolling into layout 1 one cell askew, an east door that is only an entrance, and
+// a west door joined seamlessly to layout 1's area 1; 3 is smaller than the screen in both axes, with a
+// ledge in its north wall that is only an entrance. Layout 1 is two maps joined seamlessly along their
+// whole east and west edges, the second two cells lower than the first: 0 is one screen, 1 is wider,
+// with the door east to layout 0's area 2.
 struct Maps {
     retropp::IndexGrid a0 = room(20, 16, both(column(19, 6, 9), row(15, 8, 11)));
     retropp::IndexGrid a1 = room(40, 16, column(0, 6, 9));
     retropp::IndexGrid a2 = room(30, 16, both(both(both(row(0, 2, 5), column(29, 3, 6)), row(15, 10, 13)), column(0, 3, 6)));
     retropp::IndexGrid a3 = room(12, 10, row(0, 4, 5));
+    retropp::IndexGrid a0Canopy = patches(20, 16, both(row(2, 3, 6), row(3, 3, 6)));
     retropp::IndexGrid b0 = room(20, 16, both(row(0, 2, 5), column(19, 0, 15)));
     retropp::IndexGrid b1 = room(24, 16, both(column(0, 0, 15), column(23, 3, 6)));
 };
@@ -105,20 +120,25 @@ WorldKit::World worldOver(const Maps& maps) {
     return WorldKit::World{.layouts = {
         WorldKit::Layout{
             .areas = {
-                WorldKit::Area{.tiles = &maps.a0, .art = art(), .collision = &maps.a0,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a0, .art = art()},
+                                          {.name = "canopy", .tiles = &maps.a0Canopy, .art = art(), .z = 7}},
+                               .actorSlots = {{.name = "actors", .z = 5}},
+                               .collision = &maps.a0,
                                .openings = {{.name = "east", .side = Side::East, .span = {6, 9},
                                              .transition = Transition::Scroll, .leadsTo = {.area = 1, .opening = "west"}},
                                             {.name = "south", .side = Side::South, .span = {8, 11},
                                              .transition = Transition::Scroll, .leadsTo = {.area = 2, .opening = "north"}},
                                             {.name = "stairs", .at = {.x = 12, .y = 4, .width = 2, .height = 1},
                                              .transition = Transition::Fade, .leadsTo = {.area = 3, .opening = "stairs"}}}},
-                WorldKit::Area{.tiles = &maps.a1, .art = art(), .collision = &maps.a1,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a1, .art = art()}},
+                               .actorSlots = {{.name = "actors", .z = 3}},
+                               .collision = &maps.a1,
                                .openings = {{.name = "west", .side = Side::West, .span = {6, 9},
                                              .transition = Transition::Scroll, .leadsTo = {.area = 0, .opening = "east"}},
                                             {.name = "well", .at = {.x = 30, .y = 2, .width = 2, .height = 1},
                                              .transition = Transition::Fade,
                                              .leadsTo = {.layout = 1, .area = 0, .opening = "well"}}}},
-                WorldKit::Area{.tiles = &maps.a2, .art = art(), .collision = &maps.a2,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a2, .art = art()}}, .collision = &maps.a2,
                                .openings = {{.name = "north", .side = Side::North, .span = {2, 5},
                                              .transition = Transition::Scroll, .leadsTo = {.area = 0, .opening = "south"}},
                                             {.name = "east", .side = Side::East, .span = {3, 6}},
@@ -128,7 +148,7 @@ WorldKit::World worldOver(const Maps& maps) {
                                             {.name = "west", .side = Side::West, .span = {3, 6},
                                              .transition = Transition::Seamless,
                                              .leadsTo = {.layout = 1, .area = 1, .opening = "east"}}}},
-                WorldKit::Area{.tiles = &maps.a3, .art = art(), .collision = &maps.a3,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a3, .art = art()}}, .collision = &maps.a3,
                                .openings = {{.name = "stairs", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
                                              .transition = Transition::Fade, .leadsTo = {.area = 0, .opening = "stairs"}},
                                             {.name = "ledge", .side = Side::North, .span = {4, 5}}}},
@@ -139,7 +159,7 @@ WorldKit::World worldOver(const Maps& maps) {
         },
         WorldKit::Layout{
             .areas = {
-                WorldKit::Area{.tiles = &maps.b0, .art = art(), .collision = &maps.b0,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.b0, .art = art()}}, .collision = &maps.b0,
                                .openings = {{.name = "north", .side = Side::North, .span = {2, 5},
                                              .transition = Transition::Scroll,
                                              .leadsTo = {.layout = 0, .area = 2, .opening = "south", .offset = {.x = 1, .y = 0}}},
@@ -149,7 +169,7 @@ WorldKit::World worldOver(const Maps& maps) {
                                             {.name = "east", .side = Side::East, .span = {0, 15},
                                              .transition = Transition::Seamless,
                                              .leadsTo = {.area = 1, .opening = "west", .offset = {.x = 0, .y = 2}}}}},
-                WorldKit::Area{.tiles = &maps.b1, .art = art(), .collision = &maps.b1,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.b1, .art = art()}}, .collision = &maps.b1,
                                .openings = {{.name = "west", .side = Side::West, .span = {0, 15},
                                              .transition = Transition::Seamless,
                                              .leadsTo = {.area = 0, .opening = "east", .offset = {.x = 0, .y = -2}}},
@@ -179,15 +199,15 @@ WorldKit::World chainOver(const Chain& maps, std::uint32_t seamDepth = 0) {
     return WorldKit::World{.layouts = {
         WorldKit::Layout{
             .areas = {
-                WorldKit::Area{.tiles = &maps.c0, .art = art(), .collision = &maps.c0,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c0, .art = art()}}, .collision = &maps.c0,
                                .openings = {{.name = "north", .side = Side::North, .span = {12, 21},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 1, .opening = "south"}}}},
-                WorldKit::Area{.tiles = &maps.c1, .art = art(), .collision = &maps.c1,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c1, .art = art()}}, .collision = &maps.c1,
                                .openings = {{.name = "south", .side = Side::South, .span = {1, 10},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 0, .opening = "north"}},
                                             {.name = "east", .side = Side::East, .span = {1, 8},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 2, .opening = "west"}}}},
-                WorldKit::Area{.tiles = &maps.c2, .art = art(), .collision = &maps.c2,
+                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c2, .art = art()}}, .collision = &maps.c2,
                                .openings = {{.name = "west", .side = Side::West, .span = {1, 8},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 1, .opening = "east"}}}},
             },
@@ -225,13 +245,63 @@ TEST(Validate, AcceptsTheWorldOfTwoLayouts) {
     EXPECT_NO_THROW(WorldKit::validate(worldOver(maps)));
 }
 
-TEST(Validate, RejectsAnAreaWithoutBothMapsOfOneSize) {
+TEST(Validate, RejectsAnAreaWithNoCollisionMapOrNoLayers) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
     world.layouts[0].areas[1].collision = nullptr;
-    EXPECT_NE(rejection(world).find("layout 0 area 1 has no tile map or no collision map"), std::string::npos);
+    EXPECT_NE(rejection(world).find("layout 0 area 1 has no collision map"), std::string::npos);
+    world = worldOver(maps);
+    world.layouts[0].areas[1].layers.clear();
+    EXPECT_NE(rejection(world).find("layout 0 area 1 has no layers"), std::string::npos);
+    world.layouts[0].areas[1].actorSlots.clear();   // an area needs no actor slot
+    world.layouts[0].areas[1].layers = {{.name = "ground", .tiles = &maps.a1, .art = art()}};
+    EXPECT_NO_THROW(WorldKit::validate(world));
+}
+
+TEST(Validate, RejectsALayerOrSlotWithNoNameOrANameUsedTwice) {
+    const Maps maps;
+    WorldKit::World world = worldOver(maps);
+    world.layouts[0].areas[0].layers[1].name = "";
+    EXPECT_NE(rejection(world).find("layout 0 area 0 has a layer with no name"), std::string::npos);
+    world.layouts[0].areas[0].layers[1].name = "ground";
+    EXPECT_NE(rejection(world).find("area 0 layer 'ground' is named twice"), std::string::npos);
+    world = worldOver(maps);
+    world.layouts[0].areas[0].actorSlots[0].name = "";
+    EXPECT_NE(rejection(world).find("layout 0 area 0 has an actor slot with no name"), std::string::npos);
+    world.layouts[0].areas[0].actorSlots[0].name = "canopy";   // a slot and a map layer share names
+    EXPECT_NE(rejection(world).find("area 0 layer 'canopy' is named twice"), std::string::npos);
+}
+
+TEST(Validate, RejectsALayerWithNoMapOrAMapOfAnotherSize) {
+    const Maps maps;
+    WorldKit::World world = worldOver(maps);
+    world.layouts[0].areas[0].layers[1].tiles = nullptr;
+    EXPECT_NE(rejection(world).find("area 0 layer 'canopy' has no map"), std::string::npos);
+    world.layouts[0].areas[0].layers[1].tiles = &maps.a1;
+    EXPECT_NE(rejection(world).find("area 0 layer 'canopy''s map differs in size from the collision map"),
+              std::string::npos);
+    world = worldOver(maps);
     world.layouts[0].areas[1].collision = &maps.a0;
-    EXPECT_NE(rejection(world).find("area 1's tile map and collision map differ in size"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 1 layer 'ground''s map differs in size from the collision map"),
+              std::string::npos);
+}
+
+TEST(Validate, RejectsTwoLayersOrSlotsAtOneDepth) {
+    const Maps maps;
+    WorldKit::World world = worldOver(maps);
+    world.layouts[0].areas[0].layers[1].z = 0;
+    EXPECT_NE(rejection(world).find("area 0 layer 'canopy' is at the same depth as layer 'ground'"), std::string::npos);
+    world = worldOver(maps);
+    world.layouts[0].areas[0].actorSlots[0].z = 7;
+    EXPECT_NE(rejection(world).find("area 0 layer 'actors' is at the same depth as layer 'canopy'"), std::string::npos);
+    world = worldOver(maps);
+    world.layouts[0].areas[0].actorSlots.push_back({.name = "flyers", .z = 5});
+    EXPECT_NE(rejection(world).find("area 0 layer 'flyers' is at the same depth as layer 'actors'"), std::string::npos);
+    world.layouts[0].areas[0].actorSlots[1].z = 9;   // a second slot above the canopy
+    EXPECT_NO_THROW(WorldKit::validate(world));
+    world = worldOver(maps);
+    world.layouts[0].areas[1].actorSlots[0].z = 7;   // depths are per area: area 0's canopy is not in area 1
+    EXPECT_NO_THROW(WorldKit::validate(world));
 }
 
 TEST(Validate, RejectsAnOpeningWithNoNameOrANameUsedTwice) {
@@ -956,12 +1026,12 @@ TEST(SeamDepth, AnAreaTwoSeamsAwayIsShownWhenItIsInView) {
     ASSERT_EQ(shown.size(), 2u);
     EXPECT_EQ(shown[1].area, 1);
 
-    const LayerKit::Layers layers = WorldKit::WorldLayers(camera, world, 0);
+    const LayerKit::Layers layers = WorldKit::WorldLayers(camera, world);
     ASSERT_EQ(layers.size(), 2u);
     camera.place(world, box(175, 36));
-    const LayerKit::Layers deeper = WorldKit::WorldLayers(camera, world, 0);
+    const LayerKit::Layers deeper = WorldKit::WorldLayers(camera, world);
     ASSERT_EQ(deeper.size(), 3u);
-    EXPECT_EQ(std::string_view{deeper[2].key}, "area:0:2");
+    EXPECT_EQ(std::string_view{deeper[2].key}, "area:0:2:ground");
     EXPECT_EQ(deeper[2].scroll, (retropp::LayerScroll{.x = -104, .y = 40}));
 }
 
@@ -1015,53 +1085,154 @@ TEST(SeamDepth, TheLawsBoundsStayOneSeamDeep) {
 
 // ── Layers and the fade region ───────────────────────────────────────────────────────────────
 
-TEST(WorldLayers, IsOneTileLayerPerAreaShownPlacedByItsScroll) {
+TEST(WorldLayers, IsOneTileLayerPerMapLayerOfEachAreaShownAtItsDepth) {
     const Maps maps;
     const WorldKit::World world = worldOver(maps);
     WorldKit::Camera camera{0, 0};
     (void)camera.follow(world, box(72, 56));
-    LayerKit::Layers layers = WorldKit::WorldLayers(camera, world, 5);
-    ASSERT_EQ(layers.size(), 1u);
-    EXPECT_EQ(std::string_view{layers[0].key}, "area:0:0");
-    EXPECT_EQ(layers[0].z, 5);
-    EXPECT_EQ(layers[0].scroll, (retropp::LayerScroll{.x = 0, .y = -16}));
-    const auto& tiles = std::get<retropp::TileContent>(layers[0].content);
-    EXPECT_EQ(tiles.widthInTiles, 20);
-    EXPECT_EQ(tiles.heightInTiles, 16);
-    ASSERT_EQ(tiles.cells.size(), 320u);
-    EXPECT_EQ(tiles.cells[0].tile, 1);    // a wall cell draws slot 1
-    EXPECT_EQ(tiles.cells[21].tile, 0);   // an open cell draws slot 0
-    EXPECT_EQ(tiles.cells[0].palette, retropp::PaletteId{4});
-    EXPECT_EQ(tiles.wrap, retropp::TileWrap::Blank);
-    // Confined to the view: the 16 rows above it go see-through.
-    ASSERT_EQ(layers[0].regions.size(), 1u);
-    ASSERT_EQ(layers[0].regions[0].effects.size(), 1u);
-    EXPECT_EQ(layers[0].regions[0].effects[0].kind, retropp::ScreenSpaceEffectKind::Transparency);
-    EXPECT_EQ(layers[0].regions[0].effects[0].stencil, retropp::StencilMode::TransparentOutside);
-    EXPECT_TRUE(layers[0].regions[0].shape.contains({.x = 0.5f, .y = 16.5f}));
-    EXPECT_TRUE(layers[0].regions[0].shape.contains({.x = 159.5f, .y = 143.5f}));
-    EXPECT_FALSE(layers[0].regions[0].shape.contains({.x = 0.5f, .y = 15.5f}));
+    LayerKit::Layers layers = WorldKit::WorldLayers(camera, world);
+    ASSERT_EQ(layers.size(), 2u);
+    EXPECT_EQ(std::string_view{layers[0].key}, "area:0:0:ground");
+    EXPECT_EQ(layers[0].z, 0);
+    EXPECT_EQ(std::string_view{layers[1].key}, "area:0:0:canopy");
+    EXPECT_EQ(layers[1].z, 7);
+    for (const retropp::DrawLayer& layer : layers) {
+        EXPECT_EQ(layer.scroll, (retropp::LayerScroll{.x = 0, .y = -16}));
+        // Confined to the view: the 16 rows above it go see-through.
+        ASSERT_EQ(layer.regions.size(), 1u);
+        ASSERT_EQ(layer.regions[0].effects.size(), 1u);
+        EXPECT_EQ(layer.regions[0].effects[0].kind, retropp::ScreenSpaceEffectKind::Transparency);
+        EXPECT_EQ(layer.regions[0].effects[0].stencil, retropp::StencilMode::TransparentOutside);
+        EXPECT_TRUE(layer.regions[0].shape.contains({.x = 0.5f, .y = 16.5f}));
+        EXPECT_TRUE(layer.regions[0].shape.contains({.x = 159.5f, .y = 143.5f}));
+        EXPECT_FALSE(layer.regions[0].shape.contains({.x = 0.5f, .y = 15.5f}));
+    }
+    const auto& ground = std::get<retropp::TileContent>(layers[0].content);
+    EXPECT_EQ(ground.widthInTiles, 20);
+    EXPECT_EQ(ground.heightInTiles, 16);
+    ASSERT_EQ(ground.cells.size(), 320u);
+    EXPECT_EQ(ground.cells[0].tile, 1);    // a wall cell draws slot 1
+    EXPECT_EQ(ground.cells[21].tile, 0);   // an open cell draws slot 0
+    EXPECT_EQ(ground.cells[0].palette, retropp::PaletteId{4});
+    EXPECT_EQ(ground.wrap, retropp::TileWrap::Blank);
+    // The canopy's own map: value 1 at (3, 2), value 0 at (0, 0).
+    const auto& canopy = std::get<retropp::TileContent>(layers[1].content);
+    ASSERT_EQ(canopy.cells.size(), 320u);
+    EXPECT_EQ(canopy.cells[2 * 20 + 3].tile, 0);
+    EXPECT_EQ(canopy.cells[0].tile, 1);
 
     (void)camera.follow(world, box(155, 60));
-    layers = WorldKit::WorldLayers(camera, world, 5);
-    ASSERT_EQ(layers.size(), 2u);
-    EXPECT_EQ(std::string_view{layers[1].key}, "area:0:1");
-    EXPECT_EQ(layers[1].scroll, (retropp::LayerScroll{.x = -160, .y = -16}));
-    EXPECT_EQ(std::get<retropp::TileContent>(layers[1].content).widthInTiles, 40);
+    layers = WorldKit::WorldLayers(camera, world);
+    ASSERT_EQ(layers.size(), 3u);   // area 0's two, then area 1's ground
+    EXPECT_EQ(std::string_view{layers[2].key}, "area:0:1:ground");
+    EXPECT_EQ(layers[2].scroll, (retropp::LayerScroll{.x = -160, .y = -16}));
+    EXPECT_EQ(std::get<retropp::TileContent>(layers[2].content).widthInTiles, 40);
 }
 
-TEST(WorldLayers, KeysEachAreaByLayoutAndListsASeamlessNeighborInView) {
-    EXPECT_EQ(WorldKit::AreaLayerKey(1, 2), "area:1:2");
+TEST(WorldLayers, KeysEachLayerByLayoutAreaAndNameAndListsASeamlessNeighborsLayersInView) {
+    EXPECT_EQ(WorldKit::AreaLayerKey(1, 2, "canopy"), "area:1:2:canopy");
     const Maps maps;
-    const WorldKit::World world = worldOver(maps);
+    WorldKit::World world = worldOver(maps);
+    world.layouts[1].areas[1].layers.push_back({.name = "canopy", .tiles = &maps.b1, .art = art(), .z = 3});
     WorldKit::Camera camera{1, 0};
     (void)camera.follow(world, box(150, 60));
-    const LayerKit::Layers layers = WorldKit::WorldLayers(camera, world, 0);
-    ASSERT_EQ(layers.size(), 2u);
-    EXPECT_EQ(std::string_view{layers[0].key}, "area:1:0");
-    EXPECT_EQ(std::string_view{layers[1].key}, "area:1:1");
-    EXPECT_EQ(layers[1].scroll, (retropp::LayerScroll{.x = -85, .y = -32}));
-    EXPECT_EQ(std::get<retropp::TileContent>(layers[1].content).widthInTiles, 24);
+    const LayerKit::Layers layers = WorldKit::WorldLayers(camera, world);
+    ASSERT_EQ(layers.size(), 3u);
+    EXPECT_EQ(std::string_view{layers[0].key}, "area:1:0:ground");
+    EXPECT_EQ(std::string_view{layers[1].key}, "area:1:1:ground");
+    EXPECT_EQ(std::string_view{layers[2].key}, "area:1:1:canopy");
+    EXPECT_EQ(layers[2].z, 3);
+    for (const std::size_t i : {1u, 2u}) {
+        EXPECT_EQ(layers[i].scroll, (retropp::LayerScroll{.x = -85, .y = -32})) << i;
+        EXPECT_EQ(std::get<retropp::TileContent>(layers[i].content).widthInTiles, 24) << i;
+    }
+}
+
+TEST(TopZ, IsTheHighestDepthOfAnyLayerOrSlotInAnyLayout) {
+    const Maps maps;
+    WorldKit::World world = worldOver(maps);
+    EXPECT_EQ(WorldKit::TopZ(world), 7);   // area 0's canopy
+    world.layouts[1].areas[1].layers[0].z = 12;
+    EXPECT_EQ(WorldKit::TopZ(world), 12);
+    world.layouts[0].areas[3].actorSlots.push_back({.name = "flyers", .z = 20});
+    EXPECT_EQ(WorldKit::TopZ(world), 20);
+}
+
+// ── Actor slots ──────────────────────────────────────────────────────────────────────────────
+
+TEST(ActorZ, IsTheDepthOfTheNamedSlotInThatArea) {
+    const Maps maps;
+    const WorldKit::World world = worldOver(maps);
+    EXPECT_EQ(WorldKit::ActorZ(world, {.layout = 0, .area = 0}, "actors"), 5);
+    EXPECT_EQ(WorldKit::ActorZ(world, {.layout = 0, .area = 1}, "actors"), 3);
+    try {
+        (void)WorldKit::ActorZ(world, {.layout = 0, .area = 2}, "actors");
+        ADD_FAILURE() << "an area with no such slot throws";
+    } catch (const std::out_of_range& e) {
+        EXPECT_NE(std::string{e.what()}.find("layout 0 area 2 has no actor slot 'actors'"), std::string::npos);
+    }
+    EXPECT_THROW((void)WorldKit::ActorZ(world, {.layout = 0, .area = 0}, "flyers"), std::out_of_range);
+}
+
+retropp::Sprite marker(int x, int y) {
+    return retropp::Sprite{.key = "marker", .x = x, .y = y, .size = {.width = 8, .height = 8}};
+}
+
+TEST(Actors, IsASpriteLayerAtTheCurrentAreasSlotScrolledByTheCameraAndConfinedToTheView) {
+    const Maps maps;
+    const WorldKit::World world = worldOver(maps);
+    WorldKit::Camera camera{0, 0};
+    (void)camera.follow(world, box(72, 56));
+    const retropp::DrawLayer layer = WorldKit::Actors(camera, world, "actors", {{marker(72, 56)}, {marker(80, 60)}});
+    EXPECT_EQ(std::string_view{layer.key}, "actors:actors");
+    EXPECT_EQ(layer.z, 5);
+    EXPECT_EQ(layer.scroll, camera.scroll(world));
+    EXPECT_EQ(layer.scroll, (retropp::LayerScroll{.x = 0, .y = -16}));
+    const auto& sprites = std::get<retropp::SpriteContent>(layer.content).sprites;
+    ASSERT_EQ(sprites.size(), 2u);
+    EXPECT_EQ(sprites[1].x, 80);
+    ASSERT_EQ(layer.regions.size(), 1u);
+    EXPECT_EQ(layer.regions[0].effects[0].stencil, retropp::StencilMode::TransparentOutside);
+    EXPECT_TRUE(layer.regions[0].shape.contains({.x = 0.5f, .y = 16.5f}));
+    EXPECT_FALSE(layer.regions[0].shape.contains({.x = 0.5f, .y = 15.5f}));
+}
+
+TEST(Actors, KeepsItsKeyAcrossAreasAndTakesEachAreasDepth) {
+    const Maps maps;
+    const WorldKit::World world = worldOver(maps);
+    WorldKit::Camera camera{0, 0};
+    IntRect walker = box(140, 60);
+    camera.place(world, walker);
+    const retropp::DrawLayer before = WorldKit::Actors(camera, world, "actors", {{marker(140, 60)}});
+    for (int tick = 0; tick < 200 && camera.area() == 0; ++tick) {   // east, out through the door into area 1
+        walker.x += camera.transitioning() ? 0 : 1;
+        const WorldKit::Step step = camera.follow(world, walker);
+        walker.x += step.move.x;
+        walker.y += step.move.y;
+    }
+    ASSERT_EQ(camera.area(), 1);
+    const retropp::DrawLayer after = WorldKit::Actors(camera, world, "actors", {{marker(8, 60)}});
+    EXPECT_EQ(std::string_view{before.key}, std::string_view{after.key});
+    EXPECT_EQ(before.z, 5);
+    EXPECT_EQ(after.z, 3);
+}
+
+TEST(Actors, KeepsTheCallersOptionsButTheScrollAndThrowsForASlotTheAreaLacks) {
+    const Maps maps;
+    const WorldKit::World world = worldOver(maps);
+    WorldKit::Camera camera{0, 0};
+    (void)camera.follow(world, box(72, 56));
+    const LayerKit::Regions clip = WorldKit::ViewStencil({.size = {.width = 8, .height = 8}});
+    const retropp::DrawLayer layer = WorldKit::Actors(camera, world, "actors", {{marker(72, 56)}},
+                                                      {.scroll = {.x = 99, .y = 99}, .alpha = 0.5f, .regions = clip});
+    EXPECT_EQ(layer.scroll, (retropp::LayerScroll{.x = 0, .y = -16}));
+    EXPECT_FLOAT_EQ(layer.alpha, 0.5f);
+    ASSERT_EQ(layer.regions.size(), 2u);   // the caller's region, then the view's stencil
+    EXPECT_FALSE(layer.regions[0].shape.contains({.x = 8.5f, .y = 0.5f}));
+    EXPECT_TRUE(layer.regions[1].shape.contains({.x = 8.5f, .y = 16.5f}));
+    WorldKit::Camera elsewhere{0, 2};
+    elsewhere.place(world, box(100, 60));
+    EXPECT_THROW((void)WorldKit::Actors(elsewhere, world, "actors", {{marker(100, 60)}}), std::out_of_range);
 }
 
 TEST(FadeRegion, IsNothingUntilAFadeRunsThenOneFillAtTheFadesOpacity) {

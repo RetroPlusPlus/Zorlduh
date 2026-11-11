@@ -102,8 +102,8 @@ struct Shown {
 ```
 
 The current area's scroll is `camera.scroll(world)`; another area's is that less the offset the area
-sits at, through the chain of seams that reaches it. `WorldLayers` builds a layer from each, and a game
-draws the things of each area on a layer that takes the same scroll
+sits at, through the chain of seams that reaches it. `WorldLayers` builds that area's layers with it,
+and a game draws the things of each area on a layer that takes the same scroll
 ([how-to.md](how-to.md#put-things-in-an-area)).
 
 ## `AreaSolids`

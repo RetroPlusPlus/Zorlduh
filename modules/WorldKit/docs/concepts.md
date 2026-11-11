@@ -1,7 +1,8 @@
 # Concepts
 
 The model behind the module: a world is layouts of areas joined by openings; anything may move through
-it; the camera follows one thing and takes it through the openings; the areas on screen are drawn.
+it; the camera follows one thing and takes it through the openings; the areas on screen are drawn,
+layer by layer, with the things in them at the depths each area gives.
 
 ## Contents
 
@@ -18,10 +19,11 @@ it; the camera follows one thing and takes it through the openings; the areas on
 
 ## Areas and layouts
 
-An area is one place: a tile map, the art it is drawn through, a collision map the same size, and its
-openings. A dungeon room, an overworld screen, a cave, a shop: the module does not distinguish them.
-Every position in an area is in that area's own pixels, from its map's top-left; the area's size is its
-map's. Areas have no position in a larger world. Two areas sit side by side only for as long as a
+An area is one place: a collision map, its openings, and the layers it is drawn in — one or more tile
+maps the collision map's size, each through its own art at its own depth, and the actor slots, named
+depths where the things moving in it are drawn among those layers. A dungeon room, an overworld screen,
+a cave, a shop: the module does not distinguish them. Every position in an area is in that area's own
+pixels, from its maps' top-left; the area's size is its collision map's. Areas have no position in a larger world. Two areas sit side by side only for as long as a
 scroll between them runs, or for good where a seam joins them — and then only as far as the opening
 between them says.
 
@@ -149,13 +151,21 @@ camera holds still from one transition to the next.
 
 ## Drawing
 
-The areas on screen are tile layers: one for the current area, one for each area reached through
-seams that is in view, one for the next area during a scroll, each assembled from its map through
-its art, keyed `"area:<layout>:<area>"`, placed by the camera's scroll for that area, and confined to
-the layout's view — the part of the screen the world is given; the rest is the game's. A game's own
-layers of things placed in the world take `camera.scroll(world)`. The fade is one region over the whole
-screen, returned only while a fade runs. All of it is in `world_layers.h`, the one header that builds
-draw types.
+The areas on screen are tile layers: one per map layer of the current area, of each area reached
+through seams that is in view, and of the next area during a scroll, each assembled from its map through
+its art, at its own depth, keyed `"area:<layout>:<area>:<layer>"`, placed by the camera's scroll for that
+area, and confined to the layout's view — the part of the screen the world is given; the rest is the
+game's.
+
+Depth is the engine's z axis, and the map layers and the actor slots share it. The things a game draws
+in the current area go on one sprite layer per slot, built by `Actors` at the current area's depth for
+that slot, scrolled and confined like the map layers: so the player walks over a path, under a canopy,
+into the shade of a cave mouth, by depth alone. A cell of a layer that draws nothing is a slot of its
+sheet whose pixels are all transparent indices, and the layers below show through it. Whatever is drawn
+over the whole world — effects, a HUD — takes a depth above `TopZ(world)`.
+
+The fade is one region over the whole screen, returned only while a fade runs. All of it is in
+`world_layers.h`, the one header that builds draw types.
 
 ## Where each part lives in a game
 
@@ -165,4 +175,5 @@ draw types.
 | `Camera` | at the start, then `place`d at the first thing it follows | the game state |
 | `camera.solids(world)` | every tick | the tick, handed to whatever moves |
 | `camera.follow(world, box)` | every tick, after the thing has moved | the tick |
-| `WorldLayers(...)`, `Fade(...)`, `camera.scroll(world)` | every frame | the components that draw the world |
+| `WorldLayers(...)`, `Actors(...)`, `Fade(...)` | every frame | the components that draw the world |
+| the depths of the map layers and the actor slots, `TopZ(world)` | once, with the world | the game's one depth table |

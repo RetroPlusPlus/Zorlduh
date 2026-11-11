@@ -1,7 +1,8 @@
 // Zorlduh's entry point. It activates the game's engine configuration, creates the four engine
 // objects, loads the game's art and maps, and runs the loop until the window is closed. Each tick the
-// player walks the world; each displayed frame is the areas on screen, the actors on top, and the
-// fade over everything, placed under the HUD strip.
+// player walks the world; each displayed frame is the layers of the areas on screen with the actors
+// among them at the current area's actor slot, and the fade over everything, placed under the HUD
+// strip.
 
 #include "retropp/clock.h"
 #include "retropp/draw_state.h"
@@ -17,7 +18,6 @@
 #include "game/player.h"
 #include "game/sim.h"
 #include "input/input.h"
-#include "LayerKit/sprite_layer.h"
 #include "TopDownMovement/walker.h"
 #include "WorldKit/world_layers.h"
 #include "render/layers.h"
@@ -34,7 +34,7 @@ int main() {
     platform.actions(zorlduh::actionMap());
 
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
-    const zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView);
+    const zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths);
     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
 
@@ -44,10 +44,9 @@ int main() {
 
     retropp::FrameDrawState frame;
     loop.renderLoop([&]() {
-        frame.layers = WorldKit::WorldLayers(state.camera, config.world, zorlduh::kWorldZ);
-        frame.layers.push_back(LayerKit::SpriteLayer(zorlduh::kActorsLayer, zorlduh::kActorsZ,
-                                                     {zorlduh::Player(state, config.player)},
-                                                     {.scroll = state.camera.scroll(config.world)}));
+        frame.layers = WorldKit::WorldLayers(state.camera, config.world);
+        frame.layers.push_back(WorldKit::Actors(state.camera, config.world, zorlduh::kActorSlot,
+                                                {zorlduh::Player(state, config.player)}));
         frame.regions = WorldKit::Fade(state.camera, config.world);
         renderer.renderFrame(frame);
     });

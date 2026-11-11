@@ -22,7 +22,7 @@ Assets loadAssets(retropp::Renderer& renderer) {
     constexpr AssetDimensions kCharacter{.width = 16, .height = 16};
     constexpr AssetDimensions kSwordFrame{.width = 8, .height = 16};
     constexpr int kWalkFrames = 2;
-    constexpr TransparentIndices kSpriteHole = TransparentIndices::of({0});
+    constexpr TransparentIndices kIndexZeroHole = TransparentIndices::of({0});
 
     Assets assets;
 
@@ -34,20 +34,24 @@ Assets loadAssets(retropp::Renderer& renderer) {
                                        ContentKind::Tileset, ReadOrder::LeftRightThenDown,
                                        /*count=*/0, TransparentIndices::None,
                                        /*framesPerAnimation=*/0, AssetPolicy::Embed);
+    assets.overlay = renderer.loadAtlas("assets/gfx/tiles/overlay.png", kCell,
+                                        ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                                        /*count=*/0, kIndexZeroHole, /*framesPerAnimation=*/0,
+                                        AssetPolicy::Embed);
     assets.player = renderer.loadAtlas("assets/gfx/sprites/player.png", kCharacter,
                                        ContentKind::AnimationSeries, ReadOrder::LeftRightThenDown,
-                                       /*count=*/0, kSpriteHole, kWalkFrames, AssetPolicy::Embed);
+                                       /*count=*/0, kIndexZeroHole, kWalkFrames, AssetPolicy::Embed);
     assets.enemy = renderer.loadAtlas("assets/gfx/sprites/enemy.png", kCharacter,
                                       ContentKind::SingleAnimation, ReadOrder::LeftRightThenDown,
-                                      /*count=*/0, kSpriteHole, /*framesPerAnimation=*/0,
+                                      /*count=*/0, kIndexZeroHole, /*framesPerAnimation=*/0,
                                       AssetPolicy::Embed);
     assets.sword = renderer.loadAtlas("assets/gfx/sprites/sword.png", kSwordFrame,
                                       ContentKind::Single, ReadOrder::LeftRightThenDown,
-                                      /*count=*/0, kSpriteHole, /*framesPerAnimation=*/0,
+                                      /*count=*/0, kIndexZeroHole, /*framesPerAnimation=*/0,
                                       AssetPolicy::Embed);
     assets.hearts = renderer.loadAtlas("assets/gfx/hud/hearts.png", kCell,
                                        ContentKind::SpriteSeries, ReadOrder::LeftRightThenDown,
-                                       /*count=*/0, kSpriteHole, /*framesPerAnimation=*/0,
+                                       /*count=*/0, kIndexZeroHole, /*framesPerAnimation=*/0,
                                        AssetPolicy::Embed);
 
     // The build bakes the first asset path in each statement, so every loader call is a statement of
@@ -57,6 +61,7 @@ Assets loadAssets(retropp::Renderer& renderer) {
     assets.palettes.water = renderer.loadPaletteImage("assets/palettes/tiles/water.png");
     assets.palettes.grass = renderer.loadPaletteImage("assets/palettes/tiles/grass.png");
     assets.palettes.leaf = renderer.loadPaletteImage("assets/palettes/tiles/leaf.png");
+    assets.palettes.canopy = renderer.loadPaletteImage("assets/palettes/tiles/canopy.png");
     assets.palettes.player = renderer.loadPaletteImage("assets/palettes/sprites/player.png");
     assets.palettes.enemy = renderer.loadPaletteImage("assets/palettes/sprites/enemy.png");
     assets.palettes.sword = renderer.loadPaletteImage("assets/palettes/sprites/sword.png");
@@ -65,6 +70,7 @@ Assets loadAssets(retropp::Renderer& renderer) {
     OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
     overworld.meadow.collision = retropp::loadMapPng("assets/maps/overworld/meadow/collision.png");
+    overworld.meadowOverhang = retropp::loadMapPng("assets/maps/overworld/meadow/overhang.png");
     overworld.lake.tiles = retropp::loadMapPng("assets/maps/overworld/lake/tiles.png");
     overworld.lake.collision = retropp::loadMapPng("assets/maps/overworld/lake/collision.png");
     overworld.field.tiles = retropp::loadMapPng("assets/maps/overworld/field/tiles.png");
@@ -89,8 +95,10 @@ Assets loadAssets(retropp::Renderer& renderer) {
     SeamlessForestMaps& forest = assets.areas.seamlessForest;
     forest.edge.tiles = retropp::loadMapPng("assets/maps/seamless-forest/edge/tiles.png");
     forest.edge.collision = retropp::loadMapPng("assets/maps/seamless-forest/edge/collision.png");
+    forest.edgePath = retropp::loadMapPng("assets/maps/seamless-forest/edge/path.png");
     forest.glade.tiles = retropp::loadMapPng("assets/maps/seamless-forest/glade/tiles.png");
     forest.glade.collision = retropp::loadMapPng("assets/maps/seamless-forest/glade/collision.png");
+    forest.gladeCanopy = retropp::loadMapPng("assets/maps/seamless-forest/glade/canopy.png");
     forest.thicket.tiles = retropp::loadMapPng("assets/maps/seamless-forest/thicket/tiles.png");
     forest.thicket.collision = retropp::loadMapPng("assets/maps/seamless-forest/thicket/collision.png");
     forest.bower.tiles = retropp::loadMapPng("assets/maps/seamless-forest/bower/tiles.png");

@@ -8,6 +8,8 @@ Recipes for the questions a game asks once it has more than one area.
 - [Make a one-way drop](#make-a-one-way-drop)
 - [Shut a door](#shut-a-door)
 - [Draw areas with different art](#draw-areas-with-different-art)
+- [Draw a layer over the player](#draw-a-layer-over-the-player)
+- [Draw things at more than one depth](#draw-things-at-more-than-one-depth)
 - [Use a camera law of your own](#use-a-camera-law-of-your-own)
 - [Plug in a movement module](#plug-in-a-movement-module)
 - [Change the fade's look and the scroll's pace](#change-the-fades-look-and-the-scrolls-pace)
@@ -65,15 +67,64 @@ The second keeps one world and makes the door's state the game's, like any other
 
 ## Draw areas with different art
 
-Each area carries its own `TileCatalog`, so the same map values can draw differently from area to area,
-and an area can draw from several sheets:
+Each map layer carries its own `TileCatalog`, so the same map values can draw differently from area to
+area, and a layer can draw from several sheets:
 
 ```cpp
-WorldKit::Area{.tiles = &maps.cave, .art = CaveArt(assets), .collision = &maps.cave, ...},
+WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.cave.tiles, .art = CaveArt(assets), .z = kGroundZ}},
+               .collision = &maps.cave.collision, ...},
 ```
 
 where `CaveArt` maps each value to a tile and palette of its own choosing. An art table is built once,
 after the sheets are uploaded, as any `TileCatalog` is (the engine's `docs/guide/tilemaps.md`).
+
+## Draw a layer over the player
+
+A canopy the player walks under is a second map layer above the area's actor slot. Its map is the
+area's size; the cells under leaves hold one value and every other cell another, drawn through a slot
+that draws nothing:
+
+```cpp
+// The sheet: slot 0 is every pixel index 0, slot 1 is leaves with gaps of index 0.
+// Index 0 is the sheet's transparent index, so neither slot 0 nor the gaps draw.
+const retropp::AtlasManifest overhead = renderer.uploadAtlas(pixels, 16, 8, retropp::TransparentIndices::of({0}));
+
+const retropp::TileCatalog canopyArt{.entries = {
+    {.id = 0, .sheet = overhead.atlasId, .slot = 0, .palette = leaves},   // nothing
+    {.id = 1, .sheet = overhead.atlasId, .slot = 1, .palette = leaves},   // leaves
+}};
+
+WorldKit::Area{
+    .layers = {{.name = "ground", .tiles = &maps.glade, .art = forestArt, .z = kGroundZ},
+               {.name = "canopy", .tiles = &maps.gladeCanopy, .art = canopyArt, .z = kOverheadZ}},
+    .actorSlots = {{.name = "actors", .z = kActorsZ}},   // kGroundZ < kActorsZ < kOverheadZ
+    .collision = &maps.gladeCollision,
+    ...},
+```
+
+The player, drawn through `Actors` at the `"actors"` slot, is over the ground and under the canopy;
+the ground shows through the canopy's gaps and everywhere the canopy's map draws nothing. A path under
+the player's feet is the same with its depth between the ground and the slot, and the inside of a cave
+mouth is a roof layer over it. The canopy is only drawn: the collision map alone says what is solid.
+
+## Draw things at more than one depth
+
+An area has as many actor slots as it needs. Flying things over a canopy that walking things go under:
+
+```cpp
+.actorSlots = {{.name = "actors", .z = kActorsZ},     // under the canopy
+               {.name = "flyers", .z = kFlyersZ}},    // over it: kOverheadZ < kFlyersZ
+```
+
+```cpp
+frame.layers.push_back(WorldKit::Actors(state.camera, world, "actors", {Player(state), Walkers(state)}));
+frame.layers.push_back(WorldKit::Actors(state.camera, world, "flyers", {Birds(state)}));
+```
+
+Each slot is its own sprite layer with its own key. An area without a slot by that name makes `Actors`
+throw, so either give every area the slots the game draws at or draw a slot only where the current area
+has it. A thing that moves between the two — a bird landing — is drawn by one component one frame and
+the other the next.
 
 ## Use a camera law of your own
 
@@ -181,9 +232,9 @@ WorldKit::Layout layout{..., .seamDepth = 1};
 
 ## Put things in an area
 
-The module draws the areas and nothing else. A game's things — the player, an area's inhabitants, a
-chest, a sign — live in the game's state, each with a position in its own area's pixels, and are drawn
-by the game's components on its own sprite layers.
+The module draws the areas and the sprite layers a game hands it for its actor slots. A game's things —
+the player, an area's inhabitants, a chest, a sign — live in the game's state, each with a position in
+its own area's pixels, and are drawn by the game's components, through `Actors` for the current area.
 
 Which things are where is the game's to keep: a table keyed by the place (`WorldKit::Place`, or the
 layout and area). `step.entered` says when the place changes, so that is where an area's things come into
@@ -192,21 +243,24 @@ moment. What the things make solid or passable is the game's own solid query wra
 `camera.solids(world)` ([Shut a door](#shut-a-door)).
 
 Across a seam the next area is on screen before the thing followed crosses, so its things are too. Draw
-the things of every area `shown` lists, each area's on a layer that takes that area's scroll, not the
-current area's alone:
+the things of every area `shown` lists, each area's on a layer at that area's slot depth that takes that
+area's scroll, not the current area's alone:
 
 ```cpp
 // The game's things, by area; each position is in that area's pixels.
 std::map<std::pair<int, int>, std::vector<Thing>> things;
 
 // Each frame, after the world's layers: one sprite layer per area on screen that has things.
+const CameraKit::View& view = world.layouts[static_cast<std::size_t>(camera.layout())].view;
 for (const WorldKit::Shown& area : camera.shown(world)) {
     const auto found = things.find({area.layout, area.area});
     if (found == things.end()) {
         continue;
     }
-    const std::string key = "things:" + WorldKit::AreaLayerKey(area.layout, area.area);
-    frame.layers.push_back(LayerKit::SpriteLayer(key, kThingsZ, {Things(found->second)}, {.scroll = area.scroll}));
+    const std::string key = "things:" + std::to_string(area.layout) + ":" + std::to_string(area.area);
+    const std::int32_t z = WorldKit::ActorZ(world, {.layout = area.layout, .area = area.area}, "actors");
+    frame.layers.push_back(LayerKit::SpriteLayer(key, z, {Things(found->second)},
+                                                 {.scroll = area.scroll, .regions = WorldKit::ViewStencil(view)}));
 }
 ```
 
@@ -225,7 +279,8 @@ constexpr CameraKit::View kView{.size = {.width = 160, .height = 128}, .origin =
 WorldKit::Layout layout{..., .view = kView};
 ```
 
-`WorldLayers` confines every area layer to it, so whatever an area reaches past the strip, the strip
-shows the layers below and whatever the game draws there. A border around the screen, or a panel down
-one side, is the same: a smaller view, placed where the world goes. A layer of the game's own in the
-world's pixels can take the same confinement with `ViewStencil(kView)` in its `regions`.
+`WorldLayers` confines every map layer to it and `Actors` every sprite layer it builds, so whatever an
+area reaches past the strip, the strip shows the layers below and whatever the game draws there. A
+border around the screen, or a panel down one side, is the same: a smaller view, placed where the world
+goes. Any other layer of the game's own in the world's pixels can take the same confinement with
+`ViewStencil(kView)` in its `regions`.

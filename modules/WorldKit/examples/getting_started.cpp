@@ -1,9 +1,10 @@
 // A complete program built on the WorldKit module: four areas joined by their openings — a hall with
 // a door in its east wall that scrolls into a wider hall; stairs in that hall that fade down to a small
 // cellar with stairs back up; and a garden joined seamlessly along the wider hall's north wall, so it
-// is simply there beyond the wall and walking into it changes nothing on screen — and a marker steered
-// with the arrow keys, WASD or a d-pad. The marker's own movement is a few lines here; WorldKit tells
-// it what is solid, takes it through each opening, and draws whatever is on screen.
+// is simply there beyond the wall and walking into it changes nothing on screen, with trees whose
+// canopy the marker passes under — and a marker steered with the arrow keys, WASD or a d-pad. The
+// marker's own movement is a few lines here; WorldKit tells it what is solid, takes it through each
+// opening, and draws whatever is on screen, the marker included, at the depth each area gives it.
 //
 // docs/getting-started.md walks through it part by part.
 
@@ -29,7 +30,6 @@
 #include "retropp/windowed_host.h"
 
 #include "CameraKit/camera.h"
-#include "LayerKit/sprite_layer.h"
 
 #include "WorldKit/area.h"
 #include "WorldKit/camera.h"
@@ -51,6 +51,14 @@ constexpr CameraKit::View kView{.size = {.width = 160, .height = 144}};
 
 // The values in a map, drawn as the tiles of the same name.
 enum class Cell : std::uint16_t { Floor = 0, Wall = 1, Stairs = 2 };
+
+// The values in the garden's canopy map: nothing, or the trees' leaves.
+enum class Overhead : std::uint16_t { Nothing = 0, Canopy = 1 };
+
+// Every area's depths: the ground, the marker over it, and the canopy over the marker.
+constexpr std::int32_t kGroundZ = 0;
+constexpr std::int32_t kActorsZ = 5;
+constexpr std::int32_t kCanopyZ = 10;
 
 // The cells of one wall from `first` to `last` along it: a doorway list for Room.
 std::vector<retropp::Vec2i> Across(int y, int first, int last) {
@@ -98,10 +106,12 @@ retropp::IndexGrid Room(int width, int height, const std::vector<retropp::Vec2i>
     return map;
 }
 
-// The art: one sheet of four 8×8 tiles (floor, wall, stairs, the marker) and three palettes, one for
-// the halls, one for the cellar and one for the garden.
+// The art: one sheet of four 8×8 tiles (floor, wall, stairs, the marker); a sheet of two for what
+// hangs over the garden (nothing, and the canopy), whose index 0 is transparent so the ground shows
+// through; and three palettes, one for the halls, one for the cellar and one for the garden.
 struct Art {
     retropp::AtlasId tiles{};
+    retropp::AtlasId overhead{};
     retropp::PaletteId hall{};
     retropp::PaletteId cellar{};
     retropp::PaletteId garden{};
@@ -118,10 +128,18 @@ Art uploadArt(retropp::Renderer& renderer) {
             sheet[static_cast<std::size_t>(y) * 32 + 3 * kCell + x] = rim ? 3 : 0;              // the marker
         }
     }
+    // Slot 0 is every pixel index 0, so it draws nothing; slot 1 is leaves with gaps between them.
+    std::array<std::uint8_t, 16 * 8> overhead{};
+    for (int y = 0; y < kCell; ++y) {
+        for (int x = 0; x < kCell; ++x) {
+            overhead[static_cast<std::size_t>(y) * 16 + kCell + x] = (x * 3 + y * 5) % 7 == 0 ? 0 : 1 + (x + y) % 2;
+        }
+    }
     const std::array<retropp::Rgba8, 4> hall{{{20, 24, 40}, {60, 90, 70}, {110, 140, 120}, {240, 230, 200}}};
     const std::array<retropp::Rgba8, 4> cellar{{{10, 10, 20}, {60, 50, 70}, {120, 100, 130}, {230, 210, 240}}};
     const std::array<retropp::Rgba8, 4> garden{{{10, 30, 10}, {40, 110, 50}, {90, 170, 80}, {220, 240, 180}}};
     return Art{.tiles = renderer.uploadAtlas(sheet.data(), 32, 8).atlasId,
+               .overhead = renderer.uploadAtlas(overhead.data(), 16, 8, retropp::TransparentIndices::of({0})).atlasId,
                .hall = renderer.uploadPalette(std::span<const retropp::Rgba8>(hall)),
                .cellar = renderer.uploadPalette(std::span<const retropp::Rgba8>(cellar)),
                .garden = renderer.uploadPalette(std::span<const retropp::Rgba8>(garden))};
@@ -136,14 +154,50 @@ retropp::TileCatalog CatalogThrough(const Art& art, retropp::PaletteId palette) 
     }};
 }
 
-// The four maps. Every map is its own pixel space; the openings below say how they join. The wide
-// hall's north wall and the garden's south wall are open along their whole length but the corners,
-// so the two meet along the full width.
+// How the canopy map's values are drawn: nothing through the transparent slot, leaves through the
+// garden's palette.
+retropp::TileCatalog OverheadArt(const Art& art) {
+    return retropp::TileCatalog{.entries = {
+        {.id = static_cast<std::uint16_t>(Overhead::Nothing), .sheet = art.overhead, .slot = 0, .palette = art.garden},
+        {.id = static_cast<std::uint16_t>(Overhead::Canopy), .sheet = art.overhead, .slot = 1, .palette = art.garden},
+    }};
+}
+
+// A map of `width` × `height` cells holding Nothing but for Canopy in each rectangle of `trees`.
+retropp::IndexGrid Canopy(int width, int height, const std::vector<retropp::IntRect>& trees) {
+    retropp::IndexGrid map{.width = width, .height = height};
+    map.values.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height),
+                      static_cast<std::uint16_t>(Overhead::Nothing));
+    for (const retropp::IntRect tree : trees) {
+        for (int y = tree.y; y < tree.y + tree.height; ++y) {
+            for (int x = tree.x; x < tree.x + tree.width; ++x) {
+                map.values[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
+                    static_cast<std::uint16_t>(Overhead::Canopy);
+            }
+        }
+    }
+    return map;
+}
+
+// An area's ground: its map through one palette, at the bottom.
+WorldKit::MapLayer Ground(const retropp::IndexGrid& map, const Art& art, retropp::PaletteId palette) {
+    return WorldKit::MapLayer{.name = "ground", .tiles = &map, .art = CatalogThrough(art, palette), .z = kGroundZ};
+}
+
+// The one actor slot every area has: where the marker is drawn.
+const std::vector<WorldKit::ActorSlot> kActorSlots{{.name = "actors", .z = kActorsZ}};
+
+// The five maps. Every area's map is its own pixel space; the openings below say how they join. The
+// wide hall's north wall and the garden's south wall are open along their whole length but the
+// corners, so the two meet along the full width. The garden's canopy is the garden's size, with two
+// stands of trees along its north side.
 struct Maps {
     retropp::IndexGrid hall = Room(20, 18, Down(19, 7, 10), {});
     retropp::IndexGrid wideHall = Room(30, 18, Both(Down(0, 7, 10), Across(0, 1, 28)), {{20, 5}, {21, 5}});
     retropp::IndexGrid cellar = Room(12, 10, {}, {{5, 4}, {6, 4}});
     retropp::IndexGrid garden = Room(30, 12, Across(11, 1, 28), {});
+    retropp::IndexGrid gardenCanopy = Canopy(30, 12, {{.x = 4, .y = 1, .width = 6, .height = 4},
+                                                      {.x = 18, .y = 1, .width = 7, .height = 3}});
 };
 
 WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
@@ -151,11 +205,13 @@ WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
     using WorldKit::Transition;
     return WorldKit::Layout{
         .areas = {
-            WorldKit::Area{.tiles = &maps.hall, .art = CatalogThrough(art, art.hall), .collision = &maps.hall,
+            WorldKit::Area{.layers = {Ground(maps.hall, art, art.hall)}, .actorSlots = kActorSlots,
+                           .collision = &maps.hall,
                            .openings = {{.name = "east door", .side = Side::East, .span = {7, 10},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::WideHall, .opening = "west door"}}}},
-            WorldKit::Area{.tiles = &maps.wideHall, .art = CatalogThrough(art, art.hall), .collision = &maps.wideHall,
+            WorldKit::Area{.layers = {Ground(maps.wideHall, art, art.hall)}, .actorSlots = kActorSlots,
+                           .collision = &maps.wideHall,
                            .openings = {{.name = "west door", .side = Side::West, .span = {7, 10},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::Hall, .opening = "east door"}},
@@ -165,11 +221,17 @@ WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
                                         {.name = "north edge", .side = Side::North, .span = {1, 28},
                                          .transition = Transition::Seamless,
                                          .leadsTo = {.area = Area::Garden, .opening = "south edge"}}}},
-            WorldKit::Area{.tiles = &maps.cellar, .art = CatalogThrough(art, art.cellar), .collision = &maps.cellar,
+            WorldKit::Area{.layers = {Ground(maps.cellar, art, art.cellar)}, .actorSlots = kActorSlots,
+                           .collision = &maps.cellar,
                            .openings = {{.name = "stairs up", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
                                          .transition = Transition::Fade,
                                          .leadsTo = {.area = Area::WideHall, .opening = "stairs down"}}}},
-            WorldKit::Area{.tiles = &maps.garden, .art = CatalogThrough(art, art.garden), .collision = &maps.garden,
+            // The canopy is above the actor slot, so the marker walks under the trees.
+            WorldKit::Area{.layers = {Ground(maps.garden, art, art.garden),
+                                      {.name = "canopy", .tiles = &maps.gardenCanopy, .art = OverheadArt(art),
+                                       .z = kCanopyZ}},
+                           .actorSlots = kActorSlots,
+                           .collision = &maps.garden,
                            .openings = {{.name = "south edge", .side = Side::South, .span = {1, 28},
                                          .transition = Transition::Seamless,
                                          .leadsTo = {.area = Area::WideHall, .opening = "north edge"}}}},
@@ -235,17 +297,17 @@ int main() {
 
     retropp::FrameDrawState frame;
     loop.renderLoop([&] {
-        frame.layers = WorldKit::WorldLayers(camera, world, 0);
-        frame.layers.push_back(LayerKit::SpriteLayer(
-            "marker", 10,
-            {{retropp::Sprite{.key = "marker",
-                              .x = marker.x,
-                              .y = marker.y,
-                              .size = {.width = kCell, .height = kCell},
-                              .atlas = art.tiles,
-                              .tile = 3,
-                              .palette = art.hall}}},
-            {.scroll = camera.scroll(world)}));
+        // The marker is in the current area's pixels; Actors scrolls it with the camera and draws it at
+        // that area's "actors" slot, between the ground and the canopy.
+        frame.layers = WorldKit::WorldLayers(camera, world);
+        frame.layers.push_back(WorldKit::Actors(camera, world, "actors",
+                                                {{retropp::Sprite{.key = "marker",
+                                                                  .x = marker.x,
+                                                                  .y = marker.y,
+                                                                  .size = {.width = kCell, .height = kCell},
+                                                                  .atlas = art.tiles,
+                                                                  .tile = 3,
+                                                                  .palette = art.hall}}}));
         frame.regions = WorldKit::Fade(camera, world);
         renderer.renderFrame(frame);
     });

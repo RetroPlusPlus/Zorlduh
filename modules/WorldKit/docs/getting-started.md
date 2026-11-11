@@ -3,9 +3,10 @@
 This page builds a complete program on the module: four areas — a hall with a door in its east wall
 that scrolls into a wider hall; stairs in that hall that fade down to a cellar with stairs back up; and
 a garden joined seamlessly along the wider hall's north wall, so it is simply there beyond the wall and
-walking into it changes nothing on screen — and a marker you steer with the arrow keys, WASD or a d-pad.
-The marker's own movement is a few lines in the program; WorldKit tells it what is solid, takes it
-through each opening and draws whatever is on screen.
+walking into it changes nothing on screen, with trees whose canopy the marker passes under — and a
+marker you steer with the arrow keys, WASD or a d-pad. The marker's own movement is a few lines in the
+program; WorldKit tells it what is solid, takes it through each opening and draws whatever is on
+screen, the marker included, at the depth each area gives it.
 
 The full source is [`examples/getting_started.cpp`](../examples/getting_started.cpp). It builds as the
 `WorldKit-example-getting-started` target whenever `WORLDKIT_BUILD_EXAMPLES` is on, so what you read
@@ -44,24 +45,29 @@ marker. Walk out through the gap in the east wall and the next hall slides in wh
 carried through; it is wider than the screen, so the screen follows the marker across it and stops at
 its edges. Its north wall is open along its whole length, and the green garden is there beyond it: walk
 up into it and nothing jumps — the garden was already on screen, and the marker simply carries on.
+Along the garden's north side two stands of trees hang over the grass; walk under them and the leaves
+cover the marker, the grass showing through the gaps between them.
 Step onto the striped stairs in the wide hall and the screen fades out, then in on a small purple
 cellar, the marker standing on its stairs. Step off and back on to fade up again. Close the window to
 quit.
 
-## 2. Four maps
+## 2. Five maps
 
 Each area is its own map: an `IndexGrid` of cells, ringed by wall, with doorways where its openings are
 and stairs where its spots are. The program builds them in code; a game loads them from map PNGs with
-`retropp::loadMapPng`. The same grid is drawn and walked against.
+`retropp::loadMapPng`. Here the same grid is drawn as the area's ground and walked against.
 
 ```cpp
 enum class Cell : std::uint16_t { Floor = 0, Wall = 1, Stairs = 2 };
+enum class Overhead : std::uint16_t { Nothing = 0, Canopy = 1 };
 
 struct Maps {
     retropp::IndexGrid hall = Room(20, 18, Down(19, 7, 10), {});
     retropp::IndexGrid wideHall = Room(30, 18, Both(Down(0, 7, 10), Across(0, 1, 28)), {{20, 5}, {21, 5}});
     retropp::IndexGrid cellar = Room(12, 10, {}, {{5, 4}, {6, 4}});
     retropp::IndexGrid garden = Room(30, 12, Across(11, 1, 28), {});
+    retropp::IndexGrid gardenCanopy = Canopy(30, 12, {{.x = 4, .y = 1, .width = 6, .height = 4},
+                                                      {.x = 18, .y = 1, .width = 7, .height = 3}});
 };
 ```
 
@@ -69,20 +75,42 @@ The hall's doorway is cells 7–10 of its east wall; the wide hall's is cells 7�
 wide hall's north wall and the garden's south wall are open from cell 1 to cell 28 — the whole wall but
 the corners. The maps know nothing of each other. How they join is said once, below.
 
+The fifth map is drawn over the garden: the garden's size, `Canopy` in two rectangles of cells and
+`Nothing` everywhere else. It is drawn through a sheet of its own, uploaded with index 0 as its
+transparent index, whose `Nothing` slot is every pixel 0 and whose leaves have gaps of 0, so the
+garden shows through wherever there are no leaves:
+
+```cpp
+.overhead = renderer.uploadAtlas(overhead.data(), 16, 8, retropp::TransparentIndices::of({0})).atlasId,
+```
+
 ## 3. The world: a layout of areas and their openings
 
 ```cpp
 enum Layout : std::uint8_t { Castle };
 enum Area : std::uint8_t { Hall, WideHall, Cellar, Garden };
 
+// Every area's depths: the ground, the marker over it, and the canopy over the marker.
+constexpr std::int32_t kGroundZ = 0;
+constexpr std::int32_t kActorsZ = 5;
+constexpr std::int32_t kCanopyZ = 10;
+
+WorldKit::MapLayer Ground(const retropp::IndexGrid& map, const Art& art, retropp::PaletteId palette) {
+    return WorldKit::MapLayer{.name = "ground", .tiles = &map, .art = CatalogThrough(art, palette), .z = kGroundZ};
+}
+
+const std::vector<WorldKit::ActorSlot> kActorSlots{{.name = "actors", .z = kActorsZ}};
+
 WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
     return WorldKit::Layout{
         .areas = {
-            WorldKit::Area{.tiles = &maps.hall, .art = CatalogThrough(art, art.hall), .collision = &maps.hall,
+            WorldKit::Area{.layers = {Ground(maps.hall, art, art.hall)}, .actorSlots = kActorSlots,
+                           .collision = &maps.hall,
                            .openings = {{.name = "east door", .side = Side::East, .span = {7, 10},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::WideHall, .opening = "west door"}}}},
-            WorldKit::Area{.tiles = &maps.wideHall, .art = CatalogThrough(art, art.hall), .collision = &maps.wideHall,
+            WorldKit::Area{.layers = {Ground(maps.wideHall, art, art.hall)}, .actorSlots = kActorSlots,
+                           .collision = &maps.wideHall,
                            .openings = {{.name = "west door", .side = Side::West, .span = {7, 10},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::Hall, .opening = "east door"}},
@@ -92,11 +120,16 @@ WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
                                         {.name = "north edge", .side = Side::North, .span = {1, 28},
                                          .transition = Transition::Seamless,
                                          .leadsTo = {.area = Area::Garden, .opening = "south edge"}}}},
-            WorldKit::Area{.tiles = &maps.cellar, .art = CatalogThrough(art, art.cellar), .collision = &maps.cellar,
+            WorldKit::Area{.layers = {Ground(maps.cellar, art, art.cellar)}, .actorSlots = kActorSlots,
+                           .collision = &maps.cellar,
                            .openings = {{.name = "stairs up", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
                                          .transition = Transition::Fade,
                                          .leadsTo = {.area = Area::WideHall, .opening = "stairs down"}}}},
-            WorldKit::Area{.tiles = &maps.garden, .art = CatalogThrough(art, art.garden), .collision = &maps.garden,
+            WorldKit::Area{.layers = {Ground(maps.garden, art, art.garden),
+                                      {.name = "canopy", .tiles = &maps.gardenCanopy, .art = OverheadArt(art),
+                                       .z = kCanopyZ}},
+                           .actorSlots = kActorSlots,
+                           .collision = &maps.garden,
                            .openings = {{.name = "south edge", .side = Side::South, .span = {1, 28},
                                          .transition = Transition::Seamless,
                                          .leadsTo = {.area = Area::WideHall, .opening = "north edge"}}}},
@@ -111,11 +144,13 @@ const WorldKit::World world{.layouts = {CastleLayout(maps, art)}};
 WorldKit::validate(world);
 ```
 
-An **area** is its tile map, the art it is drawn through (a `retropp::TileCatalog`: which tile and
-palette each map value is), its collision map and its openings. A **layout** is a list of areas with the
-settings they share; the program has one, and a game with an overworld and a dungeon has two. The
-**world** is the list of layouts. Layouts and areas are named by the program's enums, whose values are
-their indices in the lists.
+An **area** is its map layers, its actor slots, its collision map and its openings. A **map layer** is a
+tile map, the art it is drawn through (a `retropp::TileCatalog`: which tile and palette each map value
+is) and the depth it is drawn at; every area here has a `"ground"` layer, and the garden a `"canopy"`
+over it. An **actor slot** is a named depth for the things that move in the area: `"actors"`, between
+the ground and the canopy. A **layout** is a list of areas with the settings they share; the program
+has one, and a game with an overworld and a dungeon has two. The **world** is the list of layouts.
+Layouts and areas are named by the program's enums, whose values are their indices in the lists.
 
 An **opening** is a way out. `"east door"` is an *edge* opening: a gap in the east wall, cells 7–10 of
 it (`.span`). `"stairs down"` is a *spot* opening: a rectangle of cells inside the area (`.at`). Each
@@ -181,20 +216,21 @@ walks on.
 ## 6. Drawing it
 
 ```cpp
-frame.layers = WorldKit::WorldLayers(camera, world, 0);
-frame.layers.push_back(LayerKit::SpriteLayer("marker", 10, {{markerSprite}}, {.scroll = camera.scroll(world)}));
+frame.layers = WorldKit::WorldLayers(camera, world);
+frame.layers.push_back(WorldKit::Actors(camera, world, "actors", {{markerSprite}}));
 frame.regions = WorldKit::Fade(camera, world);
 ```
 
-`WorldLayers` is one tile layer per area on screen — the current area, any area reached through seams
-that is in view, and the next area while a scroll runs — each assembled from its map through its art,
-placed where the camera says, and confined to the layout's view, so a part of the screen kept for
-something else is never drawn over. The marker's own layer takes `camera.scroll(world)`, the scroll for
-things placed in the current area's pixels. `Fade` is the color fill over the whole screen while a fade
-runs, and nothing otherwise.
+`WorldLayers` is one tile layer per map layer of each area on screen — the current area, any area
+reached through seams that is in view, and the next area while a scroll runs — each assembled from its
+map through its art, at its layer's depth, placed where the camera says, and confined to the layout's
+view, so a part of the screen kept for something else is never drawn over. `Actors` puts the marker on
+a sprite layer at the current area's `"actors"` slot, scrolled for things placed in the current area's
+pixels and confined the same way: over the garden's grass at depth 0, under its canopy at depth 10.
+`Fade` is the color fill over the whole screen while a fade runs, and nothing otherwise.
 
 ## 7. Where to go next
 
 - The model: areas, layouts, openings, how movement plugs in, transitions, the camera — [concepts.md](concepts.md).
-- Recipes: a side-scroller, a one-way drop, a shut door, another layout, a seam, a reserved strip — [how-to.md](how-to.md).
+- Recipes: a side-scroller, a one-way drop, a shut door, a layer over the player, things at several depths, another layout, a seam, a reserved strip — [how-to.md](how-to.md).
 - Every type and member — [areas.md](areas.md), [camera.md](camera.md), [drawing.md](drawing.md).
