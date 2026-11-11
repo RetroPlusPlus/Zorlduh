@@ -30,7 +30,7 @@ retropp::TileCatalog TerrainCatalog(const Assets& assets) {
     }};
 }
 
-layers::Cells WorldTiles(const World& world, const Assets& assets) {
+LayerKit::Cells WorldTiles(const World& world, const Assets& assets) {
     return retropp::assembleTilemap(world.tiles, TerrainCatalog(assets)).cells;
 }
 

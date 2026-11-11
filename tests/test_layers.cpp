@@ -12,18 +12,18 @@
 #include "retropp/transform.h"
 #include "retropp/viewport.h"
 
-#include "layers/layer_options.h"
-#include "layers/sprite_layer.h"
-#include "layers/tile_layer.h"
-#include "layers/types.h"
+#include "LayerKit/layer_options.h"
+#include "LayerKit/sprite_layer.h"
+#include "LayerKit/tile_layer.h"
+#include "LayerKit/types.h"
 
 namespace {
 
-using layers::Cells;
-using layers::LayerOptions;
-using layers::Sprites;
-using layers::SpriteLayer;
-using layers::TileLayer;
+using LayerKit::Cells;
+using LayerKit::LayerOptions;
+using LayerKit::Sprites;
+using LayerKit::SpriteLayer;
+using LayerKit::TileLayer;
 
 retropp::Sprite sprite(const char* key, int x) {
     return retropp::Sprite{.key = key, .x = x};

@@ -4,10 +4,7 @@
 //
 //     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
 //
-//     const auto walk = assets.player.animation(static_cast<std::size_t>(zorlduh::PlayerWalk::Down));
-//     retropp::Sprite{.key = "player", .x = x, .y = y, .size = walk[frame].dimensions,
-//                     .atlas = assets.player.atlasId, .tile = walk[frame].tile,
-//                     .palette = assets.palettes.player};
+//     const TopDownMovement::WalkerConfig player{.walk = assets.playerWalk, ...};
 //
 // Every file under assets/ is written by tools/placeholder_art.py, and every one is baked into the
 // executable, so the game ships as one file.
@@ -19,6 +16,8 @@
 #include "retropp/atlas_manifest.h"
 #include "retropp/image.h"
 #include "retropp/palette.h"
+
+#include "TopDownMovement/walker.h"
 
 namespace retropp {
 class Renderer;
@@ -85,6 +84,8 @@ struct Palettes {
 struct Assets {
     retropp::AtlasManifest terrain;  // Tileset of 8×8 tiles, slots in TerrainTile order
     retropp::AtlasManifest player;   // AnimationSeries of 16×16 frames, animations in PlayerWalk order
+    TopDownMovement::DirectionalAnimations playerWalk;  // each facing's row of the player sheet, two frames
+                                                 // of 8 ticks each, through the player palette
     retropp::AtlasManifest enemy;    // SingleAnimation: two 16×16 frames
     retropp::AtlasManifest sword;    // Single: one 8×16 frame pointing up
     retropp::AtlasManifest hearts;   // SpriteSeries of 8×8 cells, slots in Heart order

@@ -16,18 +16,18 @@
 #include "retropp/transform.h"
 #include "retropp/viewport.h"
 
-#include "layers/image_layer.h"
-#include "layers/layer_options.h"
-#include "layers/raster_layer.h"
-#include "layers/types.h"
+#include "LayerKit/image_layer.h"
+#include "LayerKit/layer_options.h"
+#include "LayerKit/raster_layer.h"
+#include "LayerKit/types.h"
 
 namespace {
 
-using layers::ImageLayer;
-using layers::LayerOptions;
-using layers::Raster;
-using layers::RasterLayer;
-using layers::RasterLayerOptions;
+using LayerKit::ImageLayer;
+using LayerKit::LayerOptions;
+using LayerKit::Raster;
+using LayerKit::RasterLayer;
+using LayerKit::RasterLayerOptions;
 
 // A 2×1 RGBA raster: two pixels whose first byte is `first` and `first + 1`.
 Raster twoPixels(std::uint8_t first, std::uint64_t generation) {

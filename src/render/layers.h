@@ -17,4 +17,7 @@ inline constexpr std::int32_t kHudZ = 100;
 // The world map, every room on one tile layer.
 inline constexpr std::string_view kWorldLayer = "world";
 
+// Everything that walks the world, on one sprite layer placed like the world layer.
+inline constexpr std::string_view kActorsLayer = "actors";
+
 }  // namespace zorlduh

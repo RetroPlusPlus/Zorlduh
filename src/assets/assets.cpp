@@ -1,8 +1,13 @@
 #include "assets/assets.h"
 
+#include <chrono>
+#include <cstddef>
+
+#include "retropp/animation.h"
 #include "retropp/asset_policy.h"
 #include "retropp/geometry.h"
 #include "retropp/renderer.h"
+#include "retropp/timing.h"
 
 namespace zorlduh {
 
@@ -54,6 +59,26 @@ Assets loadAssets(retropp::Renderer& renderer) {
 
     assets.world = retropp::loadMapPng("assets/maps/world/tiles.png");
     assets.collision = retropp::loadMapPng("assets/maps/world/collision.png");
+
+    // Each facing walks through its own row of the player sheet: two frames, 8 ticks each.
+    constexpr auto kWalkFrame =
+        8 * std::chrono::nanoseconds{
+                static_cast<std::chrono::nanoseconds::rep>(retropp::TickPeriodNs::Hz60)};
+    const auto walkRow = [&](PlayerWalk row) {
+        const std::size_t first = static_cast<std::size_t>(row) * kWalkFrames;
+        return retropp::Animation{{
+            {.label = "step0", .sheet = assets.player.atlasId, .tileIndex = first,
+             .palette = assets.palettes.player, .duration = kWalkFrame},
+            {.label = "step1", .sheet = assets.player.atlasId, .tileIndex = first + 1,
+             .palette = assets.palettes.player, .duration = kWalkFrame},
+        }};
+    };
+    assets.playerWalk = TopDownMovement::DirectionalAnimations{
+        .up = walkRow(PlayerWalk::Up),
+        .down = walkRow(PlayerWalk::Down),
+        .left = walkRow(PlayerWalk::Left),
+        .right = walkRow(PlayerWalk::Right),
+    };
 
     return assets;
 }

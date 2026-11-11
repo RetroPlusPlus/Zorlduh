@@ -182,7 +182,7 @@ TEST(WorldTiles, IsOneCellPerMapCell) {
 TEST(WorldTiles, DrawsEachKindOfCellFromItsTileThroughItsPalette) {
     const World world = loadWorld();
     const zorlduh::Assets assets = fakeAssets();
-    const layers::Cells cells = zorlduh::WorldTiles(world, assets);
+    const LayerKit::Cells cells = zorlduh::WorldTiles(world, assets);
     const auto at = [&](int cx, int cy) {
         return cells[static_cast<std::size_t>(cy) * static_cast<std::size_t>(world.tiles.width) +
                      static_cast<std::size_t>(cx)];
