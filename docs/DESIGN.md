@@ -36,7 +36,8 @@ Two things, in this order of priority for now:
   their ids spread across the range so a map reads by eye.
 - **Assets are laid out by kind, then category:** `assets/gfx/`, `assets/palettes/`, `assets/maps/`
   (later `assets/audio/`), each with folders such as `tiles/`, `sprites/` and `hud/`; under `maps/`, one
-  folder per area holding its tile map and its collision map. Every asset is baked into the executable.
+  folder per layout and in it one per area, holding the area's tile map and its collision map. Every
+  asset is baked into the executable.
 
 ## Tone and writing voice
 
@@ -47,17 +48,31 @@ None yet. The template has no text, story or characters. Decided when the game's
 The template's verbs and systems:
 
 - **Screen:** a 16 px HUD strip across the top; a 160×128 play area (20×16 cells) beneath it.
-- **The world is areas joined by openings.** An area — an overworld screen, a dungeon room, a cave — is
-  its own map, of any size in cells, drawn through its own art; nothing outside an area exists, so
-  nothing outside one is ever drawn. Areas have no position in a larger world: an opening in one leads
-  to a named opening in another, and that is the only link between them, so a world of any shape can be
-  built — an overworld, every floor of a dungeon, the houses in a town. An opening is a gap in a wall
-  (any number per wall) or a spot inside the area (stairs, a cave mouth), and each says how it is gone
-  through: a **scroll**, where the next area slides in lined up with the gap and the player is carried
-  through, or a **fade** to the entrance. Links are one-way, so a two-way door is two openings leading to
-  each other and a one-way drop is one. The camera centers on the player and stops at the area's edges;
-  an area smaller than the play area sits centered. The world's model is the WorldKit module; the camera
-  and its laws are CameraKit's.
+- **The world is layouts of areas joined by openings.** An area — an overworld screen, a dungeon room, a
+  cave — is its own map, of any size in cells, drawn through its own art; nothing outside an area
+  exists, so nothing outside one is ever drawn, and beyond an area's edge is the void. A layout is a set
+  of areas that share a cell size, a view and their transitions' settings — the overworld is one, each
+  dungeon another. Areas have no position in a larger world: an opening in one leads to a named opening
+  in another, in its own layout or any other, and that is the only link between them, so a world of any
+  shape can be built — an overworld, every floor of a dungeon, the houses in a town. An opening is a gap
+  in a wall (any number per wall) or a spot inside the area (stairs, a cave mouth), and each says how it
+  is gone through: a **scroll**, where the next area slides in lined up with the gap and the player is
+  carried through; a **fade** to the entrance; or a **seam**, where the next area is simply there beyond
+  the wall, drawn whenever it is in view, and the player walks on into it with nothing on screen moving.
+  A scroll or a seam may shift the next area from where the gaps line it up, by whole cells. Links are
+  one-way, so a two-way door is two openings leading to each other and a one-way drop is one; a seam
+  leads back by construction. The world's model is the WorldKit module; the camera and its laws are
+  CameraKit's.
+- **The camera moves only with the player.** Within an area it centers on the player and stops at the
+  area's edges, reaching across a seam into the area beyond. It moves only when the player moves,
+  toward where it should be and never past it, never against the player, never on its own. A scroll
+  slides it along the door's axis only; a seam is crossed with nothing moving on screen. Where a
+  transition leaves the camera away from an area's own place, with void beside the area, the camera
+  stays there and comes into place only as the player walks that way. An area smaller than the play
+  area is not centered: it sits where the door placed it, and the camera holds still there until the
+  next transition.
+- **The world draws only in the play area.** The HUD strip, and any border or panel the screen is given,
+  is reserved: whatever an area reaches past the play area's edge, nothing of the world is drawn there.
 - **Player:** eight-direction walking — each held axis moves the player a pixel a tick, so diagonals
   cover both at once; collision resolved per axis, so a diagonal into a wall keeps moving along it; four
   facings, which change only when the player moves: a diagonal keeps a facing that is one of its two
@@ -73,9 +88,11 @@ The template's verbs and systems:
 - **Game states:** `Playing`, `Transition`, `GameOver`.
 
 Terms used consistently: **area** (one map with its own art and openings; a room, a screen, a cave),
-**opening** (a way out of an area, in a wall or at a spot, leading to an opening in another), **play
-area** (the screen below the HUD strip), **camera** (the position in the current area shown at the play
-area's top-left), **actor** (anything spawned in an area), **cell** (one 8×8 tile position).
+**layout** (a set of areas sharing a cell size, a view and transition settings; the overworld, a
+dungeon), **opening** (a way out of an area, in a wall or at a spot, leading to an opening in another),
+**seam** (a seamless join: two openings whose areas meet as one map), **play area** (the screen below
+the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
+**actor** (anything spawned in an area), **cell** (one 8×8 tile position).
 
 ## Hard constraints
 
@@ -113,5 +130,6 @@ area's top-left), **actor** (anything spawned in an area), **cell** (one 8×8 ti
   fits the same world.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
-- The area-and-opening world model and the camera behavior above.
+- The layout-area-and-opening world model, the three transitions, the camera rules and the reserved
+  screen above.
 - The Game Boy Color idiom at a 60 Hz tick.
