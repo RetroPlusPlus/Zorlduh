@@ -10,3 +10,7 @@ One row per feature status change, newest last.
 | 2026-11-10 | world | ⬜ planned | 🧪 testing | `0916fd8` | The room table, `World`'s solid and room queries, the depth and layout tables, and `WorldTiles` on one finite tile layer; the start room is on screen; 14 tests |
 | 2026-11-10 | top-down-movement | — | 🧪 testing | `474e395` | `TopDownMovement` in `modules/TopDownMovement/` — walkers, collision shapes, tile collision, the facing law, walk animations, the walker's sprite — with its guide and example; the layer kit's module is renamed `LayerKit`; 30 tests |
 | 2026-11-10 | player | ⬜ planned | 🧪 testing | `474e395` | The player walks the world through TopDownMovement, drawn on the actors layer; 8 tests |
+| 2026-11-11 | camera-kit | — | 🧪 testing | `487263a` | `CameraKit` in `modules/CameraKit/`: the camera value, the follow law, pans; with its guide and example; 10 tests |
+| 2026-11-11 | world-kit | — | 🧪 testing | `487263a` | `WorldKit` in `modules/WorldKit/`: areas with their own maps and art, openings that scroll or fade, the camera within an area, the areas on screen; with its guide and example; 27 tests |
+| 2026-11-11 | world | 🧪 testing | ❌ dropped | `487263a` | The single world map, room table and `World` are replaced by one map per area in `world-kit` and `areas` |
+| 2026-11-11 | areas | — | 🧪 testing | `487263a` | The game's five areas, joined by scrolling doors and a fading cave mouth; the player goes between them through the tick; 8 tests (`assets` and `player` reworked: 13 and 8) |

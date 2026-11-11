@@ -14,7 +14,7 @@ Two things, in this order of priority for now:
    It starts from the components that the engine's existing component-style consumers each wrote for
    themselves. Packaging the components as separate modules comes later; every system written now is
    written so it can be lifted out whole.
-2. **A top-down action-adventure game**, in the tradition of the genre's classic 2D entries: rooms
+2. **A top-down action-adventure game**, in the tradition of the genre's classic 2D entries: a world
    explored on foot, a sword, hearts, enemies, items, dungeons. The game is the proving ground that
    decides what the library needs. For now it is a **technical template** — the systems any game of this
    kind needs — with no game-specific design yet. The game's own design opens when the template is done.
@@ -35,8 +35,8 @@ Two things, in this order of priority for now:
   indices need (2-bit for four colors), so each one reads by eye as its art. Maps are grayscale too,
   their ids spread across the range so a map reads by eye.
 - **Assets are laid out by kind, then category:** `assets/gfx/`, `assets/palettes/`, `assets/maps/`
-  (later `assets/audio/`), each with folders such as `tiles/`, `sprites/` and `hud/`. Every asset is baked
-  into the executable.
+  (later `assets/audio/`), each with folders such as `tiles/`, `sprites/` and `hud/`; under `maps/`, one
+  folder per area holding its tile map and its collision map. Every asset is baked into the executable.
 
 ## Tone and writing voice
 
@@ -47,12 +47,17 @@ None yet. The template has no text, story or characters. Decided when the game's
 The template's verbs and systems:
 
 - **Screen:** a 16 px HUD strip across the top; a 160×128 play area (20×16 cells) beneath it.
-- **Rooms — free-form**, in the A-Link-to-the-Past model rather than one room per screen: a room is any
-  rectangle of the world map, in cells, and rooms differ in size. The camera centers on the player and
-  stops at the room's edges, so nothing outside the room is ever on screen. A room smaller than the play
-  area is allowed and sits centered, with nothing drawn around it. Leaving a room through an opening in
-  its edge scrolls to the room on the other side. Sizes are any number of cells, not multiples of a
-  screen.
+- **The world is areas joined by openings.** An area — an overworld screen, a dungeon room, a cave — is
+  its own map, of any size in cells, drawn through its own art; nothing outside an area exists, so
+  nothing outside one is ever drawn. Areas have no position in a larger world: an opening in one leads
+  to a named opening in another, and that is the only link between them, so a world of any shape can be
+  built — an overworld, every floor of a dungeon, the houses in a town. An opening is a gap in a wall
+  (any number per wall) or a spot inside the area (stairs, a cave mouth), and each says how it is gone
+  through: a **scroll**, where the next area slides in lined up with the gap and the player is carried
+  through, or a **fade** to the entrance. Links are one-way, so a two-way door is two openings leading to
+  each other and a one-way drop is one. The camera centers on the player and stops at the area's edges;
+  an area smaller than the play area sits centered. The world's model is the WorldKit module; the camera
+  and its laws are CameraKit's.
 - **Player:** eight-direction walking — each held axis moves the player a pixel a tick, so diagonals
   cover both at once; collision resolved per axis, so a diagonal into a wall keeps moving along it; four
   facings, which change only when the player moves: a diagonal keeps a facing that is one of its two
@@ -60,16 +65,17 @@ The template's verbs and systems:
   together; a two-frame walk animation per facing, eight ticks a frame, resting on its first frame. The
   collision box is the bottom half of the 16×16 frame, 3 px in from each side. All of it is the
   TopDownMovement module, which the player is configured into.
-- **Actors:** stable ids minted at spawn, per-room spawn tables, one wandering enemy kind.
+- **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
 - **HUD:** hearts in half-heart steps; a heart pickup dropped by enemies.
 - **Sound:** one cue per game event, played from the simulation's event stream.
 - **Game states:** `Playing`, `Transition`, `GameOver`.
 
-Terms used consistently: **room** (a rectangle of the world map), **play area** (the screen below the HUD
-strip), **camera** (the world position shown at the play area's top-left), **actor** (anything spawned
-in a room), **cell** (one 8×8 tile position).
+Terms used consistently: **area** (one map with its own art and openings; a room, a screen, a cave),
+**opening** (a way out of an area, in a wall or at a spot, leading to an opening in another), **play
+area** (the screen below the HUD strip), **camera** (the position in the current area shown at the play
+area's top-left), **actor** (anything spawned in an area), **cell** (one 8×8 tile position).
 
 ## Hard constraints
 
@@ -101,7 +107,11 @@ in a room), **cell** (one 8×8 tile position).
   layer's size is the active viewport.
 - Walking is the TopDownMovement module's, in `modules/TopDownMovement/`: the game says what a walker is
   and what is solid, and the module moves, turns, animates and draws it.
+- The world is WorldKit's, in `modules/WorldKit/`, and the camera CameraKit's, in `modules/CameraKit/`.
+  WorldKit composes LayerKit and CameraKit; no module depends on a movement module — movement plugs
+  into the world through the engine's types (a solid query, a box, a move), so another kind of movement
+  fits the same world.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
-- The free-form room model and the camera behavior above.
+- The area-and-opening world model and the camera behavior above.
 - The Game Boy Color idiom at a 60 Hz tick.
