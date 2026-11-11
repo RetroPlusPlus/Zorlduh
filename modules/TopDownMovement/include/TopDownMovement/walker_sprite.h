@@ -5,8 +5,9 @@
 //
 // The sprite shows the walker's current frame (its art, size and palette) with the frame's top-left at
 // the walker's position, in the world pixels a world-scrolled sprite layer places sprites in. Its `z`
-// is the bottom edge of the walker's collision shape, so on a layer of walkers the one standing lower
-// draws in front. The config's anchors are published on the sprite.
+// is the bottom edge of the walker's collision shape (of the frame, when the shape is empty), so on a
+// layer of walkers the one standing lower draws in front. The config's anchors are published on the
+// sprite.
 #pragma once
 
 #include <stdexcept>

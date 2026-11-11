@@ -84,8 +84,8 @@ struct Palettes {
 struct Assets {
     retropp::AtlasManifest terrain;  // Tileset of 8×8 tiles, slots in TerrainTile order
     retropp::AtlasManifest player;   // AnimationSeries of 16×16 frames, animations in PlayerWalk order
-    TopDownMovement::DirectionalAnimations playerWalk;  // each facing's row of the player sheet, two frames
-                                                 // of 8 ticks each, through the player palette
+    TopDownMovement::DirectionalAnimations playerWalk;  // each facing's row of the player sheet, two
+                                                        // frames of 8 ticks each, through the player palette
     retropp::AtlasManifest enemy;    // SingleAnimation: two 16×16 frames
     retropp::AtlasManifest sword;    // Single: one 8×16 frame pointing up
     retropp::AtlasManifest hearts;   // SpriteSeries of 8×8 cells, slots in Heart order

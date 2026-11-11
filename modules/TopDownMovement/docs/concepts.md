@@ -20,7 +20,7 @@ changes. One config serves every walker of that kind: every bat in a cave walks 
 
 A `Walker` is one walker *now*: its position, its facing, how far it is into its stride, and the order
 its directions were last pressed in. It is a small value with no pointers in it, so a game state holding
-walkers copies, compares and saves like any other value.
+walkers copies and saves like any other value.
 
 Every call that needs both takes both: `walker.walk(config, …)`, `walker.frame(config)`,
 `WalkerSprite(key, walker, config)`.
@@ -65,7 +65,8 @@ down to an up-right diagonal faces whichever of up and right was pressed last.
 facing plays, looping; when it stands, it shows that animation's frame 0.
 
 The walker counts the ticks it has walked since it last stood, and the frame is that count resolved
-through the animation, at the cadence in `config.timing` (the engine's active cadence by default). A
+through the animation, at the cadence in `config.timing` (by default, the engine's active cadence when
+the config is built). A
 turn keeps the count, so the stride carries on in the new facing's animation instead of starting over.
 
 The animations are the game's: any frames, any durations, any number of frames per facing. Each frame

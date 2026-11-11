@@ -188,8 +188,8 @@ public:
         return moved;
     }
 
-    // Whether the shape, moved by `offset`, covers any pixel `solids` calls solid. A rectangle is one
-    // query; any other shape is one query per row of covered pixels.
+    // Whether the shape, moved by `offset`, covers any pixel `solids` calls solid. A shape built from an
+    // IntRect is one query; any other shape is one query per row of covered pixels.
     template <SolidQuery Q>
     [[nodiscard]] bool hits(const Q& solids, retropp::Vec2i offset = {}) const {
         if (rectangle_) {

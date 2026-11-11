@@ -93,7 +93,7 @@ TEST(Player, WalksOutThroughTheOpeningToTheNextRoom) {
     for (int i = 0; i < 100; ++i) {
         zorlduh::tick(state, zorlduh::Input{.move = Hold({.right = true})}, player);
     }
-    // The 0↔1 opening spans rows 6–9 (pixels 48–79), which hold the whole box (rows 64–71).
+    // The 0↔1 opening spans rows 6–9 (pixels 48–79), which hold the whole box (pixel rows 64–71).
     EXPECT_EQ(state.player.position(), (Vec2i{172, 56}));
 }
 

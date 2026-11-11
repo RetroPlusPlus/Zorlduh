@@ -9,8 +9,9 @@
 namespace zorlduh {
 
 inline constexpr std::int32_t kWorldZ = 0;
-inline constexpr std::int32_t kActorsZ = 10;  // one sprite layer; each actor's Sprite::z is its foot y,
-                                              // so the actor lower on screen draws in front
+inline constexpr std::int32_t kActorsZ = 10;  // one sprite layer; each actor's Sprite::z is the bottom
+                                              // edge of its collision shape, so the actor lower on
+                                              // screen draws in front
 inline constexpr std::int32_t kEffectsZ = 20;
 inline constexpr std::int32_t kHudZ = 100;
 

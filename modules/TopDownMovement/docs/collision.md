@@ -89,8 +89,8 @@ On each tick:
    direction.
 3. **For each pixel along x, up to `config.speed`,** it takes the position one pixel on and asks
    `config.collision.hits(solids, next)`: the shape moved to `next`, tested against the query.
-4. **`hits` asks the query.** A rectangle is one call, `solidBox` with the box moved to `next`; any
-   other shape is one call per row of pixels it covers.
+4. **`hits` asks the query.** A shape built from a box is one call, `solidBox` with the box moved to
+   `next`; any other shape is one call per row of pixels it covers.
 5. **`TileCollision::solidBox` turns the box into cells** (pixel ÷ `cellSize`, rounding down) and checks
    each cell it spans: off the map, or holding any value but `open`, means solid.
 6. **Back in `walk`:** solid means that pixel is blocked and x stops there, flush with the wall. Clear
@@ -138,7 +138,8 @@ The constructors convert implicitly, so `.collision` takes any of them:
   the art's pixels, which are the walker's own.
 
 The coverage is worked out once, when the shape is built. Moving a shape and testing it costs one query
-for a rectangle and one per covered row for anything else, however complex the outline.
+for a box and one per covered row for anything else, however complex the outline; a rectangle built as
+a `ShapePoints` is tested row by row.
 
 **Throws.** Building from a `ShapePoints` throws `std::invalid_argument` for a shape with no points
 and no curve, for an inverted shape (its outside is infinite, so it would be solid everywhere), and for

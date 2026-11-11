@@ -2,7 +2,7 @@
 // steered with the arrow keys, WASD or a d-pad. It walks in eight directions, keeps moving along a wall
 // it walks into diagonally, faces where it walks and steps through its walk animation.
 //
-// docs/getting-started.md walks through it line by line.
+// docs/getting-started.md walks through it part by part.
 
 #include <array>
 #include <chrono>

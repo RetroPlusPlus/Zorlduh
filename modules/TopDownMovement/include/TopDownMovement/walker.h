@@ -57,8 +57,9 @@ struct WalkerConfig {
     // frame 0 of its facing's animation.
     DirectionalAnimations walk{};
 
-    // The cadence the animations' durations are resolved against. Taken from
-    // retropp::AnimationPlayer::defaultTiming, which EngineConfig::setActive sets to the game's own.
+    // The cadence the animations' durations are resolved against. The default is
+    // retropp::AnimationPlayer::defaultTiming as it stands when the config is built, which
+    // EngineConfig::setActive sets to the game's own; build the config after setActive runs.
     retropp::TimingProfile timing = retropp::AnimationPlayer::defaultTiming;
 };
 
