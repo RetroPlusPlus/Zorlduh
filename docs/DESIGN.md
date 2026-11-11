@@ -52,13 +52,16 @@ The template's verbs and systems:
   cave — is its own map, of any size in cells, drawn through its own art; nothing outside an area
   exists, so nothing outside one is ever drawn, and beyond an area's edge is the void. A layout is a set
   of areas that share a cell size, a view and their transitions' settings — the overworld is one, each
-  dungeon another. Areas have no position in a larger world: an opening in one leads to a named opening
+  dungeon another, and a forest of rooms joined only by seams a third. Areas have no position in a larger world: an opening in one leads to a named opening
   in another, in its own layout or any other, and that is the only link between them, so a world of any
   shape can be built — an overworld, every floor of a dungeon, the houses in a town. An opening is a gap
   in a wall (any number per wall) or a spot inside the area (stairs, a cave mouth), and each says how it
   is gone through: a **scroll**, where the next area slides in lined up with the gap and the player is
   carried through; a **fade** to the entrance; or a **seam**, where the next area is simply there beyond
   the wall, drawn whenever it is in view, and the player walks on into it with nothing on screen moving.
+  What is drawn reaches through chains of seams — a room hanging off the side of the next room is in
+  view from this one — as many seams out as the layout allows (any number by default); the camera's
+  reach and what is solid go one seam, to the next area only.
   A scroll or a seam may shift the next area from where the gaps line it up, by whole cells. Links are
   one-way, so a two-way door is two openings leading to each other and a one-way drop is one; a seam
   leads back by construction. The world's model is the WorldKit module; the camera and its laws are
@@ -90,7 +93,8 @@ The template's verbs and systems:
 Terms used consistently: **area** (one map with its own art and openings; a room, a screen, a cave),
 **layout** (a set of areas sharing a cell size, a view and transition settings; the overworld, a
 dungeon), **opening** (a way out of an area, in a wall or at a spot, leading to an opening in another),
-**seam** (a seamless join: two openings whose areas meet as one map), **play area** (the screen below
+**seam** (a seamless join: two openings whose areas meet as one map), **seam depth** (how many seams
+away an area in view is drawn), **play area** (the screen below
 the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
 **actor** (anything spawned in an area), **cell** (one 8×8 tile position).
 

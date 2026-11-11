@@ -15,9 +15,10 @@ between them, with a camera that follows the player through them.
 
 **Status: early.** The build stands up and opens the game's window, the layer kit that every on-screen
 component goes through is in place and tested, the placeholder art and maps load at startup, and the
-player walks an overworld of five areas and a dungeon of five rooms: through doors, which scroll the next
-area in; down stairs, which fade to the next; and across an open wall, where the next room is simply
-there and the player walks on.
+player walks an overworld of five areas, a dungeon of five rooms and a forest of seven: through doors,
+which scroll the next area in; down stairs, which fade to the next; and across open walls, where the
+next room is simply there and the player walks on — in the forest from room to room, each one a
+different case of how the camera follows.
 
 ## Progress
 
@@ -33,8 +34,8 @@ there and the player walks on.
   part of the screen ([`modules/WorldKit/`](modules/WorldKit/README.md))
 - [x] **Assets** — generated placeholder art and the struct that loads it
 - [x] **Player** — walking, collision, facing, animation
-- [x] **Areas** — an overworld of five areas and a dungeon of five rooms, joined by doors, stairs and an
-  open wall; the player goes between them
+- [x] **Areas** — an overworld of five areas, a dungeon of five rooms and a forest of seven, joined by
+  doors, stairs and open walls; the player goes between them
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
 - [ ] **HUD and pickups** — hearts and the heart pickup
