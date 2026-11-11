@@ -13,8 +13,8 @@ It runs at Game Boy Color resolution (160×144) on a 60 Hz tick, with rooms of a
 follows the player through them.
 
 **Status: early.** The build stands up and opens the game's window, the layer kit that every on-screen
-component goes through is in place and tested, and the placeholder art and maps load at startup. The
-window is still empty.
+component goes through is in place and tested, the placeholder art and maps load at startup, and the
+world's start room is on screen beneath the HUD strip.
 
 ## Progress
 
@@ -22,7 +22,7 @@ window is still empty.
 - [x] **Layer kit** — sprite, tile, raster and image layers that gather components onto the screen
   ([`modules/layers/`](modules/layers/README.md))
 - [x] **Assets** — generated placeholder art and the struct that loads it
-- [ ] **World** — a map of free-form rooms with collision, on screen
+- [x] **World** — a map of free-form rooms with collision, on screen
 - [ ] **Player** — walking, collision, facing, animation
 - [ ] **Rooms and camera** — following the player within a room and scrolling to the next
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
