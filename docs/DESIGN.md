@@ -53,9 +53,13 @@ The template's verbs and systems:
   area is allowed and sits centered, with nothing drawn around it. Leaving a room through an opening in
   its edge scrolls to the room on the other side. Sizes are any number of cells, not multiples of a
   screen.
-- **Player:** eight-direction walking — each held axis moves the player, so diagonals cover both at
-  once; tile collision resolved per axis, so a diagonal into a wall slides along it; four facings, which
-  a diagonal keeps when it already points along one of its two directions; walk animation.
+- **Player:** eight-direction walking — each held axis moves the player a pixel a tick, so diagonals
+  cover both at once; collision resolved per axis, so a diagonal into a wall keeps moving along it; four
+  facings, which change only when the player moves: a diagonal keeps a facing that is one of its two
+  directions and otherwise faces the one pressed more recently, the horizontal one when both were pressed
+  together; a two-frame walk animation per facing, eight ticks a frame, resting on its first frame. The
+  collision box is the bottom half of the 16×16 frame, 3 px in from each side. All of it is the
+  TopDownMovement module, which the player is configured into.
 - **Actors:** stable ids minted at spawn, per-room spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
@@ -75,9 +79,9 @@ in a room), **cell** (one 8×8 tile position).
   a thing not shown is simply not returned — so the game holds no CPU-side screen or tile map, no object
   buffer, no per-cell visibility or priority flag, no hide call, and no save-and-restore of screen
   contents.
-- **The simulation has no draw types.** `src/game/` includes nothing from the engine's draw state or
-  renderer and nothing from `src/render/`. Everything that changes over time advances in the tick;
-  rendering only reads.
+- **The simulation has no draw types.** `src/game/` never builds or reads a sprite, tile cell, layer or
+  frame, and includes nothing from the renderer or from `src/render/`; it uses the engine's geometry,
+  shapes and anchors. Everything that changes over time advances in the tick; rendering only reads.
 - **The simulation names what happened** as events; presentation and audio consume them.
 - **Every system can be lifted out** into a standalone module: nothing under `modules/` includes a
   project header, and a system meant to be general holds no game constants.
@@ -91,10 +95,12 @@ in a room), **cell** (one 8×8 tile position).
 ## What must be preserved
 
 - The component model of rendering above.
-- The layer aggregates are this project's own, in `modules/layers/`, until the engine ships its own form.
+- The layer aggregates are this project's own, in `modules/LayerKit/`, until the engine ships its own form.
   A layer built through them with no options draws exactly as a plain engine layer would: every layer
   field beyond its key, depth, size and content passes through with the engine's own default, and the
   layer's size is the active viewport.
+- Walking is the TopDownMovement module's, in `modules/TopDownMovement/`: the game says what a walker is
+  and what is solid, and the module moves, turns, animates and draws it.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The free-form room model and the camera behavior above.

@@ -13,17 +13,19 @@ It runs at Game Boy Color resolution (160×144) on a 60 Hz tick, with rooms of a
 follows the player through them.
 
 **Status: early.** The build stands up and opens the game's window, the layer kit that every on-screen
-component goes through is in place and tested, the placeholder art and maps load at startup, and the
-world's start room is on screen beneath the HUD strip.
+component goes through is in place and tested, the placeholder art and maps load at startup, the
+world's start room is on screen beneath the HUD strip, and the player walks it.
 
 ## Progress
 
 - [x] **Build** — the engine as a submodule, a lean Release executable, a GoogleTest suite
 - [x] **Layer kit** — sprite, tile, raster and image layers that gather components onto the screen
-  ([`modules/layers/`](modules/layers/README.md))
+  ([`modules/LayerKit/`](modules/LayerKit/README.md))
+- [x] **Top-down movement** — walking in eight directions, collision shapes and maps, facing, walk
+  animations ([`modules/TopDownMovement/`](modules/TopDownMovement/README.md))
 - [x] **Assets** — generated placeholder art and the struct that loads it
 - [x] **World** — a map of free-form rooms with collision, on screen
-- [ ] **Player** — walking, collision, facing, animation
+- [x] **Player** — walking, collision, facing, animation
 - [ ] **Rooms and camera** — following the player within a room and scrolling to the next
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
