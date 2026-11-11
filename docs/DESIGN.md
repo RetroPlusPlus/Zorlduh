@@ -36,8 +36,8 @@ Two things, in this order of priority for now:
   their ids spread across the range so a map reads by eye.
 - **Assets are laid out by kind, then category:** `assets/gfx/`, `assets/palettes/`, `assets/maps/`
   (later `assets/audio/`), each with folders such as `tiles/`, `sprites/` and `hud/`; under `maps/`, one
-  folder per layout and in it one per area, holding the area's tile map and its collision map. Every
-  asset is baked into the executable.
+  folder per layout and in it one per area, holding the area's tile map, its collision map and a map
+  for each further layer it is drawn in. Every asset is baked into the executable.
 
 ## Tone and writing voice
 
@@ -66,6 +66,15 @@ The template's verbs and systems:
   one-way, so a two-way door is two openings leading to each other and a one-way drop is one; a seam
   leads back by construction. The world's model is the WorldKit module; the camera and its laws are
   CameraKit's.
+- **An area is drawn in layers.** Its collision map says what is solid; its look is any number of tile
+  maps of its size, each drawn through its own art on a layer of its own at its own depth — the ground,
+  a path under the player's feet, a canopy or a roof over the player's head. Among them are the area's
+  **actor slots**: named depths where the things that move in the area are drawn, over the layers below
+  and under the layers above. Every depth is the game's, from one depth table, and the world is handed
+  them; the player and everything else that walks the world are drawn at the `"actors"` slot, and an
+  area may have more slots (things that fly over a canopy, things that swim under a surface). A layer
+  that covers part of an area draws nothing elsewhere, through its sheet's transparent index; whatever
+  is drawn over the whole world — effects, the HUD — takes a depth above the world's highest.
 - **The camera moves only with the player.** Within an area it centers on the player and stops at the
   area's edges, reaching across a seam into the area beyond. It moves only when the player moves,
   toward where it should be and never past it, never against the player, never on its own. A scroll
@@ -94,8 +103,9 @@ Terms used consistently: **area** (one map with its own art and openings; a room
 **layout** (a set of areas sharing a cell size, a view and transition settings; the overworld, a
 dungeon), **opening** (a way out of an area, in a wall or at a spot, leading to an opening in another),
 **seam** (a seamless join: two openings whose areas meet as one map), **seam depth** (how many seams
-away an area in view is drawn), **play area** (the screen below
-the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
+away an area in view is drawn), **layer** (of an area: one of its tile maps, drawn at its own depth),
+**actor slot** (a named depth in an area where the things moving in it are drawn), **play area** (the
+screen below the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
 **actor** (anything spawned in an area), **cell** (one 8×8 tile position).
 
 ## Hard constraints
@@ -136,4 +146,5 @@ the HUD strip), **camera** (the position in the current area shown at the play a
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved
   screen above.
+- An area's look as layers and actor slots on one depth axis, with every depth the game's.
 - The Game Boy Color idiom at a 60 Hz tick.

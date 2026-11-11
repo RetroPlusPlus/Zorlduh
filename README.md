@@ -18,7 +18,8 @@ component goes through is in place and tested, the placeholder art and maps load
 player walks an overworld of five areas, a dungeon of five rooms and a forest of seven: through doors,
 which scroll the next area in; down stairs, which fade to the next; and across open walls, where the
 next room is simply there and the player walks on — in the forest from room to room, each one a
-different case of how the camera follows.
+different case of how the camera follows. Areas are drawn in layers: the player walks along a path,
+under a forest canopy and into the shade of a cave mouth.
 
 ## Progress
 
@@ -29,13 +30,15 @@ different case of how the camera follows.
   animations ([`modules/TopDownMovement/`](modules/TopDownMovement/README.md))
 - [x] **Camera** — a camera value, the follow law, pans
   ([`modules/CameraKit/`](modules/CameraKit/README.md))
-- [x] **World** — layouts of areas with their own maps and art, openings that scroll, fade or join
-  seamlessly to the next area, the camera within an area and across a seam, the world confined to its
-  part of the screen ([`modules/WorldKit/`](modules/WorldKit/README.md))
+- [x] **World** — layouts of areas with their own maps and art, each area drawn in layers at depths the
+  game gives with named slots for the things moving in it, openings that scroll, fade or join seamlessly
+  to the next area, the camera within an area and across a seam, the world confined to its part of the
+  screen ([`modules/WorldKit/`](modules/WorldKit/README.md))
 - [x] **Assets** — generated placeholder art and the struct that loads it
 - [x] **Player** — walking, collision, facing, animation
 - [x] **Areas** — an overworld of five areas, a dungeon of five rooms and a forest of seven, joined by
-  doors, stairs and open walls; the player goes between them
+  doors, stairs and open walls; the player goes between them, over a path, under a canopy and under the
+  rock of a cave mouth
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
 - [ ] **HUD and pickups** — hearts and the heart pickup
