@@ -1,7 +1,7 @@
 // Zorlduh's entry point. It activates the game's engine configuration, creates the four engine
 // objects, loads the game's art and maps, and runs the loop until the window is closed. Each tick the
-// player walks the world; each displayed frame is the world's tile layer and the actors on top of it,
-// placed so the start room fills the play area beneath the HUD strip.
+// player walks the world; each displayed frame is the area (or two) on screen, the actors on top, and
+// the fade over everything, placed under the HUD strip.
 
 #include "retropp/clock.h"
 #include "retropp/draw_state.h"
@@ -15,17 +15,14 @@
 #include "assets/assets.h"
 #include "config/config.h"
 #include "game/player.h"
-#include "game/rooms.h"
 #include "game/sim.h"
-#include "game/world.h"
 #include "input/input.h"
 #include "LayerKit/sprite_layer.h"
-#include "LayerKit/tile_layer.h"
 #include "TopDownMovement/walker.h"
+#include "WorldKit/world_layers.h"
 #include "render/layers.h"
 #include "render/layout.h"
 #include "render/player.h"
-#include "render/world.h"
 
 int main() {
     retropp::EngineConfig::setActive(zorlduh::engineConfig());
@@ -37,32 +34,21 @@ int main() {
     platform.actions(zorlduh::actionMap());
 
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
-    const TopDownMovement::WalkerConfig player = zorlduh::PlayerConfig(assets);
-    zorlduh::GameState state{
-        .world = zorlduh::World{.tiles = assets.world, .collision = assets.collision},
-        .player = TopDownMovement::Walker{zorlduh::kPlayerStart},
-    };
-
-    // The start room is exactly one play area, so the camera rests on its top-left cell.
-    const zorlduh::Room& start = zorlduh::kRooms[zorlduh::kStartRoom];
-    const retropp::LayerScroll worldScroll{
-        .x = start.x * zorlduh::kCellSize - zorlduh::kPlayAreaX,
-        .y = start.y * zorlduh::kCellSize - zorlduh::kPlayAreaY,
-    };
+    const zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView);
+    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    state.camera.place(config.layout, state.player.collision(config.player).bounds());
 
     loop.simTick([&](const retropp::InputState& in) {
-        zorlduh::tick(state, zorlduh::readInput(in), player);
+        zorlduh::tick(state, zorlduh::readInput(in), config);
     });
 
     retropp::FrameDrawState frame;
     loop.renderLoop([&]() {
-        frame.layers = {
-            LayerKit::TileLayer(zorlduh::kWorldLayer, zorlduh::kWorldZ,
-                              zorlduh::WorldTiles(state.world, assets), state.world.tiles.width,
-                              state.world.tiles.height, {.scroll = worldScroll}),
-            LayerKit::SpriteLayer(zorlduh::kActorsLayer, zorlduh::kActorsZ,
-                                {zorlduh::Player(state, player)}, {.scroll = worldScroll}),
-        };
+        frame.layers = WorldKit::WorldLayers(state.camera, config.layout, zorlduh::kWorldZ);
+        frame.layers.push_back(LayerKit::SpriteLayer(zorlduh::kActorsLayer, zorlduh::kActorsZ,
+                                                     {zorlduh::Player(state, config.player)},
+                                                     {.scroll = state.camera.scroll(config.layout)}));
+        frame.regions = WorldKit::Fade(state.camera, config.layout);
         renderer.renderFrame(frame);
     });
 

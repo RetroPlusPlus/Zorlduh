@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Writes Zorlduh's placeholder art under assets/: every sheet, every palette, the world map and its
-collision map.
+"""Writes Zorlduh's placeholder art under assets/: every sheet, every palette, and each area's tile map
+and collision map.
 
     assets/gfx/tiles/terrain.png                  the terrain tiles, one per world id
     assets/gfx/sprites/{player,enemy,sword}.png   the sprite sheets
     assets/gfx/hud/hearts.png                     the HUD's hearts
-    assets/palettes/tiles/{floor,wall,water,void}.png
+    assets/palettes/tiles/{floor,wall,water}.png
     assets/palettes/sprites/{player,enemy,sword}.png
     assets/palettes/hud/hearts.png
-    assets/maps/world/tiles.png                   one world id per cell
-    assets/maps/world/collision.png               one collision id per cell
+    assets/maps/<area>/tiles.png                  one world id per cell, for each area
+    assets/maps/<area>/collision.png              one collision id per cell, for each area
 
 A sheet is atlas art: a 2-bit grayscale PNG whose samples are palette indices 0-3, so an image viewer
 shows its four indices as black, dark gray, light gray and white. It carries no color. Color comes
@@ -18,7 +18,8 @@ palette entry, dark at entry 0 to light at entry 3 like the gray levels.
 
 A map is an 8-bit grayscale PNG whose sample value is a cell's id: a world id (WorldCell in
 src/assets/assets.h) or a collision id (CollisionCell). The ids are spread across the sample range so
-a map reads by eye in an image viewer: void is black, and floor and open cells are light.
+a map reads by eye in an image viewer: stairs are near black, and floor and open cells are light. Each
+area is its own pair of maps; nothing outside an area exists.
 
 The output is deterministic. The zlib stream is written as stored (uncompressed) blocks, so the bytes
 do not depend on the zlib build, and running the script again writes identical files.
@@ -106,7 +107,6 @@ UNUSED = (0, 0, 0, 0)
 FLOOR_PAL = [(88, 72, 40, 255), (160, 136, 80, 255), (208, 184, 120, 255), (232, 216, 160, 255)]
 WALL_PAL = [(32, 32, 48, 255), (88, 88, 112, 255), (144, 144, 168, 255), (208, 208, 216, 255)]
 WATER_PAL = [(16, 48, 88, 255), (40, 104, 176, 255), (88, 168, 224, 255), (176, 224, 248, 255)]
-VOID_PAL = [(0, 0, 0, 255)] * 4
 
 PLAYER_PAL = [UNUSED, (40, 24, 32, 255), (200, 80, 56, 255), (248, 224, 192, 255)]   # outline, cloak, face
 ENEMY_PAL = [UNUSED, (32, 8, 48, 255), (128, 64, 192, 255), (240, 240, 160, 255)]    # outline, body, eyes
@@ -188,9 +188,18 @@ DOORWAY = parse([
     "21212121",
 ], 8, 8)
 
-VOID = parse(["00000000"] * 8, 8, 8)
+STAIRS = parse([
+    "11111111",
+    "10000001",
+    "11111111",
+    "10000001",
+    "11111111",
+    "10000001",
+    "11111111",
+    "10000001",
+], 8, 8)
 
-TILES = side_by_side(FLOOR, WALL, WATER, DOORWAY, VOID)
+TILES = side_by_side(FLOOR, WALL, WATER, DOORWAY, STAIRS)
 
 # The player: a hooded traveler in a cloak. Rows Down, Up, Left, Right; two walk frames each. The
 # second Down and Up frames are the first mirrored, and Right is Left mirrored.
@@ -378,57 +387,63 @@ HEART_EMPTY = parse([
 
 HUD = side_by_side(HEART_FULL, HEART_HALF, HEART_EMPTY)
 
-# ── The world ────────────────────────────────────────────────────────────────────────────────────
+# ── The areas ────────────────────────────────────────────────────────────────────────────────────
 #
-# A 60×32-cell map, one pixel per cell. Rooms are rectangles (x, y, w, h) in cells; each is ringed
-# by wall except its openings, and a cell outside every room is void.
+# Each area is its own map, one pixel per cell, ringed by wall except its doorways. The openings
+# between areas are declared in src/game/areas.cpp; the doorway and stairs cells here are where those
+# openings say they are.
 
-WORLD_WIDTH = 60
-WORLD_HEIGHT = 32
-
-# World ids, as WorldCell in src/assets/assets.h, spread from black (void) to white (floor).
-VOID_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 0, 64, 128, 192, 255
+# World ids, as WorldCell in src/assets/assets.h, spread from near black (stairs) to white (floor).
+STAIRS_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 32, 64, 128, 192, 255
 
 # Collision ids, as CollisionCell in src/assets/assets.h: solid is black, open is white.
 SOLID_ID, OPEN_ID = 0, 255
 
-ROOMS = [
-    (0, 0, 20, 16),    # room 0: exactly one play area; the start room
-    (20, 0, 40, 16),   # room 1: two play areas wide
-    (0, 16, 30, 16),   # room 2: one and a half play areas wide
-    (30, 16, 12, 10),  # room 3: smaller than the play area on both axes
-]
 
-# The openings, as the doorway cells on both sides of each shared edge.
-OPENINGS = (
-    [(x, y) for x in (19, 20) for y in range(6, 10)]       # room 0 ↔ room 1
-    + [(x, y) for x in range(8, 12) for y in (15, 16)]     # room 0 ↔ room 2
-    + [(x, y) for x in (29, 30) for y in range(19, 23)]    # room 2 ↔ room 3
-)
+def column(x, first, last):
+    return [(x, y) for y in range(first, last + 1)]
 
-# The pond in room 1's interior: rows of (first column, last column), from its top row down.
+
+def row(y, first, last):
+    return [(x, y) for x in range(first, last + 1)]
+
+
+# The pond in the lake's interior: rows of (first column, last column), from its top row down.
 POND_TOP = 5
-POND_ROWS = [(38, 41), (37, 42), (36, 43), (36, 43), (37, 42), (38, 41)]
+POND_ROWS = [(18, 21), (17, 22), (16, 23), (16, 23), (17, 22), (18, 21)]
+
+AREAS = {
+    # The start: exactly one play area, with a door east, a road south and the cave mouth inside.
+    "meadow": dict(size=(20, 16), doorways=column(19, 6, 9) + row(15, 8, 11), stairs=[(12, 4), (13, 4)]),
+    # Two play areas wide, with a pond; the camera follows across it.
+    "lake": dict(size=(40, 16), doorways=column(0, 6, 9), pond=True),
+    # One and a half play areas wide: not a multiple of the screen.
+    "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6)),
+    # Smaller than the play area on both axes: centered on screen.
+    "shrine": dict(size=(12, 10), doorways=column(0, 3, 6)),
+    # Reached by a fade from the meadow's cave mouth; the stairs lead back up.
+    "cave": dict(size=(12, 10), stairs=[(5, 4), (6, 4)]),
+}
 
 
-def world_cells():
-    cells = [[VOID_ID] * WORLD_WIDTH for _ in range(WORLD_HEIGHT)]
-    for (rx, ry, rw, rh) in ROOMS:
-        for y in range(ry, ry + rh):
-            for x in range(rx, rx + rw):
-                border = x in (rx, rx + rw - 1) or y in (ry, ry + rh - 1)
-                cells[y][x] = WALL_ID if border else FLOOR_ID
-    for (x, y) in OPENINGS:
+def area_cells(size, doorways=(), stairs=(), pond=False):
+    width, height = size
+    cells = [[WALL_ID if x in (0, width - 1) or y in (0, height - 1) else FLOOR_ID for x in range(width)]
+             for y in range(height)]
+    for (x, y) in doorways:
         cells[y][x] = DOORWAY_ID
-    for row, (first, last) in enumerate(POND_ROWS):
-        for x in range(first, last + 1):
-            cells[POND_TOP + row][x] = WATER_ID
+    for (x, y) in stairs:
+        cells[y][x] = STAIRS_ID
+    if pond:
+        for r, (first, last) in enumerate(POND_ROWS):
+            for x in range(first, last + 1):
+                cells[POND_TOP + r][x] = WATER_ID
     return cells
 
 
-def collision_cells(world):
-    solid = {WALL_ID, WATER_ID, VOID_ID}
-    return [[SOLID_ID if cell in solid else OPEN_ID for cell in row] for row in world]
+def collision_cells(area):
+    solid = {WALL_ID, WATER_ID}
+    return [[SOLID_ID if cell in solid else OPEN_ID for cell in r] for r in area]
 
 
 # ── Output ───────────────────────────────────────────────────────────────────────────────────────
@@ -436,8 +451,7 @@ def collision_cells(world):
 
 def files():
     """Every file the script writes, by path under assets/."""
-    world = world_cells()
-    return {
+    out = {
         "gfx/tiles/terrain.png": sheet_png(TILES),
         "gfx/sprites/player.png": sheet_png(PLAYER),
         "gfx/sprites/enemy.png": sheet_png(ENEMY),
@@ -446,14 +460,16 @@ def files():
         "palettes/tiles/floor.png": palette_png(FLOOR_PAL),
         "palettes/tiles/wall.png": palette_png(WALL_PAL),
         "palettes/tiles/water.png": palette_png(WATER_PAL),
-        "palettes/tiles/void.png": palette_png(VOID_PAL),
         "palettes/sprites/player.png": palette_png(PLAYER_PAL),
         "palettes/sprites/enemy.png": palette_png(ENEMY_PAL),
         "palettes/sprites/sword.png": palette_png(SWORD_PAL),
         "palettes/hud/hearts.png": palette_png(HEARTS_PAL),
-        "maps/world/tiles.png": map_png(world),
-        "maps/world/collision.png": map_png(collision_cells(world)),
     }
+    for name, spec in AREAS.items():
+        area = area_cells(**spec)
+        out[f"maps/{name}/tiles.png"] = map_png(area)
+        out[f"maps/{name}/collision.png"] = map_png(collision_cells(area))
+    return out
 
 
 def main(argv):

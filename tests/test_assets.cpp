@@ -1,7 +1,8 @@
 // The files under assets/: every one is baked into any binary that links the game's library; each
 // sheet decodes to the size and carve the game loads it with and holds palette indices only; each
-// palette image holds four colors; the maps hold the world and collision ids, rooms ringed by wall with
-// their openings, and solid exactly where the world is wall, water or void. No renderer is needed.
+// palette image holds four colors; each area's maps are the same size, hold only world and collision
+// ids, are ringed by wall except their doorways, and are solid exactly where the area is wall or water.
+// No renderer is needed.
 
 #include <gtest/gtest.h>
 
@@ -59,19 +60,29 @@ std::uint16_t value(CollisionCell cell) {
     return static_cast<std::uint16_t>(cell);
 }
 
-struct Room {
-    int x;
-    int y;
+// Every area's maps, from the bytes baked into this binary, with the size each is drawn at.
+struct AreaFiles {
+    const char* name;
+    retropp::IndexGrid tiles;
+    retropp::IndexGrid collision;
     int width;
     int height;
 };
 
-constexpr Room kRooms[] = {
-    {.x = 0, .y = 0, .width = 20, .height = 16},
-    {.x = 20, .y = 0, .width = 40, .height = 16},
-    {.x = 0, .y = 16, .width = 30, .height = 16},
-    {.x = 30, .y = 16, .width = 12, .height = 10},
-};
+std::vector<AreaFiles> areas() {
+    std::vector<AreaFiles> all;
+    all.push_back({"meadow", retropp::loadMapPng("assets/maps/meadow/tiles.png"),
+                   retropp::loadMapPng("assets/maps/meadow/collision.png"), 20, 16});
+    all.push_back({"lake", retropp::loadMapPng("assets/maps/lake/tiles.png"),
+                   retropp::loadMapPng("assets/maps/lake/collision.png"), 40, 16});
+    all.push_back({"field", retropp::loadMapPng("assets/maps/field/tiles.png"),
+                   retropp::loadMapPng("assets/maps/field/collision.png"), 30, 16});
+    all.push_back({"shrine", retropp::loadMapPng("assets/maps/shrine/tiles.png"),
+                   retropp::loadMapPng("assets/maps/shrine/collision.png"), 12, 10});
+    all.push_back({"cave", retropp::loadMapPng("assets/maps/cave/tiles.png"),
+                   retropp::loadMapPng("assets/maps/cave/collision.png"), 12, 10});
+    return all;
+}
 
 // ── Baked into the binary ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +102,7 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 15);
+    EXPECT_EQ(files, 22);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
@@ -102,7 +113,7 @@ TEST(Assets, TerrainSheetIsOneTilePerWorldCell) {
     EXPECT_EQ(sheet.height, 8);
     expectIndicesOnly(sheet);
     EXPECT_EQ(slotCount(sheet, {.width = 8, .height = 8}, ContentKind::Tileset),
-              static_cast<std::size_t>(zorlduh::TerrainTile::Void) + 1);
+              static_cast<std::size_t>(zorlduh::TerrainTile::Stairs) + 1);
 }
 
 TEST(Assets, PlayerSheetIsFourFacingsOfTwoWalkFrames) {
@@ -157,8 +168,7 @@ TEST(Assets, SpriteSheetsAreTransparentAtTheirCorners) {
 // ── Palettes ─────────────────────────────────────────────────────────────────────────────────
 
 TEST(Assets, TerrainPalettesAreFourOpaqueColors) {
-    for (const char* path : {"palettes/tiles/floor.png", "palettes/tiles/wall.png",
-                             "palettes/tiles/water.png", "palettes/tiles/void.png"}) {
+    for (const char* path : {"palettes/tiles/floor.png", "palettes/tiles/wall.png", "palettes/tiles/water.png"}) {
         const std::vector<retropp::Rgba16> entries = retropp::slicePaletteImage(decode(path));
         ASSERT_EQ(entries.size(), 4u) << path;
         for (const retropp::Rgba16& entry : entries) {
@@ -181,76 +191,67 @@ TEST(Assets, SpritePalettesLeaveEntryZeroUndrawn) {
 
 // ── Maps ─────────────────────────────────────────────────────────────────────────────────────
 
-TEST(Assets, WorldMapHoldsOnlyWorldCells) {
-    const retropp::IndexGrid world = retropp::loadMapPng("assets/maps/world/tiles.png");
-    EXPECT_EQ(world.width, 60);
-    EXPECT_EQ(world.height, 32);
-    const std::vector<std::uint16_t> ids = {value(WorldCell::Void), value(WorldCell::Wall),
+TEST(Assets, EachAreasMapsAreItsSizeAndHoldOnlyWorldCells) {
+    const std::vector<std::uint16_t> ids = {value(WorldCell::Stairs), value(WorldCell::Wall),
                                             value(WorldCell::Water), value(WorldCell::Doorway),
                                             value(WorldCell::Floor)};
-    for (const std::uint16_t cell : world.values) {
-        EXPECT_NE(std::find(ids.begin(), ids.end(), cell), ids.end()) << cell;
+    for (const AreaFiles& area : areas()) {
+        EXPECT_EQ(area.tiles.width, area.width) << area.name;
+        EXPECT_EQ(area.tiles.height, area.height) << area.name;
+        EXPECT_EQ(area.collision.width, area.width) << area.name;
+        EXPECT_EQ(area.collision.height, area.height) << area.name;
+        for (const std::uint16_t cell : area.tiles.values) {
+            EXPECT_NE(std::find(ids.begin(), ids.end(), cell), ids.end()) << area.name << " " << cell;
+        }
     }
 }
 
-TEST(Assets, RoomsAreRingedByWallExceptTheirOpenings) {
-    const retropp::IndexGrid world = retropp::loadMapPng("assets/maps/world/tiles.png");
-    for (const Room& room : kRooms) {
-        for (int y = room.y; y < room.y + room.height; ++y) {
-            for (int x = room.x; x < room.x + room.width; ++x) {
-                const bool border = x == room.x || x == room.x + room.width - 1 || y == room.y ||
-                                    y == room.y + room.height - 1;
-                const std::uint16_t cell = world.at(x, y);
+TEST(Assets, EachAreaIsRingedByWallExceptItsDoorways) {
+    for (const AreaFiles& area : areas()) {
+        for (int y = 0; y < area.height; ++y) {
+            for (int x = 0; x < area.width; ++x) {
+                const bool border = x == 0 || x == area.width - 1 || y == 0 || y == area.height - 1;
+                const std::uint16_t cell = area.tiles.at(x, y);
                 if (border) {
                     EXPECT_TRUE(cell == value(WorldCell::Wall) || cell == value(WorldCell::Doorway))
-                        << x << "," << y;
+                        << area.name << " " << x << "," << y;
                 } else {
-                    EXPECT_NE(cell, value(WorldCell::Void)) << x << "," << y;
+                    EXPECT_NE(cell, value(WorldCell::Doorway)) << area.name << " " << x << "," << y;
                 }
             }
         }
     }
 }
 
-TEST(Assets, OpeningsAreDoorwaysOnBothSidesOfTheSharedEdge) {
-    const retropp::IndexGrid world = retropp::loadMapPng("assets/maps/world/tiles.png");
-    for (int y = 6; y <= 9; ++y) {  // room 0 ↔ room 1
-        EXPECT_EQ(world.at(19, y), value(WorldCell::Doorway));
-        EXPECT_EQ(world.at(20, y), value(WorldCell::Doorway));
+TEST(Assets, TheMeadowHasItsDoorsRoadAndCaveMouthAndTheLakeItsPond) {
+    const std::vector<AreaFiles> all = areas();
+    const retropp::IndexGrid& meadow = all[0].tiles;
+    for (int y = 6; y <= 9; ++y) {
+        EXPECT_EQ(meadow.at(19, y), value(WorldCell::Doorway));   // the east door
+        EXPECT_EQ(all[1].tiles.at(0, y), value(WorldCell::Doorway));   // the lake's west door
     }
-    for (int x = 8; x <= 11; ++x) {  // room 0 ↔ room 2
-        EXPECT_EQ(world.at(x, 15), value(WorldCell::Doorway));
-        EXPECT_EQ(world.at(x, 16), value(WorldCell::Doorway));
+    EXPECT_EQ(meadow.at(19, 5), value(WorldCell::Wall));
+    EXPECT_EQ(meadow.at(19, 10), value(WorldCell::Wall));
+    for (int x = 8; x <= 11; ++x) {
+        EXPECT_EQ(meadow.at(x, 15), value(WorldCell::Doorway));   // the south road
+        EXPECT_EQ(all[2].tiles.at(x, 0), value(WorldCell::Doorway));   // the field's north road
     }
-    for (int y = 19; y <= 22; ++y) {  // room 2 ↔ room 3
-        EXPECT_EQ(world.at(29, y), value(WorldCell::Doorway));
-        EXPECT_EQ(world.at(30, y), value(WorldCell::Doorway));
-    }
-    EXPECT_EQ(world.at(19, 5), value(WorldCell::Wall));
-    EXPECT_EQ(world.at(19, 10), value(WorldCell::Wall));
+    EXPECT_EQ(meadow.at(12, 4), value(WorldCell::Stairs));   // the cave mouth
+    EXPECT_EQ(meadow.at(13, 4), value(WorldCell::Stairs));
+    EXPECT_EQ(meadow.at(5, 5), value(WorldCell::Floor));
+    EXPECT_EQ(all[1].tiles.at(20, 7), value(WorldCell::Water));   // the pond
+    EXPECT_EQ(all[4].tiles.at(5, 4), value(WorldCell::Stairs));   // the cave's way back up
 }
 
-TEST(Assets, CellsOutsideEveryRoomAreVoidAndRoomOneHasAPond) {
-    const retropp::IndexGrid world = retropp::loadMapPng("assets/maps/world/tiles.png");
-    EXPECT_EQ(world.at(59, 31), value(WorldCell::Void));
-    EXPECT_EQ(world.at(45, 20), value(WorldCell::Void));
-    EXPECT_EQ(world.at(35, 28), value(WorldCell::Void));
-    EXPECT_EQ(world.at(40, 7), value(WorldCell::Water));
-    EXPECT_EQ(world.at(5, 5), value(WorldCell::Floor));
-}
-
-TEST(Assets, CollisionIsSolidExactlyWhereTheWorldIsWallWaterOrVoid) {
-    const retropp::IndexGrid world = retropp::loadMapPng("assets/maps/world/tiles.png");
-    const retropp::IndexGrid collision = retropp::loadMapPng("assets/maps/world/collision.png");
-    ASSERT_EQ(collision.width, world.width);
-    ASSERT_EQ(collision.height, world.height);
-    for (int y = 0; y < world.height; ++y) {
-        for (int x = 0; x < world.width; ++x) {
-            const std::uint16_t cell = world.at(x, y);
-            const bool solid = cell == value(WorldCell::Wall) || cell == value(WorldCell::Water) ||
-                               cell == value(WorldCell::Void);
-            EXPECT_EQ(collision.at(x, y), value(solid ? CollisionCell::Solid : CollisionCell::Open))
-                << x << "," << y;
+TEST(Assets, CollisionIsSolidExactlyWhereTheAreaIsWallOrWater) {
+    for (const AreaFiles& area : areas()) {
+        for (int y = 0; y < area.height; ++y) {
+            for (int x = 0; x < area.width; ++x) {
+                const std::uint16_t cell = area.tiles.at(x, y);
+                const bool solid = cell == value(WorldCell::Wall) || cell == value(WorldCell::Water);
+                EXPECT_EQ(area.collision.at(x, y), value(solid ? CollisionCell::Solid : CollisionCell::Open))
+                    << area.name << " " << x << "," << y;
+            }
         }
     }
 }

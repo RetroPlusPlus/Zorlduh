@@ -8,17 +8,14 @@
 
 namespace zorlduh {
 
-inline constexpr std::int32_t kWorldZ = 0;
+inline constexpr std::int32_t kWorldZ = 0;    // one tile layer per area on screen, keyed by WorldKit
 inline constexpr std::int32_t kActorsZ = 10;  // one sprite layer; each actor's Sprite::z is the bottom
                                               // edge of its collision shape, so the actor lower on
                                               // screen draws in front
 inline constexpr std::int32_t kEffectsZ = 20;
 inline constexpr std::int32_t kHudZ = 100;
 
-// The world map, every room on one tile layer.
-inline constexpr std::string_view kWorldLayer = "world";
-
-// Everything that walks the world, on one sprite layer placed like the world layer.
+// Everything that walks the world, on one sprite layer placed like the area layers.
 inline constexpr std::string_view kActorsLayer = "actors";
 
 }  // namespace zorlduh

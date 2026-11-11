@@ -51,14 +51,21 @@ Assets loadAssets(retropp::Renderer& renderer) {
     assets.palettes.floor = renderer.loadPaletteImage("assets/palettes/tiles/floor.png");
     assets.palettes.wall = renderer.loadPaletteImage("assets/palettes/tiles/wall.png");
     assets.palettes.water = renderer.loadPaletteImage("assets/palettes/tiles/water.png");
-    assets.palettes.voidCells = renderer.loadPaletteImage("assets/palettes/tiles/void.png");
     assets.palettes.player = renderer.loadPaletteImage("assets/palettes/sprites/player.png");
     assets.palettes.enemy = renderer.loadPaletteImage("assets/palettes/sprites/enemy.png");
     assets.palettes.sword = renderer.loadPaletteImage("assets/palettes/sprites/sword.png");
     assets.palettes.hearts = renderer.loadPaletteImage("assets/palettes/hud/hearts.png");
 
-    assets.world = retropp::loadMapPng("assets/maps/world/tiles.png");
-    assets.collision = retropp::loadMapPng("assets/maps/world/collision.png");
+    assets.areas.meadow.tiles = retropp::loadMapPng("assets/maps/meadow/tiles.png");
+    assets.areas.meadow.collision = retropp::loadMapPng("assets/maps/meadow/collision.png");
+    assets.areas.lake.tiles = retropp::loadMapPng("assets/maps/lake/tiles.png");
+    assets.areas.lake.collision = retropp::loadMapPng("assets/maps/lake/collision.png");
+    assets.areas.field.tiles = retropp::loadMapPng("assets/maps/field/tiles.png");
+    assets.areas.field.collision = retropp::loadMapPng("assets/maps/field/collision.png");
+    assets.areas.shrine.tiles = retropp::loadMapPng("assets/maps/shrine/tiles.png");
+    assets.areas.shrine.collision = retropp::loadMapPng("assets/maps/shrine/collision.png");
+    assets.areas.cave.tiles = retropp::loadMapPng("assets/maps/cave/tiles.png");
+    assets.areas.cave.collision = retropp::loadMapPng("assets/maps/cave/collision.png");
 
     // Each facing walks through its own row of the player sheet: two frames, 8 ticks each.
     constexpr auto kWalkFrame =

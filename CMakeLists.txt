@@ -39,13 +39,18 @@ enable_testing()
 # ---------------------------------------------------------------------------
 add_subdirectory(engine)
 
-# Modules: systems that depend on the engine alone and include nothing from this
-# project, each with its own CMakeLists.txt. Their example programs are built so
-# the examples their guides walk through always compile.
+# Modules: systems that include nothing from this project, each with its own
+# CMakeLists.txt. The first three depend on the engine alone; WorldKit composes
+# LayerKit and CameraKit. Their example programs are built so the examples their
+# guides walk through always compile.
 set(LAYERKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/LayerKit)  # LayerKit::LayerKit — SpriteLayer, TileLayer, RasterLayer, ImageLayer
 set(TOPDOWNMOVEMENT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/TopDownMovement)  # TopDownMovement::TopDownMovement — Walker, WalkerConfig, CollisionShape, WalkerSprite
+set(CAMERAKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
+add_subdirectory(modules/CameraKit)  # CameraKit::CameraKit — View, Camera, follow
+set(WORLDKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
+add_subdirectory(modules/WorldKit)  # WorldKit::WorldKit — Area, Opening, Layout, Camera, AreaSolids, WorldLayers, Fade
 
 # Warnings apply to this project's targets only; the engine keeps its own flags.
 if(MSVC)
@@ -61,16 +66,16 @@ endif()
 add_library(zorlduh-lib STATIC
     src/assets/assets.cpp
     src/config/config.cpp
+    src/game/areas.cpp
     src/game/player.cpp
     src/game/sim.cpp
-    src/game/world.cpp
     src/input/input.cpp
-    src/render/player.cpp
-    src/render/world.cpp)
+    src/render/player.cpp)
 target_include_directories(zorlduh-lib PUBLIC src)
 target_compile_features(zorlduh-lib PUBLIC cxx_std_20)
 target_compile_options(zorlduh-lib PRIVATE ${_zorlduh_warn})
-target_link_libraries(zorlduh-lib PUBLIC retropp::engine LayerKit::LayerKit TopDownMovement::TopDownMovement)
+target_link_libraries(zorlduh-lib PUBLIC retropp::engine LayerKit::LayerKit TopDownMovement::TopDownMovement
+                                          CameraKit::CameraKit WorldKit::WorldKit)
 
 # ---------------------------------------------------------------------------
 # The game executable.
@@ -127,9 +132,11 @@ zorlduh_add_test(smoke)
 zorlduh_add_test(layers)
 zorlduh_add_test(raster_layers)
 zorlduh_add_test(assets)
-zorlduh_add_test(world)
 zorlduh_add_test(TopDownMovement)
 zorlduh_add_test(player)
+zorlduh_add_test(CameraKit)
+zorlduh_add_test(WorldKit)
+zorlduh_add_test(areas)
 # The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE

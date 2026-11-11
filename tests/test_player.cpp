@@ -22,12 +22,12 @@
 #include "retropp/timing.h"
 
 #include "assets/assets.h"
+#include "game/areas.h"
 #include "game/player.h"
-#include "game/rooms.h"
 #include "game/sim.h"
-#include "game/world.h"
 #include "input/input.h"
 #include "TopDownMovement/walker.h"
+#include "render/layout.h"
 #include "render/player.h"
 
 namespace {
@@ -37,17 +37,40 @@ using retropp::Vec2i;
 
 constexpr retropp::TimingProfile kHz60{.tickPeriodNs = retropp::TickPeriodNs::Hz60};
 
-zorlduh::World loadWorld() {
-    return zorlduh::World{.tiles = retropp::loadMapPng("assets/maps/world/tiles.png"),
-                          .collision = retropp::loadMapPng("assets/maps/world/collision.png")};
+// The real maps, with the sheets and palettes as handles the test makes up. The config's layout points
+// at the maps, so the assets outlive it.
+zorlduh::Assets headlessAssets() {
+    zorlduh::Assets assets;
+    assets.terrain = retropp::AtlasManifest{
+        .atlasId = retropp::AtlasId{7},
+        .slots = retropp::sliceLayout({.width = 40, .height = 8}, {.width = 8, .height = 8},
+                                      retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
+        .kind = retropp::ContentKind::Tileset,
+    };
+    assets.areas.meadow.tiles = retropp::loadMapPng("assets/maps/meadow/tiles.png");
+    assets.areas.meadow.collision = retropp::loadMapPng("assets/maps/meadow/collision.png");
+    assets.areas.lake.tiles = retropp::loadMapPng("assets/maps/lake/tiles.png");
+    assets.areas.lake.collision = retropp::loadMapPng("assets/maps/lake/collision.png");
+    assets.areas.field.tiles = retropp::loadMapPng("assets/maps/field/tiles.png");
+    assets.areas.field.collision = retropp::loadMapPng("assets/maps/field/collision.png");
+    assets.areas.shrine.tiles = retropp::loadMapPng("assets/maps/shrine/tiles.png");
+    assets.areas.shrine.collision = retropp::loadMapPng("assets/maps/shrine/collision.png");
+    assets.areas.cave.tiles = retropp::loadMapPng("assets/maps/cave/tiles.png");
+    assets.areas.cave.collision = retropp::loadMapPng("assets/maps/cave/collision.png");
+    return assets;
 }
 
-// The player as PlayerConfig makes it, from assets whose walk animations name made-up handles.
-TopDownMovement::WalkerConfig headlessPlayer() {
-    zorlduh::Assets assets;
-    TopDownMovement::WalkerConfig config = zorlduh::PlayerConfig(assets);
-    config.timing = kHz60;
+// The game as gameConfig makes it.
+zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView);
+    config.player.timing = kHz60;
     return config;
+}
+
+zorlduh::GameState start(const zorlduh::Config& config) {
+    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    state.camera.place(config.layout, state.player.collision(config.player).bounds());
+    return state;
 }
 
 TopDownMovement::DirectionalInput Hold(TopDownMovement::Directions held) {
@@ -56,45 +79,50 @@ TopDownMovement::DirectionalInput Hold(TopDownMovement::Directions held) {
 
 // ── Where it starts and how it walks the world ───────────────────────────────────────────────
 
-TEST(Player, StartsCenteredInTheStartRoomClearOfEverySolidCell) {
-    const zorlduh::World world = loadWorld();
-    const TopDownMovement::WalkerConfig player = headlessPlayer();
+TEST(Player, StartsCenteredInTheMeadowClearOfEverySolidCell) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    const zorlduh::GameState state = start(config);
     EXPECT_EQ(zorlduh::kPlayerStart, (Vec2i{72, 56}));
-    EXPECT_EQ(world.roomAt(zorlduh::kPlayerStart.x + 8, zorlduh::kPlayerStart.y + 8),
-              std::optional<zorlduh::RoomId>{zorlduh::kStartRoom});
-    EXPECT_FALSE(player.collision.hits(world, zorlduh::kPlayerStart));
+    EXPECT_EQ(state.camera.area(), zorlduh::Area::Meadow);
+    EXPECT_FALSE(config.player.collision.hits(state.camera.solids(config.layout), zorlduh::kPlayerStart));
 }
 
 TEST(Player, CollidesWithTheBottomHalfOfItsFrame) {
-    const TopDownMovement::WalkerConfig player = headlessPlayer();
-    EXPECT_EQ(player.speed, 1);
-    EXPECT_EQ(player.collision.bounds(), (retropp::IntRect{.x = 3, .y = 8, .width = 10, .height = 8}));
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    EXPECT_EQ(config.player.speed, 1);
+    EXPECT_EQ(config.player.collision.bounds(), (retropp::IntRect{.x = 3, .y = 8, .width = 10, .height = 8}));
 }
 
 TEST(Player, TheTickWalksItUntilItsCollisionBoxMeetsTheWall) {
-    const TopDownMovement::WalkerConfig player = headlessPlayer();
-    zorlduh::GameState state{.world = loadWorld(), .player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = start(config);
     for (int i = 0; i < 100; ++i) {
-        zorlduh::tick(state, zorlduh::Input{.move = Hold({.left = true})}, player);
+        zorlduh::tick(state, zorlduh::Input{.move = Hold({.left = true})}, config);
     }
-    // Room 0's left wall is column 0, pixels 0–7; the box starts 3 px into the frame.
+    // The meadow's west wall is column 0, pixels 0–7; the box starts 3 px into the frame.
     EXPECT_EQ(state.player.position(), (Vec2i{5, 56}));
     EXPECT_EQ(state.player.facing(), Dir::Left);
     for (int i = 0; i < 100; ++i) {
-        zorlduh::tick(state, zorlduh::Input{.move = Hold({.up = true})}, player);
+        zorlduh::tick(state, zorlduh::Input{.move = Hold({.up = true})}, config);
     }
-    // Its top wall is row 0; the box starts 8 px down the frame.
+    // Its north wall is row 0; the box starts 8 px down the frame.
     EXPECT_EQ(state.player.position(), (Vec2i{5, 0}));
+    EXPECT_TRUE(state.events.empty());
 }
 
-TEST(Player, WalksOutThroughTheOpeningToTheNextRoom) {
-    const TopDownMovement::WalkerConfig player = headlessPlayer();
-    zorlduh::GameState state{.world = loadWorld(), .player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
-    for (int i = 0; i < 100; ++i) {
-        zorlduh::tick(state, zorlduh::Input{.move = Hold({.right = true})}, player);
+TEST(Player, KeepsWalkingAndAnimatingThroughTicksThatMoveItNowhereElse) {
+    const zorlduh::Assets assets = headlessAssets();
+    const zorlduh::Config config = headlessConfig(assets);
+    zorlduh::GameState state = start(config);
+    for (int i = 0; i < 12; ++i) {
+        zorlduh::tick(state, zorlduh::Input{.move = Hold({.down = true})}, config);
     }
-    // The 0↔1 opening spans rows 6–9 (pixels 48–79), which hold the whole box (pixel rows 64–71).
-    EXPECT_EQ(state.player.position(), (Vec2i{172, 56}));
+    // The stride is not reset by the camera's empty move: twelve ticks in, the second walk frame shows.
+    EXPECT_TRUE(state.player.moving());
+    EXPECT_EQ(state.player.position(), (Vec2i{72, 68}));
 }
 
 // ── The controls ─────────────────────────────────────────────────────────────────────────────
@@ -202,10 +230,7 @@ TEST_F(PlayerOnDevice, ThePlayerComponentIsOneSpriteKeyedPlayer) {
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
     TopDownMovement::WalkerConfig player = zorlduh::PlayerConfig(assets);
     player.timing = kHz60;
-    const zorlduh::GameState state{
-        .world = zorlduh::World{.tiles = assets.world, .collision = assets.collision},
-        .player = TopDownMovement::Walker{zorlduh::kPlayerStart},
-    };
+    const zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
 
     const LayerKit::Sprites sprites = zorlduh::Player(state, player);
     ASSERT_EQ(sprites.size(), 1u);

@@ -1,6 +1,6 @@
 // The game's art and maps: every sheet uploaded as an atlas, every palette uploaded from its palette
-// image, and the world and collision maps, loaded once at startup and handed to whatever draws or
-// reads them.
+// image, and each area's tile and collision maps, loaded once at startup and handed to whatever draws
+// or reads them.
 //
 //     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
 //
@@ -25,30 +25,30 @@ class Renderer;
 
 namespace zorlduh {
 
-// The value of a cell in the world's tile map, assets/maps/world/tiles.png. The values are spread across
-// the 8-bit grayscale range so the map reads by eye: void is black, floor is white.
+// The value of a cell in an area's tile map, assets/maps/<area>/tiles.png. The values are spread across
+// the 8-bit grayscale range so the map reads by eye: stairs are near black, floor is white.
 enum class WorldCell : std::uint16_t {
-    Void = 0,       // outside every room
+    Stairs = 32,    // a way down or up: a spot opening
     Wall = 64,
     Water = 128,
-    Doorway = 192,  // floor in a room's opening, on both sides of the edge two rooms share
+    Doorway = 192,  // floor in a wall where an opening is
     Floor = 255,
 };
 
-// The value of a cell in the world's collision map, assets/maps/world/collision.png: solid is black,
-// open is white. Wall, water and void are solid.
+// The value of a cell in an area's collision map, assets/maps/<area>/collision.png: solid is black,
+// open is white. Wall and water are solid.
 enum class CollisionCell : std::uint16_t {
     Solid = 0,
     Open = 255,
 };
 
-// The slots of the terrain sheet: one 8×8 tile per WorldCell, in the same order.
+// The slots of the terrain sheet: one 8×8 tile per WorldCell.
 enum class TerrainTile : std::size_t {
     Floor = 0,
     Wall = 1,
     Water = 2,
     Doorway = 3,
-    Void = 4,
+    Stairs = 4,
 };
 
 // The animations of the player sheet: one row of two walk frames per facing. A standing player
@@ -74,11 +74,26 @@ struct Palettes {
     retropp::PaletteId floor{};  // Floor and Doorway tiles
     retropp::PaletteId wall{};
     retropp::PaletteId water{};
-    retropp::PaletteId voidCells{};
     retropp::PaletteId player{};
     retropp::PaletteId enemy{};
     retropp::PaletteId sword{};
     retropp::PaletteId hearts{};
+};
+
+// One area's maps: the same size, one WorldCell value per cell in `tiles` and one CollisionCell value
+// per cell in `collision`.
+struct AreaMaps {
+    retropp::IndexGrid tiles;
+    retropp::IndexGrid collision;
+};
+
+// Every area's maps, from assets/maps/<area>/.
+struct AreaMapSet {
+    AreaMaps meadow;  // 20×16 cells: the start
+    AreaMaps lake;    // 40×16, with a pond
+    AreaMaps field;   // 30×16
+    AreaMaps shrine;  // 12×10
+    AreaMaps cave;    // 12×10
 };
 
 struct Assets {
@@ -90,12 +105,11 @@ struct Assets {
     retropp::AtlasManifest sword;    // Single: one 8×16 frame pointing up
     retropp::AtlasManifest hearts;   // SpriteSeries of 8×8 cells, slots in Heart order
     Palettes palettes;
-    retropp::IndexGrid world;      // 60×32 cells, one WorldCell value each
-    retropp::IndexGrid collision;  // the same size, one CollisionCell value each
+    AreaMapSet areas;
 };
 
-// Uploads every sheet and palette to `renderer` and decodes both maps. Index 0 is transparent on the
-// player, enemy, sword and hearts sheets; the terrain sheet has no transparent index. Throws
+// Uploads every sheet and palette to `renderer` and decodes every area's maps. Index 0 is transparent
+// on the player, enemy, sword and hearts sheets; the terrain sheet has no transparent index. Throws
 // std::runtime_error when a file cannot be decoded or uploaded.
 [[nodiscard]] Assets loadAssets(retropp::Renderer& renderer);
 
