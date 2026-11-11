@@ -44,8 +44,8 @@ MSVC 19.38+), and the engine's build-time shader toolchain — see the engine's
 `tools/placeholder_art.py --check` to confirm the committed art is what the script writes.
 
 ```sh
-git clone --recurse-submodules <repo-url>
-cd <repo>
+git clone --recurse-submodules https://github.com/RetroPlusPlus/Zorlduh.git
+cd Zorlduh
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
@@ -53,6 +53,14 @@ ctest --test-dir build --output-on-failure
 ```
 
 The default build type is Release.
+
+## License
+
+Zorlduh and every module under `modules/` are licensed under the [MIT License](LICENSE); each module
+carries its own copy so it can be taken on its own. The Polyrhythm engine they depend on is licensed
+separately — PolyForm Noncommercial, with a commercial license available — under its own terms in
+[`engine/LICENSE`](engine/LICENSE) and [`engine/LICENSING.md`](engine/LICENSING.md). Nothing here runs
+without the engine, so using the modules means using the engine under its license.
 
 ## Documentation
 
