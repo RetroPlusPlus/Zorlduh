@@ -68,8 +68,9 @@ enum class Heart : std::size_t {
     Empty = 2,
 };
 
-// Each palette is four colors, light at entry 0 to dark at entry 3. A sprite palette's entry 0 is
-// its sheet's transparent index and is never drawn.
+// Each palette is four colors, dark at entry 0 to light at entry 3, in the order of the gray levels a
+// sheet shows in an image viewer. A sprite palette's entry 0 is its sheet's transparent index and is
+// never drawn.
 struct Palettes {
     retropp::PaletteId floor{};  // Floor and Doorway tiles
     retropp::PaletteId wall{};

@@ -17,8 +17,8 @@ from a palette image chosen when a tile or sprite is drawn: a 4×1 truecolor RGB
 palette entry, dark at entry 0 to light at entry 3 like the gray levels.
 
 A map is an 8-bit grayscale PNG whose sample value is a cell's id: a world id (WorldCell in
-src/assets.h) or a collision id (CollisionCell). The ids are spread across the sample range so a map
-reads by eye in an image viewer: void is black, and floor and open cells are light.
+src/assets/assets.h) or a collision id (CollisionCell). The ids are spread across the sample range so
+a map reads by eye in an image viewer: void is black, and floor and open cells are light.
 
 The output is deterministic. The zlib stream is written as stored (uncompressed) blocks, so the bytes
 do not depend on the zlib build, and running the script again writes identical files.
@@ -386,10 +386,10 @@ HUD = side_by_side(HEART_FULL, HEART_HALF, HEART_EMPTY)
 WORLD_WIDTH = 60
 WORLD_HEIGHT = 32
 
-# World ids, as WorldCell in src/assets.h, spread from black (void) to white (floor).
+# World ids, as WorldCell in src/assets/assets.h, spread from black (void) to white (floor).
 VOID_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 0, 64, 128, 192, 255
 
-# Collision ids, as CollisionCell in src/assets.h: solid is black, open is white.
+# Collision ids, as CollisionCell in src/assets/assets.h: solid is black, open is white.
 SOLID_ID, OPEN_ID = 0, 255
 
 ROOMS = [
