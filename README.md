@@ -20,7 +20,9 @@ which scroll the next area in; down stairs, which fade to the next; and across o
 next room is simply there and the player walks on — in the forest from room to room, each one a
 different case of how the camera follows. Areas are drawn in layers: the player walks along a path,
 under a forest canopy and into the shade of a cave mouth. The HUD strip shows the current area's name,
-typed out letter by letter each time the player enters an area.
+typed out letter by letter each time the player enters an area. A wooden sign in the meadow and a stone
+rock beside the dungeon door can be read: their messages type out in a box framed in wood or stone, a
+page at a time, while the world holds still.
 
 ## Progress
 
@@ -31,6 +33,8 @@ typed out letter by letter each time the player enters an area.
   animations ([`modules/TopDownMovement/`](modules/TopDownMovement/README.md))
 - [x] **Text** — fonts from glyph sheets, wrapped and typed-out text
   ([`modules/TextKit/`](modules/TextKit/README.md))
+- [x] **Windows** — boxes of any size from border sheets, message boxes
+  ([`modules/WindowKit/`](modules/WindowKit/README.md))
 - [x] **Camera** — a camera value, the follow law, pans
   ([`modules/CameraKit/`](modules/CameraKit/README.md))
 - [x] **World** — layouts of areas with their own maps and art, each area drawn in layers at depths the
@@ -42,6 +46,7 @@ typed out letter by letter each time the player enters an area.
 - [x] **Areas** — an overworld of five areas, a dungeon of five rooms and a forest of seven, joined by
   doors, stairs and open walls; the player goes between them, over a path, under a canopy and under the
   rock of a cave mouth
+- [x] **Signs** — a sign and a rock read with Item, each in a border of its own
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
 - [ ] **HUD and pickups** — hearts and the heart pickup

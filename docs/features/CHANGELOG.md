@@ -25,3 +25,7 @@ One row per feature status change, newest last.
 | 2026-11-11 | text-kit | — | 🧪 testing | `3af6c87` | `TextKit` in `modules/TextKit/`: fonts from glyph sheets with the case rule, text as sprites keyed by position, wrapping, measuring, alignment, the shadow and the reveal; with its guide and an example over its own font sheet and palettes; 13 tests |
 | 2026-11-11 | area-name | — | 🧪 testing | `3af6c87` | The current area's name in the HUD strip, right-aligned and typed out again on entering each area; 4 tests |
 | 2026-11-11 | assets | 🧪 testing | 🧪 testing | `3af6c87` | The glyph sheet of 43 characters and the text and shadow palettes; 57 files; 3 new tests (21 now) |
+| 2026-11-11 | window-kit | — | 🧪 testing | `4d92478` | `WindowKit` in `modules/WindowKit/`: borders, boxes of any size with cut pieces, windows as one layer, and the message box; with its guide and an example over its own border, font and palettes; 15 tests |
+| 2026-11-11 | signs | — | 🧪 testing | `4d92478` | The meadow's wooden sign and the lake's stone rock, read with Item, each message in its own border while the world holds still; 6 tests |
+| 2026-11-11 | assets | 🧪 testing | 🧪 testing | `4d92478` | The wood and stone border sheets and palettes, the sign and rock tiles and their cells in the meadow and lake; 61 files (21 tests) |
+| 2026-11-11 | top-down-movement | 🧪 testing | 🧪 testing | `4d92478` | Facing follows the directions held whether or not the walker moves, so a walker pushing into a wall turns to face it; 31 tests |

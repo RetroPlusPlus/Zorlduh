@@ -87,15 +87,22 @@ The template's verbs and systems:
   is reserved: whatever an area reaches past the play area's edge, nothing of the world is drawn there.
 - **Player:** eight-direction walking — each held axis moves the player a pixel a tick, so diagonals
   cover both at once; collision resolved per axis, so a diagonal into a wall keeps moving along it; four
-  facings, which change only when the player moves: a diagonal keeps a facing that is one of its two
-  directions and otherwise faces the one pressed more recently, the horizontal one when both were pressed
-  together; a two-frame walk animation per facing, eight ticks a frame, resting on its first frame. The
+  facings, which follow the directions held whether or not the player moves, so the player pushing into
+  a wall or a sign turns to face it: a diagonal keeps a facing that is one of its two directions and
+  otherwise faces the one pressed more recently, the horizontal one when both were pressed together; a
+  two-frame walk animation per facing, eight ticks a frame, resting on its first frame. The
   collision box is the bottom half of the 16×16 frame, 3 px in from each side. All of it is the
   TopDownMovement module, which the player is configured into.
 - **Text:** a font is a glyph sheet and the string of characters its cells are; text is sprites, one
   per glyph, wrapped to a width, aligned, shadowed, and typed out a character every few ticks. A font of
   one case draws the other case with it, so text is written in the case it reads best. The HUD strip
   shows the current area's name, right-aligned, typed out again on entering each area.
+- **Windows and messages:** a window is a box of any size drawn from a sheet of border pieces of any
+  size, with a game's sprites inside it, on one layer; a piece with less room than its own size is cut
+  where its room ends. A message is wrapped and cut into pages that fit its box, typed out, and turned
+  with one button, an arrow blinking while another page follows. Signs and rocks are read with Item from
+  beside them, the player turning to face one by pushing toward it; the world holds still while a message
+  is up, and each message is drawn in the border of what is read — wood for a sign, stone for a rock.
 - **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
@@ -112,7 +119,9 @@ away an area in view is drawn), **layer** (of an area: one of its tile maps, dra
 screen below the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
 **actor** (anything spawned in an area), **cell** (one 8×8 tile position), **font** (a glyph sheet and
 the character of each of its cells), **glyph** (one character's cell, drawn as one sprite), **reveal**
-(how much of a passage has been typed out).
+(how much of a passage has been typed out), **border** (a sheet of the pieces a box is drawn from, and
+its palette), **window** (a box and what is put inside it, on one layer), **message** (a passage read in
+a box, a page at a time), **sign** (a thing in the world that is read: a sign, a rock).
 
 ## Hard constraints
 
@@ -128,6 +137,9 @@ the character of each of its cells), **glyph** (one character's cell, drawn as o
 - **The simulation names what happened** as events; presentation and audio consume them.
 - **Every system can be lifted out** into a standalone module: nothing under `modules/` includes a
   project header, and a system meant to be general holds no game constants.
+- **Every size a module uses is the art's or the caller's**: a piece, a glyph, a box, a cell is the size
+  its sheet or its caller says. The screen size and the 8-pixel cell are this game's choice, held in
+  `src/` and `assets/`.
 - **The engine is consumed, not modified.** `engine/` is a pinned submodule; what the engine should do
   differently is raised with the engine project.
 - **Original content only.** The game is in a genre and uses its mechanics; it recreates no existing
@@ -148,9 +160,9 @@ the character of each of its cells), **glyph** (one character's cell, drawn as o
   WorldKit composes LayerKit and CameraKit; no module depends on a movement module — movement plugs
   into the world through the engine's types (a solid query, a box, a move), so another kind of movement
   fits the same world.
-- Text is TextKit's, in `modules/TextKit/`, on the engine alone. Windows build on it, and menus on
-  windows: TextKit, then WindowKit (a box, with optional text in it, and the dialog pieces), then MenuKit
-  (windows composed into menus).
+- Text is TextKit's, in `modules/TextKit/`, on the engine alone. Windows and messages are WindowKit's, in
+  `modules/WindowKit/`, on the engine, LayerKit and TextKit; menus will be windows composed into menus,
+  in MenuKit. How a window appears and goes is not part of WindowKit yet: a window is shown or it is not.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved
