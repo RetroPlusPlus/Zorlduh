@@ -19,7 +19,8 @@ player walks an overworld of five areas, a dungeon of five rooms and a forest of
 which scroll the next area in; down stairs, which fade to the next; and across open walls, where the
 next room is simply there and the player walks on — in the forest from room to room, each one a
 different case of how the camera follows. Areas are drawn in layers: the player walks along a path,
-under a forest canopy and into the shade of a cave mouth.
+under a forest canopy and into the shade of a cave mouth. The HUD strip shows the current area's name,
+typed out letter by letter each time the player enters an area.
 
 ## Progress
 
@@ -28,6 +29,8 @@ under a forest canopy and into the shade of a cave mouth.
   ([`modules/LayerKit/`](modules/LayerKit/README.md))
 - [x] **Top-down movement** — walking in eight directions, collision shapes and maps, facing, walk
   animations ([`modules/TopDownMovement/`](modules/TopDownMovement/README.md))
+- [x] **Text** — fonts from glyph sheets, wrapped and typed-out text
+  ([`modules/TextKit/`](modules/TextKit/README.md))
 - [x] **Camera** — a camera value, the follow law, pans
   ([`modules/CameraKit/`](modules/CameraKit/README.md))
 - [x] **World** — layouts of areas with their own maps and art, each area drawn in layers at depths the

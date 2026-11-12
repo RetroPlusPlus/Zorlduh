@@ -92,6 +92,10 @@ The template's verbs and systems:
   together; a two-frame walk animation per facing, eight ticks a frame, resting on its first frame. The
   collision box is the bottom half of the 16×16 frame, 3 px in from each side. All of it is the
   TopDownMovement module, which the player is configured into.
+- **Text:** a font is a glyph sheet and the string of characters its cells are; text is sprites, one
+  per glyph, wrapped to a width, aligned, shadowed, and typed out a character every few ticks. A font of
+  one case draws the other case with it, so text is written in the case it reads best. The HUD strip
+  shows the current area's name, right-aligned, typed out again on entering each area.
 - **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
@@ -106,7 +110,9 @@ dungeon), **opening** (a way out of an area, in a wall or at a spot, leading to 
 away an area in view is drawn), **layer** (of an area: one of its tile maps, drawn at its own depth),
 **actor slot** (a named depth in an area where the things moving in it are drawn), **play area** (the
 screen below the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
-**actor** (anything spawned in an area), **cell** (one 8×8 tile position).
+**actor** (anything spawned in an area), **cell** (one 8×8 tile position), **font** (a glyph sheet and
+the character of each of its cells), **glyph** (one character's cell, drawn as one sprite), **reveal**
+(how much of a passage has been typed out).
 
 ## Hard constraints
 
@@ -142,6 +148,9 @@ screen below the HUD strip), **camera** (the position in the current area shown 
   WorldKit composes LayerKit and CameraKit; no module depends on a movement module — movement plugs
   into the world through the engine's types (a solid query, a box, a move), so another kind of movement
   fits the same world.
+- Text is TextKit's, in `modules/TextKit/`, on the engine alone. Windows build on it, and menus on
+  windows: TextKit, then WindowKit (a box, with optional text in it, and the dialog pieces), then MenuKit
+  (windows composed into menus).
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved

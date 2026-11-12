@@ -22,3 +22,6 @@ One row per feature status change, newest last.
 | 2026-11-11 | areas | 🧪 testing | 🧪 testing | `4434f17` | Every area a ground layer and the `"actors"` slot at depths handed in from the game's depth table; rock over the meadow's cave mouth; 2 new tests in `areas` (21 now) and 1 in `player` (9 now) |
 | 2026-11-11 | seamless-forest | 🧪 testing | 🧪 testing | `4434f17` | A path under the player's feet in the edge and a band of canopy over the player in the glade |
 | 2026-11-11 | assets | 🧪 testing | 🧪 testing | `4434f17` | The overlay sheet (index 0 transparent), the canopy palette and three layer maps; 54 files; 2 new tests (18 now) |
+| 2026-11-11 | text-kit | — | 🧪 testing | `3af6c87` | `TextKit` in `modules/TextKit/`: fonts from glyph sheets with the case rule, text as sprites keyed by position, wrapping, measuring, alignment, the shadow and the reveal; with its guide and an example over its own font sheet and palettes; 13 tests |
+| 2026-11-11 | area-name | — | 🧪 testing | `3af6c87` | The current area's name in the HUD strip, right-aligned and typed out again on entering each area; 4 tests |
+| 2026-11-11 | assets | 🧪 testing | 🧪 testing | `3af6c87` | The glyph sheet of 43 characters and the text and shadow palettes; 57 files; 3 new tests (21 now) |
