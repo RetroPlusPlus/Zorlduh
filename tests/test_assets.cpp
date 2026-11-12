@@ -1,7 +1,8 @@
 // The files under assets/: every one is baked into any binary that links the game's library; each
 // sheet decodes to the size and carve the game loads it with and holds palette indices only; each
 // palette image holds four colors; each area's maps are the same size, hold only world and collision
-// ids, are ringed by wall except their doorways, and are solid exactly where the area is wall or water;
+// ids, are ringed by wall except their doorways, and are solid exactly where the area is wall, water, a
+// sign or a rock;
 // each further layer's map is its area's size and holds overlay ids exactly where the layer draws. No
 // renderer is needed.
 
@@ -127,18 +128,18 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 57);
+    EXPECT_EQ(files, 61);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
 
 TEST(Assets, TerrainSheetIsOneTilePerWorldCell) {
     const LoadedImage sheet = decode("gfx/tiles/terrain.png");
-    EXPECT_EQ(sheet.width, 40);
+    EXPECT_EQ(sheet.width, 56);
     EXPECT_EQ(sheet.height, 8);
     expectIndicesOnly(sheet);
     EXPECT_EQ(slotCount(sheet, {.width = 8, .height = 8}, ContentKind::Tileset),
-              static_cast<std::size_t>(zorlduh::TerrainTile::Stairs) + 1);
+              static_cast<std::size_t>(zorlduh::TerrainTile::Rock) + 1);
 }
 
 TEST(Assets, ForestSheetIsOneTilePerForestTile) {
@@ -286,7 +287,8 @@ TEST(Assets, TerrainPalettesAreFourOpaqueColors) {
 TEST(Assets, PalettesOfSheetsWithAHoleLeaveEntryZeroUndrawn) {
     for (const char* path : {"palettes/sprites/player.png", "palettes/sprites/enemy.png",
                              "palettes/sprites/sword.png", "palettes/hud/hearts.png", "palettes/hud/text.png",
-                             "palettes/hud/shadow.png", "palettes/tiles/canopy.png"}) {
+                             "palettes/hud/shadow.png", "palettes/tiles/canopy.png",
+                             "palettes/hud/wood-border.png", "palettes/hud/stone-border.png"}) {
         const std::vector<retropp::Rgba16> entries = retropp::slicePaletteImage(decode(path));
         ASSERT_EQ(entries.size(), 4u) << path;
         EXPECT_EQ(entries[0].a, 0) << path;
@@ -312,7 +314,8 @@ TEST(Assets, TheTextPaletteDrawsGlyphsWhiteAndTheShadowPaletteBlack) {
 
 TEST(Assets, EachAreasMapsAreItsSizeAndHoldOnlyWorldCells) {
     const std::vector<std::uint16_t> ids = {value(WorldCell::Stairs), value(WorldCell::Wall),
-                                            value(WorldCell::Water), value(WorldCell::Doorway),
+                                            value(WorldCell::Rock),   value(WorldCell::Water),
+                                            value(WorldCell::Sign),   value(WorldCell::Doorway),
                                             value(WorldCell::Floor)};
     for (const AreaFiles& area : areas()) {
         EXPECT_EQ(area.tiles.width, area.width) << area.name;
@@ -358,6 +361,8 @@ TEST(Assets, TheMeadowHasItsDoorsRoadAndCaveMouthAndTheLakeItsPondAndDungeonDoor
     EXPECT_EQ(meadow.at(12, 4), value(WorldCell::Stairs));   // the cave mouth
     EXPECT_EQ(meadow.at(13, 4), value(WorldCell::Stairs));
     EXPECT_EQ(meadow.at(5, 5), value(WorldCell::Floor));
+    EXPECT_EQ(meadow.at(6, 4), value(WorldCell::Sign));         // the sign
+    EXPECT_EQ(all[1].tiles.at(28, 2), value(WorldCell::Rock));  // the rock by the dungeon door
     EXPECT_EQ(all[1].tiles.at(20, 7), value(WorldCell::Water));   // the pond
     EXPECT_EQ(all[1].tiles.at(30, 2), value(WorldCell::Stairs));  // the dungeon door
     EXPECT_EQ(all[1].tiles.at(31, 2), value(WorldCell::Stairs));
@@ -491,12 +496,13 @@ TEST(Assets, EachLayerMapIsItsAreasSizeAndDrawsExactlyItsCells) {
     }
 }
 
-TEST(Assets, CollisionIsSolidExactlyWhereTheAreaIsWallOrWater) {
+TEST(Assets, CollisionIsSolidExactlyWhereTheAreaIsWallWaterSignOrRock) {
     for (const AreaFiles& area : areas()) {
         for (int y = 0; y < area.height; ++y) {
             for (int x = 0; x < area.width; ++x) {
                 const std::uint16_t cell = area.tiles.at(x, y);
-                const bool solid = cell == value(WorldCell::Wall) || cell == value(WorldCell::Water);
+                const bool solid = cell == value(WorldCell::Wall) || cell == value(WorldCell::Water) ||
+                                   cell == value(WorldCell::Sign) || cell == value(WorldCell::Rock);
                 EXPECT_EQ(area.collision.at(x, y), value(solid ? CollisionCell::Solid : CollisionCell::Open))
                     << area.name << " " << x << "," << y;
             }

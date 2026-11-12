@@ -41,7 +41,8 @@ add_subdirectory(engine)
 
 # Modules: systems that include nothing from this project, each with its own
 # CMakeLists.txt. LayerKit, TopDownMovement, TextKit and CameraKit depend on the
-# engine alone; WorldKit composes LayerKit and CameraKit. Their example programs
+# engine alone; WorldKit composes LayerKit and CameraKit, and WindowKit composes
+# LayerKit and TextKit. Their example programs
 # are built so the examples their guides walk through always compile.
 set(LAYERKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/LayerKit)  # LayerKit::LayerKit — SpriteLayer, TileLayer, RasterLayer, ImageLayer
@@ -49,6 +50,8 @@ set(TOPDOWNMOVEMENT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/TopDownMovement)  # TopDownMovement::TopDownMovement — Walker, WalkerConfig, CollisionShape, WalkerSprite
 set(TEXTKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/TextKit)  # TextKit::TextKit — Font, Text, wrap, measure, Reveal
+set(WINDOWKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
+add_subdirectory(modules/WindowKit)  # WindowKit::WindowKit — Border, Box, Window, Dialog, DialogBox
 set(CAMERAKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/CameraKit)  # CameraKit::CameraKit — View, Camera, follow
 set(WORLDKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
@@ -70,15 +73,18 @@ add_library(zorlduh-lib STATIC
     src/config/config.cpp
     src/game/areas.cpp
     src/game/player.cpp
+    src/game/signs.cpp
     src/game/sim.cpp
     src/input/input.cpp
     src/render/area_name.cpp
+    src/render/dialog.cpp
     src/render/player.cpp)
 target_include_directories(zorlduh-lib PUBLIC src)
 target_compile_features(zorlduh-lib PUBLIC cxx_std_20)
 target_compile_options(zorlduh-lib PRIVATE ${_zorlduh_warn})
 target_link_libraries(zorlduh-lib PUBLIC retropp::engine LayerKit::LayerKit TopDownMovement::TopDownMovement
-                                          TextKit::TextKit CameraKit::CameraKit WorldKit::WorldKit)
+                                          TextKit::TextKit CameraKit::CameraKit WorldKit::WorldKit
+                                          WindowKit::WindowKit)
 
 # ---------------------------------------------------------------------------
 # The game executable.
@@ -142,6 +148,8 @@ zorlduh_add_test(WorldKit)
 zorlduh_add_test(areas)
 zorlduh_add_test(TextKit)
 zorlduh_add_test(area_name)
+zorlduh_add_test(WindowKit)
+zorlduh_add_test(signs)
 # The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE

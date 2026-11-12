@@ -85,10 +85,11 @@ public:
     // `config.speed`, taking each pixel only if its collision shape there covers nothing `solids` calls
     // solid, so it stops flush against a wall and slides along one when walking into it diagonally.
     //
-    // Facing changes only when the walker moves. Walking along one axis, it faces the way it walks.
-    // Holding two directions on different axes, it keeps its facing if that is one of the two, and
-    // otherwise faces the one pressed more recently; when both were pressed on the same tick, the
-    // horizontal one.
+    // Facing follows the directions held, whether or not the walker moves, so a walker pushing into a
+    // wall turns to face it. Holding one axis, it faces that way. Holding two directions on different
+    // axes, it keeps its facing if that is one of the two, and otherwise faces the one pressed more
+    // recently; when both were pressed on the same tick, the horizontal one. Holding nothing, or only
+    // opposite directions, leaves the facing as it was.
     //
     // The facing's animation advances while the walker moves, keeping its place across a turn, and
     // returns to frame 0 when it stands.
@@ -105,21 +106,21 @@ public:
         const bool movedX = stepAxis(config, solids, retropp::Vec2i{.x = dx, .y = 0});
         const bool movedY = stepAxis(config, solids, retropp::Vec2i{.x = 0, .y = dy});
 
-        if (!movedX && !movedY) {
-            strideTicks_ = 0;
-            return;
-        }
-        ++strideTicks_;
-
         const retropp::Dir horizontal = dx > 0 ? retropp::Dir::Right : retropp::Dir::Left;
         const retropp::Dir vertical = dy > 0 ? retropp::Dir::Down : retropp::Dir::Up;
         if (dx != 0 && dy != 0) {
             if (facing_ != horizontal && facing_ != vertical) {
                 facing_ = pressedAt(vertical) > pressedAt(horizontal) ? vertical : horizontal;
             }
-        } else {
+        } else if (dx != 0 || dy != 0) {
             facing_ = dx != 0 ? horizontal : vertical;
         }
+
+        if (!movedX && !movedY) {
+            strideTicks_ = 0;
+            return;
+        }
+        ++strideTicks_;
     }
 
     // The walker's top-left, in world pixels.

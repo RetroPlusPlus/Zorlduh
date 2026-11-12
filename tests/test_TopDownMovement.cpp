@@ -196,10 +196,20 @@ TEST(Facing, PressedOnTheSameTickTheHorizontalDirectionWins) {
     EXPECT_EQ(walker.facing(), Dir::Left);
 }
 
-TEST(Facing, ABlockedWalkerKeepsItsFacing) {
+TEST(Facing, ABlockedWalkerTurnsToFaceTheWayItPushesAndStandsStill) {
     Walker walker{{8, 16}, Dir::Down};
     walker.walk(Config(), Press({.left = true}), kWalls);
-    EXPECT_EQ(walker.facing(), Dir::Down);
+    EXPECT_EQ(walker.position(), (Vec2i{8, 16}));
+    EXPECT_EQ(walker.facing(), Dir::Left);
+    EXPECT_FALSE(walker.moving());
+}
+
+TEST(Facing, HoldingNothingOrOppositeDirectionsKeepsTheFacing) {
+    Walker walker{{32, 32}, Dir::Right};
+    walker.walk(Config(), DirectionalInput{}, kWalls);
+    EXPECT_EQ(walker.facing(), Dir::Right);
+    walker.walk(Config(), Press({.up = true, .down = true}), kWalls);
+    EXPECT_EQ(walker.facing(), Dir::Right);
 }
 
 TEST(Facing, ADiagonalSlideStillFollowsTheDiagonalRule) {

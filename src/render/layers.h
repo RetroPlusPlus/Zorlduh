@@ -4,7 +4,7 @@
 //
 // The world comes first: each area's ground, what lies under the player's feet, the actors, and what
 // hangs over them, handed to the world as kAreaDepths. Above the whole world, at depths counted from
-// its top, come the effects, then the HUD.
+// its top, come the effects, then the HUD, then the message box.
 #pragma once
 
 #include <cstdint>
@@ -39,6 +39,11 @@ inline constexpr AreaDepths kAreaDepths{
 // The HUD, over the effects.
 [[nodiscard]] inline std::int32_t HudZ(const WorldKit::World& world) {
     return WorldKit::TopZ(world) + 2;
+}
+
+// The message box, over the HUD.
+[[nodiscard]] inline std::int32_t DialogZ(const WorldKit::World& world) {
+    return WorldKit::TopZ(world) + 3;
 }
 
 }  // namespace zorlduh

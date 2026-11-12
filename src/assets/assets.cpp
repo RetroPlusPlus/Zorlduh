@@ -58,6 +58,16 @@ Assets loadAssets(retropp::Renderer& renderer) {
                                        ContentKind::Tileset, ReadOrder::LeftRightThenDown,
                                        /*count=*/static_cast<int>(kGlyphOrder.size()), kIndexZeroHole,
                                        /*framesPerAnimation=*/0, AssetPolicy::Embed);
+    // Each border sheet's last row is padded with blank cells; the pieces and the arrow are slots.
+    constexpr int kBorderSlots = static_cast<int>(WindowKit::kArrowSlot) + 1;
+    assets.woodBorder = renderer.loadAtlas("assets/gfx/hud/wood-border.png", kCell,
+                                           ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                                           kBorderSlots, kIndexZeroHole, /*framesPerAnimation=*/0,
+                                           AssetPolicy::Embed);
+    assets.stoneBorder = renderer.loadAtlas("assets/gfx/hud/stone-border.png", kCell,
+                                            ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                                            kBorderSlots, kIndexZeroHole, /*framesPerAnimation=*/0,
+                                            AssetPolicy::Embed);
 
     // The build bakes the first asset path in each statement, so every loader call is a statement of
     // its own.
@@ -73,6 +83,8 @@ Assets loadAssets(retropp::Renderer& renderer) {
     assets.palettes.hearts = renderer.loadPaletteImage("assets/palettes/hud/hearts.png");
     assets.palettes.text = renderer.loadPaletteImage("assets/palettes/hud/text.png");
     assets.palettes.shadow = renderer.loadPaletteImage("assets/palettes/hud/shadow.png");
+    assets.palettes.woodBorder = renderer.loadPaletteImage("assets/palettes/hud/wood-border.png");
+    assets.palettes.stoneBorder = renderer.loadPaletteImage("assets/palettes/hud/stone-border.png");
 
     OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
@@ -142,6 +154,10 @@ Assets loadAssets(retropp::Renderer& renderer) {
         .glyphs = kGlyphOrder,
         .palette = assets.palettes.text,
         .shadow = assets.palettes.shadow,
+    };
+    assets.borders = Borders{
+        .wood = WindowKit::Border{.sheet = assets.woodBorder, .palette = assets.palettes.woodBorder},
+        .stone = WindowKit::Border{.sheet = assets.stoneBorder, .palette = assets.palettes.stoneBorder},
     };
 
     return assets;

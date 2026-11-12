@@ -47,10 +47,12 @@ per tick than a straight line does.
 
 ## Facing
 
-A walker faces one of four ways, `Dir::Up`, `Down`, `Left` or `Right`, and its facing changes only on
-a tick it moves. A walker pushing into a wall it cannot move away from keeps the facing it had.
+A walker faces one of four ways, `Dir::Up`, `Down`, `Left` or `Right`, and its facing follows the
+directions held on every tick, whether or not it moves. A walker pushing into a wall turns to face the
+wall and stands still facing it; that is how a game knows what the walker is facing to read or use.
+Holding nothing, or only opposite directions, leaves the facing as it was.
 
-- **Moving along one axis**, it faces the way it moves.
+- **Holding one axis**, it faces that way.
 - **Holding two directions on different axes** (a diagonal, whether or not a wall blocks one of them),
   it keeps its facing if that is one of the two. Otherwise it faces the one of the two pressed more
   recently. When both were pressed on the same tick, it faces the horizontal one.

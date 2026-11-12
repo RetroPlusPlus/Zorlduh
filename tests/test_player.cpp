@@ -47,7 +47,7 @@ zorlduh::Assets headlessAssets() {
     zorlduh::Assets assets;
     assets.terrain = retropp::AtlasManifest{
         .atlasId = retropp::AtlasId{7},
-        .slots = retropp::sliceLayout({.width = 40, .height = 8}, {.width = 8, .height = 8},
+        .slots = retropp::sliceLayout({.width = 56, .height = 8}, {.width = 8, .height = 8},
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
@@ -108,7 +108,7 @@ zorlduh::Assets headlessAssets() {
 
 // The game as main makes it: the view and the depths from the render side.
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox);
     config.player.timing = kHz60;
     return config;
 }
@@ -196,6 +196,7 @@ TEST(Player, IsDrawnAtTheActorsDepthInEveryAreaBetweenUnderfootAndOverhead) {
     EXPECT_EQ(WorldKit::TopZ(config.world), zorlduh::kOverheadZ);
     EXPECT_GT(zorlduh::EffectsZ(config.world), zorlduh::kOverheadZ);
     EXPECT_GT(zorlduh::HudZ(config.world), zorlduh::EffectsZ(config.world));
+    EXPECT_GT(zorlduh::DialogZ(config.world), zorlduh::HudZ(config.world));
 }
 
 // ── The controls ─────────────────────────────────────────────────────────────────────────────

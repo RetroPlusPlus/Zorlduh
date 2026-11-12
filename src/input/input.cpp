@@ -20,6 +20,7 @@ Input readInput(const retropp::InputState& input) {
                                                  .down = Action::Down,
                                                  .left = Action::Left,
                                                  .right = Action::Right}),
+        .item = input.justPressed(Action::Item),
     };
 }
 

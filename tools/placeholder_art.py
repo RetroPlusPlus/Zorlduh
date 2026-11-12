@@ -9,9 +9,11 @@ and collision map.
     assets/gfx/sprites/{player,enemy,sword}.png   the sprite sheets
     assets/gfx/hud/hearts.png                     the HUD's hearts
     assets/gfx/hud/glyphs.png                     the font: one glyph per character of GLYPH_ORDER
+    assets/gfx/hud/{wood,stone}-border.png        the borders of the message box: nine pieces and
+                                                  an arrow each
     assets/palettes/tiles/{floor,wall,water,grass,leaf,canopy}.png
     assets/palettes/sprites/{player,enemy,sword}.png
-    assets/palettes/hud/{hearts,text,shadow}.png
+    assets/palettes/hud/{hearts,text,shadow,wood-border,stone-border}.png
     assets/maps/<layout>/<area>/tiles.png         one world id per cell, for each area of each layout
     assets/maps/<layout>/<area>/collision.png     one collision id per cell, for each area of each layout
     assets/maps/<layout>/<area>/<layer>.png       one overlay id per cell, for each further layer of an area
@@ -127,6 +129,10 @@ HEARTS_PAL = [UNUSED, (48, 16, 24, 255), (224, 48, 64, 255), (255, 255, 255, 255
 # Text: the glyphs are drawn in index 3, white through the text palette and black through the shadow's.
 TEXT_PAL = [UNUSED, (0, 0, 0, 255), (128, 128, 128, 255), (255, 255, 255, 255)]
 SHADOW_PAL = [UNUSED, (0, 0, 0, 255), (0, 0, 0, 255), (0, 0, 0, 255)]
+# The borders: entry 1 is the outline and the panel inside, 2 the border's face, 3 its grain or
+# highlight and the arrow. Entry 0 is the transparent index, around a rounded corner.
+WOOD_BORDER_PAL = [UNUSED, (40, 24, 16, 255), (128, 84, 48, 255), (156, 108, 64, 255)]     # dark, wood, grain
+STONE_BORDER_PAL = [UNUSED, (32, 32, 40, 255), (112, 112, 120, 255), (160, 160, 168, 255)]  # dark, stone, highlight
 
 # ── Pixel art ────────────────────────────────────────────────────────────────────────────────────
 #
@@ -145,6 +151,15 @@ def parse(art, width, height):
 
 def mirrored(rows):
     return [list(reversed(row)) for row in rows]
+
+
+def flipped(rows):
+    return list(reversed(rows))
+
+
+def transposed(rows):
+    """Rows become columns: a piece drawn along the top, turned to run down the left."""
+    return [list(column) for column in zip(*rows)]
 
 
 def side_by_side(*frames):
@@ -214,7 +229,31 @@ STAIRS = parse([
     "10000001",
 ], 8, 8)
 
-TILES = side_by_side(FLOOR, WALL, WATER, DOORWAY, STAIRS)
+# A sign on a post, drawn through the floor palette.
+SIGN = parse([
+    "00000000",
+    "03333330",
+    "03222230",
+    "03333330",
+    "03222230",
+    "03333330",
+    "00011000",
+    "00011000",
+], 8, 8)
+
+# A rock with lines cut into it, drawn through the wall palette.
+ROCK = parse([
+    "00111100",
+    "01333310",
+    "13222231",
+    "12333321",
+    "13222231",
+    "12333321",
+    "12222221",
+    "01111110",
+], 8, 8)
+
+TILES = side_by_side(FLOOR, WALL, WATER, DOORWAY, STAIRS, SIGN, ROCK)
 
 # The forest, one 8×8 tile per ForestTile in src/assets/assets.h: grass drawn through the grass
 # palette, a tree filling its cell through the leaf palette, a stream through the water palette, and
@@ -949,6 +988,84 @@ def glyph_sheet():
 
 GLYPHS = glyph_sheet()
 
+# The borders: ten 8×8 cells each, three to a row in the order of the box they make (top-left, top,
+# top-right; left, fill, right; bottom-left, bottom, bottom-right), then the arrow shown while another
+# page follows, and two blank cells padding the last row. Index 0 is transparent. Each border is drawn
+# as its top-left corner, its top edge and its fill; the other corners are that corner mirrored and
+# flipped, the left edge is the top turned, and the right and bottom edges are those mirrored and
+# flipped.
+
+WOOD_TOP_LEFT = parse([
+    "..111111",
+    ".1222222",
+    "12222332",
+    "12322222",
+    "12322222",
+    "12222222",
+    "12222211",
+    "12223211",
+], 8, 8)
+
+WOOD_TOP = parse([
+    "11111111",
+    "22222222",
+    "22333222",
+    "22222222",
+    "32222233",
+    "22222222",
+    "11111111",
+    "11111111",
+], 8, 8)
+
+STONE_TOP_LEFT = parse([
+    "..111111",
+    ".1333331",
+    "13222221",
+    "13223221",
+    "13222221",
+    "13222221",
+    "13222211",
+    "11111111",
+], 8, 8)
+
+STONE_TOP = parse([
+    "11111111",
+    "33333331",
+    "32222221",
+    "32232221",
+    "32222321",
+    "22222221",
+    "11111111",
+    "11111111",
+], 8, 8)
+
+BORDER_FILL = parse(["11111111"] * 8, 8, 8)
+
+BORDER_ARROW = parse([
+    "........",
+    "........",
+    ".33333..",
+    "..333...",
+    "...3....",
+    "........",
+    "........",
+    "........",
+], 8, 8)
+
+
+def border_sheet(top_left, top):
+    left = transposed(top)
+    return stacked(
+        side_by_side(top_left, top, mirrored(top_left)),
+        side_by_side(left, BORDER_FILL, mirrored(left)),
+        side_by_side(flipped(top_left), flipped(top), flipped(mirrored(top_left))),
+        side_by_side(BORDER_ARROW, BLANK_CELL, BLANK_CELL),
+    )
+
+
+WOOD_BORDER = border_sheet(WOOD_TOP_LEFT, WOOD_TOP)
+STONE_BORDER = border_sheet(STONE_TOP_LEFT, STONE_TOP)
+
 # ── The areas ────────────────────────────────────────────────────────────────────────────────────
 #
 # Each area is its own map, one pixel per cell, ringed by wall except its doorways. The openings
@@ -957,7 +1074,7 @@ GLYPHS = glyph_sheet()
 # the rooms of SeamlessForest.
 
 # World ids, as WorldCell in src/assets/assets.h, spread from near black (stairs) to white (floor).
-STAIRS_ID, WALL_ID, WATER_ID, DOORWAY_ID, FLOOR_ID = 32, 64, 128, 192, 255
+STAIRS_ID, WALL_ID, ROCK_ID, WATER_ID, SIGN_ID, DOORWAY_ID, FLOOR_ID = 32, 64, 96, 128, 160, 192, 255
 
 # Collision ids, as CollisionCell in src/assets/assets.h: solid is black, open is white.
 SOLID_ID, OPEN_ID = 0, 255
@@ -987,11 +1104,13 @@ LAYOUTS = {
     "overworld": {
         # The start: exactly one play area, with a door east, a road south and the cave mouth inside,
         # under an overhang of rock over the mouth and the row above it.
+        # A sign stands west of the cave mouth.
         "meadow": dict(size=(20, 16), doorways=column(19, 6, 9) + row(15, 8, 11), stairs=[(12, 4), (13, 4)],
-                       layers={"overhang": (ROOF_ID, block(12, 3, 13, 4))}),
+                       signs=[(6, 4)], layers={"overhang": (ROOF_ID, block(12, 3, 13, 4))}),
         # Two play areas wide, with a pond; the camera follows across it. The dungeon door, past the
-        # pond, fades down into DungeonOne.
-        "lake": dict(size=(40, 16), doorways=column(0, 6, 9), stairs=[(30, 2), (31, 2)], pond=True),
+        # pond, fades down into DungeonOne; a rock stands beside it.
+        "lake": dict(size=(40, 16), doorways=column(0, 6, 9), stairs=[(30, 2), (31, 2)], rocks=[(28, 2)],
+                     pond=True),
         # One and a half play areas wide: not a multiple of the screen.
         # The forest path in its south wall scrolls down into SeamlessForest.
         "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6) + row(15, 13, 16)),
@@ -1038,7 +1157,7 @@ LAYOUTS = {
 }
 
 
-def area_cells(size, doorways=(), stairs=(), pond=False):
+def area_cells(size, doorways=(), stairs=(), signs=(), rocks=(), pond=False):
     width, height = size
     cells = [[WALL_ID if x in (0, width - 1) or y in (0, height - 1) else FLOOR_ID for x in range(width)]
              for y in range(height)]
@@ -1046,6 +1165,10 @@ def area_cells(size, doorways=(), stairs=(), pond=False):
         cells[y][x] = DOORWAY_ID
     for (x, y) in stairs:
         cells[y][x] = STAIRS_ID
+    for (x, y) in signs:
+        cells[y][x] = SIGN_ID
+    for (x, y) in rocks:
+        cells[y][x] = ROCK_ID
     if pond:
         for r, (first, last) in enumerate(POND_ROWS):
             for x in range(first, last + 1):
@@ -1054,7 +1177,7 @@ def area_cells(size, doorways=(), stairs=(), pond=False):
 
 
 def collision_cells(area):
-    solid = {WALL_ID, WATER_ID}
+    solid = {WALL_ID, WATER_ID, SIGN_ID, ROCK_ID}
     return [[SOLID_ID if cell in solid else OPEN_ID for cell in r] for r in area]
 
 
@@ -1081,6 +1204,8 @@ def files():
         "gfx/sprites/sword.png": sheet_png(SWORD),
         "gfx/hud/hearts.png": sheet_png(HUD),
         "gfx/hud/glyphs.png": sheet_png(GLYPHS),
+        "gfx/hud/wood-border.png": sheet_png(WOOD_BORDER),
+        "gfx/hud/stone-border.png": sheet_png(STONE_BORDER),
         "palettes/tiles/floor.png": palette_png(FLOOR_PAL),
         "palettes/tiles/wall.png": palette_png(WALL_PAL),
         "palettes/tiles/water.png": palette_png(WATER_PAL),
@@ -1093,6 +1218,8 @@ def files():
         "palettes/hud/hearts.png": palette_png(HEARTS_PAL),
         "palettes/hud/text.png": palette_png(TEXT_PAL),
         "palettes/hud/shadow.png": palette_png(SHADOW_PAL),
+        "palettes/hud/wood-border.png": palette_png(WOOD_BORDER_PAL),
+        "palettes/hud/stone-border.png": palette_png(STONE_BORDER_PAL),
     }
     for layout, areas in LAYOUTS.items():
         for name, spec in areas.items():

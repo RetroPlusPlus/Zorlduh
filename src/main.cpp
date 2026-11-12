@@ -2,7 +2,8 @@
 // objects, loads the game's art and maps, and runs the loop until the window is closed. Each tick the
 // player walks the world; each displayed frame is the layers of the areas on screen with the actors
 // among them at the current area's actor slot, and the fade over everything, placed under the HUD
-// strip, and in the strip the current area's name.
+// strip, in the strip the current area's name, and over it all the message box while a sign or a rock
+// is read.
 
 #include "retropp/clock.h"
 #include "retropp/draw_state.h"
@@ -22,6 +23,7 @@
 #include "TopDownMovement/walker.h"
 #include "WorldKit/world_layers.h"
 #include "render/area_name.h"
+#include "render/dialog.h"
 #include "render/layers.h"
 #include "render/layout.h"
 #include "render/player.h"
@@ -36,7 +38,8 @@ int main() {
     platform.actions(zorlduh::actionMap());
 
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
-    const zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths);
+    const zorlduh::Config config =
+        zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox);
     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
 
@@ -51,6 +54,7 @@ int main() {
                                                 {zorlduh::Player(state, config.player)}));
         frame.layers.push_back(LayerKit::SpriteLayer("hud:area-name", zorlduh::HudZ(config.world),
                                                      {zorlduh::AreaName(state, assets)}));
+        frame.layers.push_back(zorlduh::Dialog(state, assets, zorlduh::DialogZ(config.world)));
         frame.regions = WorldKit::Fade(state.camera, config.world);
         renderer.renderFrame(frame);
     });

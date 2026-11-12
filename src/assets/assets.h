@@ -20,6 +20,7 @@
 
 #include "TextKit/font.h"
 #include "TopDownMovement/walker.h"
+#include "WindowKit/border.h"
 
 namespace retropp {
 class Renderer;
@@ -33,13 +34,15 @@ namespace zorlduh {
 enum class WorldCell : std::uint16_t {
     Stairs = 32,    // a way down or up: a spot opening
     Wall = 64,
+    Rock = 96,      // a rock: solid, read from beside it
     Water = 128,
+    Sign = 160,     // a sign: solid, read from beside it
     Doorway = 192,  // floor in a wall where an opening is
     Floor = 255,
 };
 
 // The value of a cell in an area's collision map, assets/maps/<layout>/<area>/collision.png: solid is
-// black, open is white. Wall and water are solid.
+// black, open is white. Wall, water, signs and rocks are solid.
 enum class CollisionCell : std::uint16_t {
     Solid = 0,
     Open = 255,
@@ -61,6 +64,8 @@ enum class TerrainTile : std::size_t {
     Water = 2,
     Doorway = 3,
     Stairs = 4,
+    Sign = 5,
+    Rock = 6,
 };
 
 // The slots of the forest sheet: one 8×8 tile each for the forest's ground, its walls, its water and
@@ -118,6 +123,14 @@ struct Palettes {
     retropp::PaletteId hearts{};
     retropp::PaletteId text{};    // the glyphs: white; entry 0 is never drawn
     retropp::PaletteId shadow{};  // the glyphs' shadow: black; entry 0 is never drawn
+    retropp::PaletteId woodBorder{};   // the wood border: outline and panel, wood, grain; entry 0 is never drawn
+    retropp::PaletteId stoneBorder{};  // the stone border: outline and panel, stone, highlight; entry 0 is never drawn
+};
+
+// The borders a message box is drawn in, each its sheet through its palette.
+struct Borders {
+    WindowKit::Border wood;   // a sign's
+    WindowKit::Border stone;  // a rock's
 };
 
 // One area's maps: the same size, one WorldCell value per cell in `tiles` and one CollisionCell value
@@ -177,15 +190,19 @@ struct Assets {
     retropp::AtlasManifest sword;    // Single: one 8×16 frame pointing up
     retropp::AtlasManifest hearts;   // SpriteSeries of 8×8 cells, slots in Heart order
     retropp::AtlasManifest glyphs;   // Tileset of 8×8 cells, one slot per character of kGlyphOrder
+    retropp::AtlasManifest woodBorder;   // Tileset of 8×8 cells: the nine pieces in WindowKit::Piece
+                                         // order, then the arrow
+    retropp::AtlasManifest stoneBorder;  // the same, in stone
     Palettes palettes;
     AreaMapSet areas;
     TextKit::Font font;              // the glyph sheet as kGlyphOrder, through the text palette with
                                      // the shadow palette beneath
+    Borders borders;                 // each border sheet through its palette
 };
 
 // Uploads every sheet and palette to `renderer` and decodes every area's maps. Index 0 is transparent
-// on the overlay, player, enemy, sword, hearts and glyph sheets; the terrain and forest sheets have no
-// transparent index. Throws std::runtime_error when a file cannot be decoded or uploaded.
+// on the overlay, player, enemy, sword, hearts, glyph and border sheets; the terrain and forest sheets
+// have no transparent index. Throws std::runtime_error when a file cannot be decoded or uploaded.
 [[nodiscard]] Assets loadAssets(retropp::Renderer& renderer);
 
 }  // namespace zorlduh

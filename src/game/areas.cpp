@@ -289,7 +289,9 @@ retropp::TileCatalog OverworldArt(const Assets& assets) {
     return retropp::TileCatalog{.entries = {
         terrain(assets, WorldCell::Stairs, TerrainTile::Stairs, palettes.floor),
         terrain(assets, WorldCell::Wall, TerrainTile::Wall, palettes.wall),
+        terrain(assets, WorldCell::Rock, TerrainTile::Rock, palettes.wall),
         terrain(assets, WorldCell::Water, TerrainTile::Water, palettes.water),
+        terrain(assets, WorldCell::Sign, TerrainTile::Sign, palettes.floor),
         terrain(assets, WorldCell::Doorway, TerrainTile::Doorway, palettes.floor),
         terrain(assets, WorldCell::Floor, TerrainTile::Floor, palettes.floor),
     }};
@@ -300,7 +302,9 @@ retropp::TileCatalog CaveArt(const Assets& assets) {
     return retropp::TileCatalog{.entries = {
         terrain(assets, WorldCell::Stairs, TerrainTile::Stairs, palettes.wall),
         terrain(assets, WorldCell::Wall, TerrainTile::Wall, palettes.water),
+        terrain(assets, WorldCell::Rock, TerrainTile::Rock, palettes.wall),
         terrain(assets, WorldCell::Water, TerrainTile::Water, palettes.water),
+        terrain(assets, WorldCell::Sign, TerrainTile::Sign, palettes.floor),
         terrain(assets, WorldCell::Doorway, TerrainTile::Doorway, palettes.wall),
         terrain(assets, WorldCell::Floor, TerrainTile::Floor, palettes.wall),
     }};
@@ -311,7 +315,9 @@ retropp::TileCatalog DungeonArt(const Assets& assets) {
     return retropp::TileCatalog{.entries = {
         terrain(assets, WorldCell::Stairs, TerrainTile::Stairs, palettes.floor),
         terrain(assets, WorldCell::Wall, TerrainTile::Wall, palettes.water),
+        terrain(assets, WorldCell::Rock, TerrainTile::Rock, palettes.wall),
         terrain(assets, WorldCell::Water, TerrainTile::Water, palettes.water),
+        terrain(assets, WorldCell::Sign, TerrainTile::Sign, palettes.floor),
         terrain(assets, WorldCell::Doorway, TerrainTile::Doorway, palettes.wall),
         terrain(assets, WorldCell::Floor, TerrainTile::Floor, palettes.wall),
     }};
@@ -332,7 +338,9 @@ retropp::TileCatalog ForestArt(const Assets& assets) {
     return retropp::TileCatalog{.entries = {
         terrain(assets, WorldCell::Stairs, TerrainTile::Stairs, palettes.floor),
         forest(assets, WorldCell::Wall, ForestTile::Tree, palettes.leaf),
+        terrain(assets, WorldCell::Rock, TerrainTile::Rock, palettes.wall),
         forest(assets, WorldCell::Water, ForestTile::Stream, palettes.water),
+        terrain(assets, WorldCell::Sign, TerrainTile::Sign, palettes.floor),
         forest(assets, WorldCell::Doorway, ForestTile::Trodden, palettes.grass),
         forest(assets, WorldCell::Floor, ForestTile::Grass, palettes.grass),
     }};

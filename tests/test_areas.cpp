@@ -52,7 +52,7 @@ zorlduh::Assets headlessAssets() {
     zorlduh::Assets assets;
     assets.terrain = retropp::AtlasManifest{
         .atlasId = retropp::AtlasId{7},
-        .slots = retropp::sliceLayout({.width = 40, .height = 8}, {.width = 8, .height = 8},
+        .slots = retropp::sliceLayout({.width = 56, .height = 8}, {.width = 8, .height = 8},
                                       retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown),
         .kind = retropp::ContentKind::Tileset,
     };
@@ -120,7 +120,7 @@ zorlduh::Assets headlessAssets() {
 }
 
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, kDepths);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, kDepths, zorlduh::kDialogBox);
     config.player.timing = kHz60;
     return config;
 }
@@ -344,6 +344,10 @@ TEST(Areas, TheArtDrawsEveryKindOfCellFromItsTileThroughItsPalette) {
     EXPECT_EQ(entry(overworld, WorldCell::Doorway).palette, assets.palettes.floor);
     EXPECT_EQ(entry(overworld, WorldCell::Stairs).slot, 4);
     EXPECT_EQ(entry(overworld, WorldCell::Stairs).sheet, assets.terrain.atlasId);
+    EXPECT_EQ(entry(overworld, WorldCell::Sign).slot, 5);
+    EXPECT_EQ(entry(overworld, WorldCell::Sign).palette, assets.palettes.floor);
+    EXPECT_EQ(entry(overworld, WorldCell::Rock).slot, 6);
+    EXPECT_EQ(entry(overworld, WorldCell::Rock).palette, assets.palettes.wall);
     const retropp::TileCatalog cave = zorlduh::CaveArt(assets);
     EXPECT_EQ(entry(cave, WorldCell::Floor).slot, 0);
     EXPECT_EQ(entry(cave, WorldCell::Floor).palette, assets.palettes.wall);
