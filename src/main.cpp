@@ -2,7 +2,7 @@
 // objects, loads the game's art and maps, and runs the loop until the window is closed. Each tick the
 // player walks the world; each displayed frame is the layers of the areas on screen with the actors
 // among them at the current area's actor slot, and the fade over everything, placed under the HUD
-// strip.
+// strip, and in the strip the current area's name.
 
 #include "retropp/clock.h"
 #include "retropp/draw_state.h"
@@ -18,8 +18,10 @@
 #include "game/player.h"
 #include "game/sim.h"
 #include "input/input.h"
+#include "LayerKit/sprite_layer.h"
 #include "TopDownMovement/walker.h"
 #include "WorldKit/world_layers.h"
+#include "render/area_name.h"
 #include "render/layers.h"
 #include "render/layout.h"
 #include "render/player.h"
@@ -47,6 +49,8 @@ int main() {
         frame.layers = WorldKit::WorldLayers(state.camera, config.world);
         frame.layers.push_back(WorldKit::Actors(state.camera, config.world, zorlduh::kActorSlot,
                                                 {zorlduh::Player(state, config.player)}));
+        frame.layers.push_back(LayerKit::SpriteLayer("hud:area-name", zorlduh::HudZ(config.world),
+                                                     {zorlduh::AreaName(state, assets)}));
         frame.regions = WorldKit::Fade(state.camera, config.world);
         renderer.renderFrame(frame);
     });

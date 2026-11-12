@@ -127,7 +127,7 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 54);
+    EXPECT_EQ(files, 57);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
@@ -216,6 +216,49 @@ TEST(Assets, HeartsSheetIsFullHalfAndEmpty) {
               static_cast<std::size_t>(zorlduh::Heart::Empty) + 1);
 }
 
+TEST(Assets, TheGlyphOrderIsFortyThreeCharactersNoneTwice) {
+    const std::string_view order = zorlduh::kGlyphOrder;
+    EXPECT_EQ(order.size(), 43u);
+    for (std::size_t i = 0; i < order.size(); ++i) {
+        EXPECT_EQ(order.find(order[i]), i) << order[i];
+    }
+}
+
+// The glyph sheet is 16 cells to a row and padded to a whole row; carved to kGlyphOrder's length it is
+// one slot per character. Each glyph is drawn in index 3, no two alike, and each cell's right column
+// and bottom row are index 0 so the shadow has room.
+TEST(Assets, GlyphSheetIsOneDistinctGlyphPerCharacterWithRoomForItsShadow) {
+    const LoadedImage sheet = decode("gfx/hud/glyphs.png");
+    EXPECT_EQ(sheet.width, 128);
+    EXPECT_EQ(sheet.height, 24);
+    expectIndicesOnly(sheet);
+    const std::vector<retropp::AssetSlot> slots =
+        retropp::sliceLayout({.width = sheet.width, .height = sheet.height}, {.width = 8, .height = 8},
+                             ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                             static_cast<int>(zorlduh::kGlyphOrder.size()));
+    ASSERT_EQ(slots.size(), zorlduh::kGlyphOrder.size());
+
+    std::vector<std::vector<std::uint8_t>> cells;
+    for (std::size_t n = 0; n < slots.size(); ++n) {
+        const int left = static_cast<int>(n % 16) * 8;
+        const int top = static_cast<int>(n / 16) * 8;
+        std::vector<std::uint8_t> cell;
+        for (int y = 0; y < 8; ++y) {
+            for (int x = 0; x < 8; ++x) {
+                const auto index = static_cast<std::uint8_t>(
+                    sheet.indices[static_cast<std::size_t>((top + y) * sheet.width + left + x)]);
+                cell.push_back(index);
+                if (x == 7 || y == 7) {
+                    EXPECT_EQ(index, 0) << zorlduh::kGlyphOrder[n] << " " << x << "," << y;
+                }
+            }
+        }
+        EXPECT_NE(std::find(cell.begin(), cell.end(), 3), cell.end()) << zorlduh::kGlyphOrder[n];
+        EXPECT_EQ(std::find(cells.begin(), cells.end(), cell), cells.end()) << zorlduh::kGlyphOrder[n];
+        cells.push_back(cell);
+    }
+}
+
 TEST(Assets, SpriteSheetsAreTransparentAtTheirCorners) {
     for (const char* path : {"gfx/sprites/player.png", "gfx/sprites/enemy.png", "gfx/sprites/sword.png",
                              "gfx/hud/hearts.png"}) {
@@ -238,16 +281,30 @@ TEST(Assets, TerrainPalettesAreFourOpaqueColors) {
     }
 }
 
-// The palettes drawn through a sheet whose index 0 is transparent: the sprites, the HUD, and the canopy.
+// The palettes drawn through a sheet whose index 0 is transparent: the sprites, the HUD, the text and
+// its shadow, and the canopy.
 TEST(Assets, PalettesOfSheetsWithAHoleLeaveEntryZeroUndrawn) {
     for (const char* path : {"palettes/sprites/player.png", "palettes/sprites/enemy.png",
-                             "palettes/sprites/sword.png", "palettes/hud/hearts.png", "palettes/tiles/canopy.png"}) {
+                             "palettes/sprites/sword.png", "palettes/hud/hearts.png", "palettes/hud/text.png",
+                             "palettes/hud/shadow.png", "palettes/tiles/canopy.png"}) {
         const std::vector<retropp::Rgba16> entries = retropp::slicePaletteImage(decode(path));
         ASSERT_EQ(entries.size(), 4u) << path;
         EXPECT_EQ(entries[0].a, 0) << path;
         for (std::size_t i = 1; i < entries.size(); ++i) {
             EXPECT_EQ(entries[i].a, 65535) << path;
         }
+    }
+}
+
+// The glyphs are drawn in index 3: white through the text palette, black through the shadow's.
+TEST(Assets, TheTextPaletteDrawsGlyphsWhiteAndTheShadowPaletteBlack) {
+    const std::vector<retropp::Rgba16> text = retropp::slicePaletteImage(decode("palettes/hud/text.png"));
+    ASSERT_EQ(text.size(), 4u);
+    EXPECT_EQ(text[3], (retropp::Rgba16{65535, 65535, 65535, 65535}));
+    const std::vector<retropp::Rgba16> shadow = retropp::slicePaletteImage(decode("palettes/hud/shadow.png"));
+    ASSERT_EQ(shadow.size(), 4u);
+    for (std::size_t i = 1; i < shadow.size(); ++i) {
+        EXPECT_EQ(shadow[i], (retropp::Rgba16{0, 0, 0, 65535})) << i;
     }
 }
 

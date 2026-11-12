@@ -1,5 +1,6 @@
 #include "game/areas.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -10,6 +11,13 @@
 namespace zorlduh {
 
 namespace {
+
+// Each layout's area names, indexed by its enum.
+constexpr std::array<std::string_view, 5> kOverworldNames{"Meadow", "Lake", "Field", "Shrine", "Cave"};
+constexpr std::array<std::string_view, 5> kDungeonOneNames{"Entrance", "Hall", "West Wing", "East Wing",
+                                                           "Treasury"};
+constexpr std::array<std::string_view, 7> kSeamlessForestNames{"Edge",   "Glade", "Thicket", "Bower",
+                                                               "Hollow", "Brook", "Clearing"};
 
 retropp::TileCatalogEntry terrain(const Assets& assets, WorldCell cell, TerrainTile tile,
                                   retropp::PaletteId palette) {
@@ -259,6 +267,22 @@ WorldKit::Layout seamlessForest(const Assets& assets, CameraKit::View view, cons
 }
 
 }  // namespace
+
+std::string_view areaName(Layout layout, int area) noexcept {
+    const auto pick = [area](const auto& names) -> std::string_view {
+        return area >= 0 && static_cast<std::size_t>(area) < names.size() ? names[static_cast<std::size_t>(area)]
+                                                                          : std::string_view{};
+    };
+    switch (layout) {
+    case Layout::Overworld:
+        return pick(kOverworldNames);
+    case Layout::DungeonOne:
+        return pick(kDungeonOneNames);
+    case Layout::SeamlessForest:
+        return pick(kSeamlessForestNames);
+    }
+    return {};
+}
 
 retropp::TileCatalog OverworldArt(const Assets& assets) {
     const Palettes& palettes = assets.palettes;

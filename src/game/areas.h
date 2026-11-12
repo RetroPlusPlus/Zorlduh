@@ -47,6 +47,10 @@ struct AreaDepths {
 // world, is drawn.
 inline constexpr std::string_view kActorSlot = "actors";
 
+// The name of `area` in `layout`, in mixed case, as the HUD strip shows it: "Meadow", "West Wing",
+// "Clearing". An index past the layout's last area, or a layout past the last, is an empty name.
+[[nodiscard]] std::string_view areaName(Layout layout, int area) noexcept;
+
 // The layout and area the game starts in.
 inline constexpr Layout kStartLayout = Layout::Overworld;
 inline constexpr Area kStartArea = Area::Meadow;

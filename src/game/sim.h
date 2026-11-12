@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "CameraKit/camera.h"
+#include "TextKit/reveal.h"
 #include "TopDownMovement/directions.h"
 #include "TopDownMovement/walker.h"
 #include "WorldKit/area.h"
@@ -47,12 +48,14 @@ struct Config {
 struct GameState {
     TopDownMovement::Walker player;
     WorldKit::Camera camera{kStartLayout, kStartArea};  // which area, where the screen looks, any scroll or fade running
+    TextKit::Reveal nameReveal;  // how much of the current area's name has been typed into the HUD strip
     std::vector<GameEvent> events;
 };
 
 // One tick: the player walks the current area unless a scroll or fade is running, the camera follows
 // the player's collision box and moves the player through any opening it goes out by, and entering an
-// area is recorded as an AreaChanged event.
+// area is recorded as an AreaChanged event and starts its name typing out again. The name's reveal
+// advances every tick.
 void tick(GameState& state, const Input& input, const Config& config);
 
 }  // namespace zorlduh

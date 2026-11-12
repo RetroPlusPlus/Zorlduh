@@ -24,7 +24,9 @@ void tick(GameState& state, const Input& input, const Config& config) {
     }
     if (step.entered) {
         state.events.push_back(AreaChanged{.layout = static_cast<Layout>(step.entered->layout), .area = step.entered->area});
+        state.nameReveal = TextKit::Reveal{};
     }
+    state.nameReveal.advance();
 }
 
 }  // namespace zorlduh

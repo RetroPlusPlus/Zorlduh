@@ -53,6 +53,11 @@ Assets loadAssets(retropp::Renderer& renderer) {
                                        ContentKind::SpriteSeries, ReadOrder::LeftRightThenDown,
                                        /*count=*/0, kIndexZeroHole, /*framesPerAnimation=*/0,
                                        AssetPolicy::Embed);
+    // The sheet's last row is padded with blank cells; only the glyphs are slots.
+    assets.glyphs = renderer.loadAtlas("assets/gfx/hud/glyphs.png", kCell,
+                                       ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                                       /*count=*/static_cast<int>(kGlyphOrder.size()), kIndexZeroHole,
+                                       /*framesPerAnimation=*/0, AssetPolicy::Embed);
 
     // The build bakes the first asset path in each statement, so every loader call is a statement of
     // its own.
@@ -66,6 +71,8 @@ Assets loadAssets(retropp::Renderer& renderer) {
     assets.palettes.enemy = renderer.loadPaletteImage("assets/palettes/sprites/enemy.png");
     assets.palettes.sword = renderer.loadPaletteImage("assets/palettes/sprites/sword.png");
     assets.palettes.hearts = renderer.loadPaletteImage("assets/palettes/hud/hearts.png");
+    assets.palettes.text = renderer.loadPaletteImage("assets/palettes/hud/text.png");
+    assets.palettes.shadow = renderer.loadPaletteImage("assets/palettes/hud/shadow.png");
 
     OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
@@ -128,6 +135,13 @@ Assets loadAssets(retropp::Renderer& renderer) {
         .down = walkRow(PlayerWalk::Down),
         .left = walkRow(PlayerWalk::Left),
         .right = walkRow(PlayerWalk::Right),
+    };
+
+    assets.font = TextKit::Font{
+        .sheet = assets.glyphs,
+        .glyphs = kGlyphOrder,
+        .palette = assets.palettes.text,
+        .shadow = assets.palettes.shadow,
     };
 
     return assets;
