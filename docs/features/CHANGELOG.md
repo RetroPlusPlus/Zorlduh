@@ -29,3 +29,7 @@ One row per feature status change, newest last.
 | 2026-11-11 | signs | — | 🧪 testing | `4d92478` | The meadow's wooden sign and the lake's stone rock, read with Item, each message in its own border while the world holds still; 6 tests |
 | 2026-11-11 | assets | 🧪 testing | 🧪 testing | `4d92478` | The wood and stone border sheets and palettes, the sign and rock tiles and their cells in the meadow and lake; 61 files (21 tests) |
 | 2026-11-11 | top-down-movement | 🧪 testing | 🧪 testing | `4d92478` | Facing follows the directions held whether or not the walker moves, so a walker pushing into a wall turns to face it; 31 tests |
+| 2026-11-13 | window-animation | — | 🧪 testing | `1f15898` | `Animation`, the five styles (grow, clip, squash, fade, slide), `Style` and `Animate`, a `Window` that takes an animation and draws nothing on the opening's first tick, a `Dialog` that runs its own box's animation; with a guide page and the example cycling the styles; 23 tests, one on a GPU device |
+| 2026-11-13 | window-kit | 🧪 testing | 🧪 testing | `1f15898` | Every piece of a box keyed by the box's size; a confirm finishes whatever a message is doing, the box opening and closing included; `close` plays the closing; 15 tests |
+| 2026-11-13 | signs | 🧪 testing | 🧪 testing | `1f15898` | Message boxes open and close over 300 ms; six signs on a grid in the shrine, each opening its box in one of the styles; 6 tests, and 5 more on the animation |
+| 2026-11-13 | assets | 🧪 testing | 🧪 testing | `1f15898` | The shrine's six sign cells on its maps; 61 files (21 tests) |

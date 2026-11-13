@@ -99,10 +99,15 @@ The template's verbs and systems:
   shows the current area's name, right-aligned, typed out again on entering each area.
 - **Windows and messages:** a window is a box of any size drawn from a sheet of border pieces of any
   size, with a game's sprites inside it, on one layer; a piece with less room than its own size is cut
-  where its room ends. A message is wrapped and cut into pages that fit its box, typed out, and turned
-  with one button, an arrow blinking while another page follows. Signs and rocks are read with Item from
-  beside them, the player turning to face one by pushing toward it; the world holds still while a message
-  is up, and each message is drawn in the border of what is read — wood for a sign, stone for a rock.
+  where its room ends. A window opens and closes over time in a style the game picks — growing from a
+  point, revealed through a clip, squashed, faded or slid — with what is inside it shown only once it is
+  open. A message is wrapped and cut into pages that fit its box, typed out, and turned with one button,
+  an arrow blinking while another page follows; that one button finishes whatever a message is doing,
+  the box opening and closing included. Signs and rocks are read with Item from beside them, the player
+  turning to face one by pushing toward it; a message's box opens over 300 ms and closes the same way,
+  the world holds still while a message is up, and each message is drawn in the border of what is read
+  — wood for a sign, stone for a rock. The meadow's sign and the lake's rock grow from the box's middle;
+  the shrine holds six signs on a grid, one for each style, each saying which it is.
 - **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
@@ -120,8 +125,10 @@ screen below the HUD strip), **camera** (the position in the current area shown 
 **actor** (anything spawned in an area), **cell** (one 8×8 tile position), **font** (a glyph sheet and
 the character of each of its cells), **glyph** (one character's cell, drawn as one sprite), **reveal**
 (how much of a passage has been typed out), **border** (a sheet of the pieces a box is drawn from, and
-its palette), **window** (a box and what is put inside it, on one layer), **message** (a passage read in
-a box, a page at a time), **sign** (a thing in the world that is read: a sign, a rock).
+its palette), **window** (a box and what is put inside it, on one layer), **animation** (of a window: how
+far open it is, opening and closing over time), **style** (how a window looks while its animation moves:
+grow, clip, squash, fade, slide or pop), **message** (a passage read in a box, a page at a time), **sign**
+(a thing in the world that is read: a sign, a rock).
 
 ## Hard constraints
 
@@ -162,7 +169,8 @@ a box, a page at a time), **sign** (a thing in the world that is read: a sign, a
   fits the same world.
 - Text is TextKit's, in `modules/TextKit/`, on the engine alone. Windows and messages are WindowKit's, in
   `modules/WindowKit/`, on the engine, LayerKit and TextKit; menus will be windows composed into menus,
-  in MenuKit. How a window appears and goes is not part of WindowKit yet: a window is shown or it is not.
+  in MenuKit. How a window opens and closes is WindowKit's too: an animation is state the tick advances,
+  a style is a function of it, and a message's box is opened and closed by the message itself.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved
