@@ -15,6 +15,11 @@ Recipes built on the module. Each assumes a `border`, a `font` and a frame being
 - [Several borders](#several-borders)
 - [A portrait beside a message](#a-portrait-beside-a-message)
 - [Closing a message from the game](#closing-a-message-from-the-game)
+- [A window that grows from a corner](#a-window-that-grows-from-a-corner)
+- [A window that slides in from the bottom of the screen](#a-window-that-slides-in-from-the-bottom-of-the-screen)
+- [A window that pops](#a-window-that-pops)
+- [The same style on every window](#the-same-style-on-every-window)
+- [Skipping an opening](#skipping-an-opening)
 
 ## A HUD panel
 
@@ -58,10 +63,12 @@ frame.layers.push_back(WindowKit::Window("item-detail", kMenuZ + 1, detailBox, b
 
 ## A message the player cannot skip
 
-Confirm only once the page is out, so the press shows nothing early and only turns the page.
+Confirm only once the box is open and the page is out, so the press opens nothing early, shows nothing
+early and closes nothing early: it only turns the page, or starts the close after the last.
 
 ```cpp
-state.dialog.advance(input.confirm && state.dialog.pageDone());
+const bool ready = state.dialog.animation.phase() == WindowKit::Phase::Open && state.dialog.pageDone();
+state.dialog.advance(input.confirm && ready);
 ```
 
 ## Another confirm button
@@ -122,10 +129,78 @@ frame.layers.push_back(WindowKit::Window("message", kMessageZ, kMessageBox, bord
 
 ## Closing a message from the game
 
-`close` ends a message at once, wherever it is: when the player is hit, when a scene ends.
+`close` closes a message wherever it is, as its last page's confirm does: the box closes over its length,
+and the message is gone once it has. Call it when the player is hit, when a scene ends.
 
 ```cpp
 if (playerWasHit) {
     state.dialog.close();
 }
 ```
+
+To have it gone on the same tick, close it and confirm, which finishes the closing:
+
+```cpp
+state.dialog.close();
+state.dialog.advance(true);
+```
+
+## A window that grows from a corner
+
+Grow from the point the window should appear out of: its own top-left, the corner of the screen it sits
+in, or the spot on screen it belongs to.
+
+```cpp
+WindowKit::Window("menu", kMenuZ, kMenuBox, border, state.menu,
+                  WindowKit::Style::grow({kMenuBox.x, kMenuBox.y}), {Items(state)});
+```
+
+`Style::clip` takes an origin the same way, revealing the whole box through a growing rectangle instead of
+drawing a smaller box.
+
+## A window that slides in from the bottom of the screen
+
+Slide from where the box's top-left starts: below the screen, at the box's own x.
+
+```cpp
+constexpr int kScreenHeight = 144;
+WindowKit::DialogBox("message", kMessageZ, kMessageBox, border, font, state.dialog,
+                     WindowKit::Style::slide({kMessageBox.x, kScreenHeight}));
+```
+
+The slide is the layer's scroll, so the whole window travels; a caller's own scroll is added to it.
+
+## A window that pops
+
+An animation with no length is instant: the window is open the moment it opens and gone the moment it
+closes, in any style. That is what a `Dialog` does until it is given a length, and what a game gets from
+an `Animation` it never sets.
+
+```cpp
+WindowKit::Animation menu;   // no duration, no ticks: pops
+```
+
+`Style::pop()` keeps a length and draws nothing moving: the box stands as it is while it opens and
+closes, with its contents only once it is open.
+
+## The same style on every window
+
+A `Style` is a value. Keep the game's with its layout and hand it to every window and message box.
+
+```cpp
+// render/layout.h
+inline const WindowKit::Style kWindowStyle = WindowKit::Style::grow();
+inline constexpr std::chrono::milliseconds kWindowTime{150};
+```
+
+## Skipping an opening
+
+A window a game draws itself finishes its opening or closing with `skip`:
+
+```cpp
+if (input.justPressed(Action::Item) && state.menu.moving()) {
+    state.menu.skip();
+}
+```
+
+A `Dialog` does this itself: a confirm while its box opens or closes finishes it.

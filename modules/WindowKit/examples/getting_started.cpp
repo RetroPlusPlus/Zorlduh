@@ -1,14 +1,19 @@
-// A complete program built on the WindowKit module: a window at the top with its own size written
-// inside it, which the arrow keys or a pad's directions grow and shrink a pixel at a time, and a
-// message box along the bottom with a three-page message typed out a character at a time. Space,
-// Return or a pad's A button shows the page at once, turns it, and closes the message after the last;
-// pressed again, it opens the message again.
+// A complete program built on the WindowKit module: a window at the top with its own size and the
+// message box's style written inside it, which the arrow keys or a pad's directions grow and shrink a
+// pixel at a time, and a message box along the bottom that opens over 300 ms and types a three-page
+// message out a character at a time. Space, Return or a pad's A button finishes whatever the message is
+// doing: opens the box at once, shows the page at once, turns it, closes the box after the last page, or
+// closes it at once; pressed again, it opens the message again. S or a pad's B button picks the next
+// style the box opens and closes in: grow, clip, squash, fade, slide, pop.
 //
 // The border is assets/border.png, a sheet of nine box pieces and an arrow; the font is
 // assets/font.png; their colors are the palette images in assets/palettes/. docs/getting-started.md
 // walks through it part by part.
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <iterator>
@@ -34,6 +39,7 @@
 
 #include "TextKit/font.h"
 #include "TextKit/text.h"
+#include "WindowKit/animate.h"
 #include "WindowKit/border.h"
 #include "WindowKit/dialog.h"
 #include "WindowKit/dialog_box.h"
@@ -41,7 +47,7 @@
 
 namespace {
 
-enum class Action : std::uint8_t { Wider, Narrower, Taller, Shorter, Next };
+enum class Action : std::uint8_t { Wider, Narrower, Taller, Shorter, Next, Style };
 
 // The characters of assets/font.png, one per cell, in the sheet's read order. The sheet's last row is
 // padded with blank cells, which are not loaded.
@@ -53,9 +59,24 @@ constexpr std::string_view kMessage =
     "Each page types out, and an arrow blinks while more follows. "
     "Press again to turn the page, or to close it after the last.";
 
-// Where the two windows sit on the screen.
+// Where the two windows sit on the screen, and how tall the screen is.
 constexpr retropp::IntRect kMessageBox{.x = 0, .y = 96, .width = 160, .height = 48};
 constexpr retropp::Vec2i kResizableAt{.x = 8, .y = 8};
+constexpr int kScreenHeight = 144;
+
+// The styles S cycles through, with the name each is written as.
+struct NamedStyle {
+    std::string_view name;
+    WindowKit::Style style;
+};
+const std::array<NamedStyle, 6> kStyles{{
+    {"GROW", WindowKit::Style::grow()},
+    {"CLIP", WindowKit::Style::clip()},
+    {"SQUASH", WindowKit::Style::squash()},
+    {"FADE", WindowKit::Style::fade()},
+    {"SLIDE", WindowKit::Style::slide({.x = kMessageBox.x, .y = kScreenHeight})},  // up from below the screen
+    {"POP", WindowKit::Style::pop()},
+}};
 
 // The bytes of a file under this example's assets/ directory.
 std::vector<std::uint8_t> readAsset(const std::string& name) {
@@ -93,6 +114,7 @@ int main() {
         {Action::Taller, {SDL_SCANCODE_DOWN, retropp::PadButton::DpadDown}},
         {Action::Shorter, {SDL_SCANCODE_UP, retropp::PadButton::DpadUp}},
         {Action::Next, {SDL_SCANCODE_SPACE, SDL_SCANCODE_RETURN, retropp::PadButton::FaceLabelA}},
+        {Action::Style, {SDL_SCANCODE_S, retropp::PadButton::FaceLabelB}},
     });
 
     // The border sheet: its cells are its pieces in the order of WindowKit::Piece, then the arrow.
@@ -116,11 +138,18 @@ int main() {
     // The room the message has: the message box with the border's thickness taken off each side.
     const retropp::IntRect messageRoom = WindowKit::inside(kMessageBox, border);
 
-    // The program's state: the resizable window's size, and the message being read.
+    // The program's state: the resizable window's size, the message being read, and the style its box
+    // is drawn in. The dialog is made after setActive, so its animation resolves 300 ms at the
+    // program's 60 Hz: 18 ticks.
     retropp::PixelSize size{.width = 93, .height = 41};
     WindowKit::Dialog dialog;
+    dialog.animation.duration = std::chrono::milliseconds{300};
     dialog.open(kMessage, {.width = messageRoom.width, .height = messageRoom.height}, font);
+    std::size_t style = 0;
     loop.simTick([&](const retropp::InputState& input) {
+        if (input.justPressed(Action::Style)) {
+            style = (style + 1) % kStyles.size();
+        }
         if (input.justPressed(Action::Wider)) {
             size.width = std::min(size.width + 1, 160 - 2 * kResizableAt.x);
         }
@@ -147,11 +176,12 @@ int main() {
     loop.renderLoop([&] {
         const retropp::IntRect box{.x = kResizableAt.x, .y = kResizableAt.y, .width = size.width, .height = size.height};
         const retropp::IntRect room = WindowKit::inside(box, border);
-        const std::string label = std::to_string(size.width) + " X " + std::to_string(size.height);
+        const std::string label = std::to_string(size.width) + " X " + std::to_string(size.height) + "\n" +
+                                  std::string(kStyles[style].name);
         frame.layers = {
             WindowKit::Window("resizable", 0, box, border,
-                              {TextKit::Text("resizable:size", label, {.x = room.x, .y = room.y}, font)}),
-            WindowKit::DialogBox("message", 1, kMessageBox, border, font, dialog),
+                              {TextKit::Text("resizable:label", label, {.x = room.x, .y = room.y}, font)}),
+            WindowKit::DialogBox("message", 1, kMessageBox, border, font, dialog, kStyles[style].style),
         };
         renderer.renderFrame(frame);
     });

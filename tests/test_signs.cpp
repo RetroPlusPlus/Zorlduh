@@ -20,6 +20,7 @@
 
 #include "TextKit/font.h"
 #include "TopDownMovement/walker.h"
+#include "WindowKit/animation.h"
 #include "WindowKit/border.h"
 
 #include "assets/assets.h"
@@ -122,6 +123,13 @@ zorlduh::GameState standing(const zorlduh::Config& config, Vec2i at, Dir facing)
     return state;
 }
 
+// Ticks with nothing pressed until the message's box has opened.
+void untilOpen(zorlduh::GameState& state, const zorlduh::Config& config) {
+    for (int i = 0; i < 100 && state.dialog.animation.phase() != WindowKit::Phase::Open; ++i) {
+        zorlduh::tick(state, zorlduh::Input{}, config);
+    }
+}
+
 TopDownMovement::DirectionalInput Hold(TopDownMovement::Directions held) {
     return TopDownMovement::DirectionalInput{.held = held, .pressed = held};
 }
@@ -139,7 +147,7 @@ constexpr Vec2i kBelowTheSign{.x = 44, .y = 32};
 
 TEST(Signs, TheMeadowHasAWoodenSignAndTheLakeAStoneRockEachSolidOnItsMaps) {
     const std::span<const zorlduh::Sign> all = zorlduh::signs();
-    ASSERT_EQ(all.size(), 2u);
+    ASSERT_EQ(all.size(), 8u);  // these two and the shrine's six
     EXPECT_EQ(all[0].area, Area::Meadow);
     EXPECT_EQ(all[0].cell, (Vec2i{6, 4}));
     EXPECT_EQ(all[0].material, Material::Wood);
@@ -185,9 +193,11 @@ TEST(Signs, ItemFacingTheSignOpensItsMessageAndTheWorldHoldsStill) {
     zorlduh::GameState state = standing(config, kBelowTheSign, Dir::Up);
     zorlduh::tick(state, zorlduh::Input{.item = true}, config);
     ASSERT_TRUE(state.dialog.showing());
+    EXPECT_EQ(state.dialog.animation.phase(), WindowKit::Phase::Opening);
     EXPECT_EQ(state.dialog.page(), 0u);
     EXPECT_EQ(state.dialog.shown(), 0u);  // the press that opens it is not its first confirm
     EXPECT_EQ(state.reading, Material::Wood);
+    // Through the opening and the typing, the world holds still.
     for (int i = 0; i < 30; ++i) {
         zorlduh::tick(state, zorlduh::Input{.move = Hold({.left = true})}, config);
     }
@@ -202,12 +212,18 @@ TEST(Signs, ItemShowsEachPageTurnsItAndClosesTheMessageAfterTheLast) {
     zorlduh::tick(state, zorlduh::Input{.item = true}, config);
     // 144×32 inside the box's 8 px border: 18 characters by 4 lines, four pages of the meadow's sign.
     EXPECT_EQ(state.dialog.pageCount(), 4u);
+    zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // opens the box at once
+    EXPECT_EQ(state.dialog.animation.phase(), WindowKit::Phase::Open);
+    EXPECT_EQ(state.dialog.shown(), 0u);
     for (std::size_t page = 0; page < 4; ++page) {
         EXPECT_EQ(state.dialog.page(), page);
         zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // shows the page whole
         EXPECT_TRUE(state.dialog.pageDone());
-        zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // turns it, or closes after the last
+        zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // turns it, or starts the close after the last
     }
+    EXPECT_TRUE(state.dialog.showing());
+    EXPECT_EQ(state.dialog.animation.phase(), WindowKit::Phase::Closing);
+    zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // closes the box at once
     EXPECT_FALSE(state.dialog.showing());
     zorlduh::tick(state, zorlduh::Input{.move = Hold({.left = true})}, config);
     EXPECT_EQ(state.player.position(), (Vec2i{kBelowTheSign.x - 1, kBelowTheSign.y}));
@@ -240,11 +256,12 @@ TEST(Signs, TheMessageBoxIsDrawnInTheBorderOfWhatIsRead) {
     EXPECT_TRUE(std::get<retropp::SpriteContent>(closed.content).sprites.empty());
 
     zorlduh::tick(state, zorlduh::Input{.item = true}, config);
+    untilOpen(state, config);
     const retropp::DrawLayer wood = zorlduh::Dialog(state, assets, 21);
     const std::span<const retropp::Sprite> woodSprites = std::get<retropp::SpriteContent>(wood.content).sprites;
     const retropp::Sprite* corner = nullptr;
     for (const retropp::Sprite& sprite : woodSprites) {
-        if (std::string_view(sprite.key) == "dialog:box:top-left") {
+        if (std::string_view(sprite.key) == "dialog:box:top-left:160x48") {
             corner = &sprite;
         }
     }
@@ -261,7 +278,9 @@ TEST(Signs, TheMessageBoxIsDrawnInTheBorderOfWhatIsRead) {
     ASSERT_TRUE(atTheRock.dialog.showing());
     EXPECT_EQ(atTheRock.reading, Material::Stone);
     EXPECT_EQ(atTheRock.dialog.pageCount(), 2u);
+    untilOpen(atTheRock, config);
     const retropp::DrawLayer stone = zorlduh::Dialog(atTheRock, assets, 21);
+    ASSERT_FALSE(std::get<retropp::SpriteContent>(stone.content).sprites.empty());
     EXPECT_EQ(std::get<retropp::SpriteContent>(stone.content).sprites.front().atlas,
               assets.borders.stone.sheet.atlasId);
     EXPECT_GT(zorlduh::DialogZ(config.world), zorlduh::HudZ(config.world));

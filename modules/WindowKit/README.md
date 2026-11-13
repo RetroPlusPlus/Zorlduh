@@ -1,8 +1,9 @@
 # WindowKit — windows and message boxes
 
 `WindowKit` draws a box of any size from a sheet of border pieces, puts a game's sprites inside it as
-one layer, and runs a message box: a passage wrapped and paged to the box, typed out a character at a
-time, with an arrow while another page follows. It is for games on the
+one layer, opens and closes it over time — growing, clipped, squashed, faded or slid — and runs a message
+box: a passage wrapped and paged to the box, typed out a character at a time, with an arrow while another
+page follows. It is for games on the
 [Polyrhythm](https://github.com/RetroPlusPlus/Polyrhythm) engine, and builds on the LayerKit and TextKit
 modules.
 
@@ -27,7 +28,9 @@ frame.layers.push_back(WindowKit::DialogBox("message", kMessageZ, box, border, f
 | `thickness`, `inside` | the border's thickness; the room a box leaves inside it | [docs/window.md](docs/window.md#thickness-and-inside) |
 | `Box` | a rectangle of any size filled and framed by the pieces, as sprites | [docs/window.md](docs/window.md#box) |
 | `Window` | a box and the sprites a game puts inside it, as one sprite layer | [docs/window.md](docs/window.md#window) |
-| `Dialog` | a message being read: its pages, the page up, how much is typed | [docs/dialog.md](docs/dialog.md#dialog) |
+| `Animation`, `Phase` | a window opening and closing over time: how far open it is | [docs/animation.md](docs/animation.md#animation) |
+| `Grow`, `Clip`, `Squash`, `Fade`, `Slide`, `Style`, `Animate` | the styles a window opens and closes in | [docs/animation.md](docs/animation.md#the-styles) |
+| `Dialog` | a message being read: its box opening and closing, its pages, the page up, how much is typed | [docs/dialog.md](docs/dialog.md#dialog) |
 | `DialogText`, `DialogArrow`, `DialogBox` | the page, the arrow, and the whole message box | [docs/dialog.md](docs/dialog.md#drawing-a-message) |
 
 The module is header-only, depends on the engine (`retropp::engine`), LayerKit (`LayerKit::LayerKit`) and
@@ -63,6 +66,8 @@ modules/WindowKit/
     border.h                        Piece, kArrowSlot, Border, thickness, inside
     box.h                           Box
     window.h                        Window
+    animation.h                     Phase, Animation
+    animate.h                       Grow, Clip, Squash, Fade, Slide, middle, Style, Animated, Animate
     dialog.h                        Dialog
     dialog_box.h                    DialogText, DialogArrow, DialogBox
   examples/getting_started.cpp      the getting-started program
@@ -70,5 +75,6 @@ modules/WindowKit/
   docs/                             the guide
 ```
 
-`border.h` and `dialog.h` build no draw type, so a game's simulation can hold a `Border` and a `Dialog`.
-`box.h`, `window.h` and `dialog_box.h` return sprites and layers.
+`border.h`, `animation.h` and `dialog.h` build no draw type, so a game's simulation can hold a `Border`,
+an `Animation` and a `Dialog`. `box.h`, `animate.h`, `window.h` and `dialog_box.h` return sprites, regions,
+transforms and layers.

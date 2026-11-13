@@ -86,14 +86,13 @@ namespace detail {
 // over the fill. Each sprite is its slot's tile and size from the border's sheet, through the border's
 // palette.
 //
-// Keys name each piece's place in the box: "<key>:fill:<column>:<row>", "<key>:top:<n>",
-// "<key>:left:<n>" and "<key>:top-left" for the pieces placed from the box's top-left, which keep their
-// keys as the box changes size. The pieces placed from its right or bottom also carry the box's size —
-// "<key>:bottom:<n>:<width>x<height>", "<key>:right:<n>:<width>x<height>",
-// "<key>:top-right:<width>x<height>", "<key>:bottom-left:<width>x<height>",
-// "<key>:bottom-right:<width>x<height>" — so a box drawn at a new size has them in place on the frame it
-// changes, as its cuts are: the renderer eases a sprite's position between ticks by its key but never
-// its regions. A box that moves at one size keeps every key, and all of it eases together.
+// Keys name each piece's place in the box and the box's size: "<key>:fill:<column>:<row>:<size>",
+// "<key>:top:<n>:<size>", "<key>:bottom:<n>:<size>", "<key>:left:<n>:<size>", "<key>:right:<n>:<size>",
+// "<key>:top-left:<size>", "<key>:top-right:<size>", "<key>:bottom-left:<size>" and
+// "<key>:bottom-right:<size>", where <size> is "<width>x<height>". The renderer eases a sprite's
+// position between ticks by its key but never its regions, so a box drawn at a new size is drawn whole
+// on the tick it changes, every piece in place with its cut, wherever the box grows from. A box that
+// moves at one size keeps every key, and all of it eases together.
 //
 // A box with no width or no height, or a border whose sheet has fewer than nine slots, is no sprites.
 // Box never throws.
@@ -121,13 +120,14 @@ namespace detail {
         for (int y = room.y; y < room.y + room.height; y += fill.height, ++row) {
             int column = 0;
             for (int x = room.x; x < room.x + room.width; x += fill.width, ++column) {
-                sprites.push_back(detail::piece(name("fill:" + std::to_string(column) + ":" + std::to_string(row)),
-                                                border, Piece::Fill, x, y, z, room));
+                sprites.push_back(detail::piece(
+                    name("fill:" + std::to_string(column) + ":" + std::to_string(row) + sized), border, Piece::Fill,
+                    x, y, z, room));
             }
         }
     }
 
-    const auto across = [&](Piece which, std::string_view part, std::string_view suffix, int y) {
+    const auto across = [&](Piece which, std::string_view part, int y) {
         const int step = size(which).width;
         if (step <= 0) {
             return;
@@ -135,11 +135,11 @@ namespace detail {
         const retropp::IntRect keep{.x = spanLeft, .y = box.y, .width = spanRight - spanLeft, .height = box.height};
         int n = 0;
         for (int x = spanLeft; x < spanRight; x += step, ++n) {
-            sprites.push_back(detail::piece(name(std::string(part) + ":" + std::to_string(n) + std::string(suffix)),
+            sprites.push_back(detail::piece(name(std::string(part) + ":" + std::to_string(n) + sized),
                                             border, which, x, y, z, keep));
         }
     };
-    const auto down = [&](Piece which, std::string_view part, std::string_view suffix, int x) {
+    const auto down = [&](Piece which, std::string_view part, int x) {
         const int step = size(which).height;
         if (step <= 0) {
             return;
@@ -147,16 +147,16 @@ namespace detail {
         const retropp::IntRect keep{.x = box.x, .y = spanTop, .width = box.width, .height = spanBottom - spanTop};
         int n = 0;
         for (int y = spanTop; y < spanBottom; y += step, ++n) {
-            sprites.push_back(detail::piece(name(std::string(part) + ":" + std::to_string(n) + std::string(suffix)),
+            sprites.push_back(detail::piece(name(std::string(part) + ":" + std::to_string(n) + sized),
                                             border, which, x, y, z, keep));
         }
     };
-    across(Piece::Top, "top", "", box.y);
-    across(Piece::Bottom, "bottom", sized, bottom - size(Piece::Bottom).height);
-    down(Piece::Left, "left", "", box.x);
-    down(Piece::Right, "right", sized, right - size(Piece::Right).width);
+    across(Piece::Top, "top", box.y);
+    across(Piece::Bottom, "bottom", bottom - size(Piece::Bottom).height);
+    down(Piece::Left, "left", box.x);
+    down(Piece::Right, "right", right - size(Piece::Right).width);
 
-    sprites.push_back(detail::piece(name("top-left"), border, Piece::TopLeft, box.x, box.y, z, box));
+    sprites.push_back(detail::piece(name("top-left" + sized), border, Piece::TopLeft, box.x, box.y, z, box));
     sprites.push_back(detail::piece(name("top-right" + sized), border, Piece::TopRight,
                                     right - size(Piece::TopRight).width, box.y, z, box));
     sprites.push_back(detail::piece(name("bottom-left" + sized), border, Piece::BottomLeft, box.x,

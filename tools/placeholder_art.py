@@ -1114,8 +1114,10 @@ LAYOUTS = {
         # One and a half play areas wide: not a multiple of the screen.
         # The forest path in its south wall scrolls down into SeamlessForest.
         "field": dict(size=(30, 16), doorways=row(0, 8, 11) + column(29, 3, 6) + row(15, 13, 16)),
-        # Smaller than the play area on both axes: centered on screen.
-        "shrine": dict(size=(12, 10), doorways=column(0, 3, 6)),
+        # Smaller than the play area on both axes: centered on screen. Six signs on a grid of three
+        # columns and two rows, each read in a message box that opens and closes in a style of its own.
+        "shrine": dict(size=(12, 10), doorways=column(0, 3, 6),
+                       signs=[(x, y) for y in (2, 6) for x in (3, 6, 9)]),
         # Reached by a fade from the meadow's cave mouth; the stairs lead back up.
         "cave": dict(size=(12, 10), stairs=[(5, 4), (6, 4)]),
     },

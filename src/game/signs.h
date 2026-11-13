@@ -15,12 +15,19 @@ namespace zorlduh {
 // What a readable thing is made of: the border its message is drawn in.
 enum class Material { Wood, Stone };
 
-// A readable thing: where it stands, what it is made of, and what it says.
+// How a readable thing's message box opens and closes: grown from its middle, revealed through a
+// rectangle growing from its middle, squashed to a line across its middle, faded, slid up from below
+// the screen, or standing as it is.
+enum class MessageStyle { Grow, Clip, Squash, Fade, Slide, Pop };
+
+// A readable thing: where it stands, what it is made of, how its message box opens and closes, and what
+// it says.
 struct Sign {
     Layout layout;
     int area;              // an Area in the overworld, a Room in DungeonOne, a Woods in SeamlessForest
     retropp::Vec2i cell;   // the cell it stands on, in the area's cells
     Material material;
+    MessageStyle style = MessageStyle::Grow;
     std::string_view text;
 };
 

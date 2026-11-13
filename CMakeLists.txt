@@ -149,7 +149,9 @@ zorlduh_add_test(areas)
 zorlduh_add_test(TextKit)
 zorlduh_add_test(area_name)
 zorlduh_add_test(WindowKit)
+zorlduh_add_test(WindowKit_animation)
 zorlduh_add_test(signs)
+zorlduh_add_test(signs_animation)
 # The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE

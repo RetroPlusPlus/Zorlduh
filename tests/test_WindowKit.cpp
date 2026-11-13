@@ -135,8 +135,9 @@ TEST(Box, ABoxThatFitsItsPiecesIsNineUncutPiecesInOrder) {
     const WindowKit::Border b = border(8, 10);
     const std::vector<Sprite> sprites = WindowKit::Box("w", {.x = 10, .y = 20, .width = 24, .height = 24}, b);
     EXPECT_EQ(keys(sprites), (std::vector<std::string>{
-                                 "w:fill:0:0", "w:top:0", "w:bottom:0:24x24", "w:left:0", "w:right:0:24x24",
-                                 "w:top-left", "w:top-right:24x24", "w:bottom-left:24x24", "w:bottom-right:24x24"}));
+                                 "w:fill:0:0:24x24", "w:top:0:24x24", "w:bottom:0:24x24", "w:left:0:24x24",
+                                 "w:right:0:24x24", "w:top-left:24x24", "w:top-right:24x24", "w:bottom-left:24x24",
+                                 "w:bottom-right:24x24"}));
     const struct {
         Piece piece;
         int x;
@@ -164,16 +165,16 @@ TEST(Box, EachRepeatPastTheEndOfItsSpanIsCutThere) {
     // Fill: the room is 77×25 at (8, 8): ten columns, four rows.
     EXPECT_EQ(sprites.size(), 40u + 10u + 10u + 4u + 4u + 4u);
     EXPECT_TRUE(sprites[0].regions.empty());
-    expectCut(*find(sprites, "w:fill:9:0"), {rect(5, 0, 3, 8)});               // 5 px left in the room
-    expectCut(*find(sprites, "w:fill:0:3"), {rect(0, 1, 8, 7)});               // 1 px left
-    expectCut(*find(sprites, "w:fill:9:3"), {rect(5, 0, 3, 8), rect(0, 1, 8, 7)});  // right, then bottom
-    EXPECT_EQ(find(sprites, "w:fill:10:0"), nullptr);
-    EXPECT_EQ(find(sprites, "w:fill:0:4"), nullptr);
+    expectCut(*find(sprites, "w:fill:9:0:93x41"), {rect(5, 0, 3, 8)});               // 5 px left in the room
+    expectCut(*find(sprites, "w:fill:0:3:93x41"), {rect(0, 1, 8, 7)});               // 1 px left
+    expectCut(*find(sprites, "w:fill:9:3:93x41"), {rect(5, 0, 3, 8), rect(0, 1, 8, 7)});  // right, then bottom
+    EXPECT_EQ(find(sprites, "w:fill:10:0:93x41"), nullptr);
+    EXPECT_EQ(find(sprites, "w:fill:0:4:93x41"), nullptr);
     // The top edge: ten repeats from x 8, the tenth at 80 cut at 85.
-    EXPECT_EQ(find(sprites, "w:top:9")->x, 80);
-    expectCut(*find(sprites, "w:top:9"), {rect(5, 0, 3, 8)});
-    EXPECT_TRUE(find(sprites, "w:top:8")->regions.empty());
-    EXPECT_EQ(find(sprites, "w:top:10"), nullptr);
+    EXPECT_EQ(find(sprites, "w:top:9:93x41")->x, 80);
+    expectCut(*find(sprites, "w:top:9:93x41"), {rect(5, 0, 3, 8)});
+    EXPECT_TRUE(find(sprites, "w:top:8:93x41")->regions.empty());
+    EXPECT_EQ(find(sprites, "w:top:10:93x41"), nullptr);
     // The bottom and right edges against the box's bottom and right.
     EXPECT_EQ(find(sprites, "w:bottom:0:93x41")->y, 33);
     EXPECT_EQ(find(sprites, "w:right:0:93x41")->x, 85);
@@ -186,29 +187,29 @@ TEST(Box, EachRepeatPastTheEndOfItsSpanIsCutThere) {
 TEST(Box, ABorderOfLargerPiecesRepeatsAndCutsAtItsOwnSize) {
     const WindowKit::Border b = border(16, 9);
     const std::vector<Sprite> sprites = WindowKit::Box("w", {.x = 0, .y = 0, .width = 50, .height = 50}, b);
-    EXPECT_EQ(find(sprites, "w:top-left")->size, (retropp::AssetDimensions{.width = 16, .height = 16}));
+    EXPECT_EQ(find(sprites, "w:top-left:50x50")->size, (retropp::AssetDimensions{.width = 16, .height = 16}));
     EXPECT_EQ(find(sprites, "w:top-right:50x50")->x, 34);
-    EXPECT_EQ(find(sprites, "w:top:1")->x, 32);
-    expectCut(*find(sprites, "w:top:1"), {rect(2, 0, 14, 16)});
-    EXPECT_EQ(find(sprites, "w:top:2"), nullptr);
-    expectCut(*find(sprites, "w:left:1"), {rect(0, 2, 16, 14)});
-    expectCut(*find(sprites, "w:fill:1:1"), {rect(2, 0, 14, 16), rect(0, 2, 16, 14)});
-    EXPECT_EQ(find(sprites, "w:fill:2:0"), nullptr);
+    EXPECT_EQ(find(sprites, "w:top:1:50x50")->x, 32);
+    expectCut(*find(sprites, "w:top:1:50x50"), {rect(2, 0, 14, 16)});
+    EXPECT_EQ(find(sprites, "w:top:2:50x50"), nullptr);
+    expectCut(*find(sprites, "w:left:1:50x50"), {rect(0, 2, 16, 14)});
+    expectCut(*find(sprites, "w:fill:1:1:50x50"), {rect(2, 0, 14, 16), rect(0, 2, 16, 14)});
+    EXPECT_EQ(find(sprites, "w:fill:2:0:50x50"), nullptr);
 }
 
 TEST(Box, SmallBoxesOverlapOrCutTheirCornersAndEmptyOnesAreNothing) {
     const WindowKit::Border b = border(8, 10);
     // Narrower than two corners: they overlap, the right after the left, and no edge repeats across.
     const std::vector<Sprite> narrow = WindowKit::Box("w", {.x = 0, .y = 0, .width = 12, .height = 24}, b);
-    EXPECT_EQ(find(narrow, "w:top:0"), nullptr);
+    EXPECT_EQ(find(narrow, "w:top:0:12x24"), nullptr);
     EXPECT_EQ(find(narrow, "w:top-right:12x24")->x, 4);
     EXPECT_TRUE(find(narrow, "w:top-right:12x24")->regions.empty());
     const std::vector<std::string> order = keys(narrow);
-    EXPECT_LT(std::find(order.begin(), order.end(), "w:top-left"),
+    EXPECT_LT(std::find(order.begin(), order.end(), "w:top-left:12x24"),
               std::find(order.begin(), order.end(), "w:top-right:12x24"));
     // Narrower than one corner: each corner is cut to the box.
     const std::vector<Sprite> thin = WindowKit::Box("w", {.x = 0, .y = 0, .width = 5, .height = 24}, b);
-    expectCut(*find(thin, "w:top-left"), {rect(5, 0, 3, 8)});
+    expectCut(*find(thin, "w:top-left:5x24"), {rect(5, 0, 3, 8)});
     EXPECT_EQ(find(thin, "w:top-right:5x24")->x, -3);
     expectCut(*find(thin, "w:top-right:5x24"), {rect(0, 0, 3, 8)});
     // Nothing to draw.
@@ -217,21 +218,21 @@ TEST(Box, SmallBoxesOverlapOrCutTheirCornersAndEmptyOnesAreNothing) {
     EXPECT_TRUE(WindowKit::Box("w", {.x = 0, .y = 0, .width = 24, .height = 24}, border(8, 8)).empty());
 }
 
-TEST(Box, EveryPieceIsAtZAndTheTopLeftPiecesKeepTheirKeysAsTheBoxGrows) {
+TEST(Box, EveryPieceIsAtZAndCarriesTheBoxsSizeInItsKey) {
     const WindowKit::Border b = border(8, 10);
     const std::vector<Sprite> narrow = WindowKit::Box("w", {.x = 0, .y = 0, .width = 24, .height = 24}, b, 7);
     const std::vector<Sprite> wide = WindowKit::Box("w", {.x = 0, .y = 0, .width = 32, .height = 24}, b, 7);
     for (const Sprite& sprite : wide) {
         EXPECT_EQ(sprite.z, 7) << std::string_view(sprite.key);
+        EXPECT_TRUE(std::string_view(sprite.key).ends_with(":32x24")) << std::string_view(sprite.key);
     }
-    for (const char* key : {"w:fill:0:0", "w:top:0", "w:left:0", "w:top-left"}) {
-        EXPECT_NE(find(narrow, key), nullptr) << key;
-        EXPECT_NE(find(wide, key), nullptr) << key;
+    for (const Sprite& sprite : narrow) {
+        EXPECT_TRUE(std::string_view(sprite.key).ends_with(":24x24")) << std::string_view(sprite.key);
     }
-    // The pieces placed from the right carry the size, so a resize puts them in place at once.
-    EXPECT_NE(find(narrow, "w:right:0:24x24"), nullptr);
-    EXPECT_EQ(find(wide, "w:right:0:24x24"), nullptr);
-    EXPECT_NE(find(wide, "w:right:0:32x24"), nullptr);
+    // A box at another size shares no key with it, so every piece is drawn in place on the tick it changes.
+    for (const std::string& key : keys(narrow)) {
+        EXPECT_EQ(find(wide, key), nullptr) << key;
+    }
     // A box that only moves keeps every key.
     EXPECT_EQ(keys(WindowKit::Box("w", {.x = 40, .y = 9, .width = 24, .height = 24}, b, 7)), keys(narrow));
 }
@@ -413,7 +414,7 @@ TEST(DialogBox, IsAnEmptyLayerWhileClosedAndTheBoxTextAndArrowWhileShowing) {
     const retropp::DrawLayer showing = WindowKit::DialogBox("dialog", 20, box, b, font(), dialog);
     const std::span<const Sprite> sprites = spritesOf(showing);
     ASSERT_FALSE(sprites.empty());
-    EXPECT_EQ(std::string_view(sprites.front().key), "dialog:box:fill:0:0");
+    EXPECT_EQ(std::string_view(sprites.front().key), "dialog:box:fill:0:0:160x48");
     EXPECT_EQ(std::string_view(sprites.back().key), "dialog:arrow:0");
     EXPECT_EQ(sprites.back().z, 1);
     const Sprite* first = nullptr;

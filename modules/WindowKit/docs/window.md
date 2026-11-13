@@ -5,7 +5,7 @@ Reference for `border.h`, `box.h` and `window.h`.
 ```cpp
 #include "WindowKit/border.h"   // Piece, kArrowSlot, Border, thickness, inside
 #include "WindowKit/box.h"      // Box
-#include "WindowKit/window.h"   // Window
+#include "WindowKit/window.h"   // Window, plain and with an animation
 ```
 
 ## Contents
@@ -15,6 +15,7 @@ Reference for `border.h`, `box.h` and `window.h`.
 - [Box](#box)
 - [Worked boxes](#worked-boxes)
 - [Window](#window)
+  - [With an animation](#with-an-animation)
 
 ## Border
 
@@ -94,24 +95,25 @@ width or no height, or a border whose sheet has fewer than nine slots, is no spr
 top-right, bottom-left, bottom-right), all at `z`: equal z keeps that order, so the corners draw over the
 edges and the edges over the fill.
 
-**Keys.** Each piece is keyed by its place in the box:
+**Keys.** Each piece is keyed by its place in the box and the box's size, `<width>` and `<height>` being
+the box's:
 
 | Piece | Key |
 |---|---|
-| fill, column c, row r | `"<key>:fill:<c>:<r>"` |
-| top edge, repeat n | `"<key>:top:<n>"` |
-| left edge, repeat n | `"<key>:left:<n>"` |
-| top-left corner | `"<key>:top-left"` |
+| fill, column c, row r | `"<key>:fill:<c>:<r>:<width>x<height>"` |
+| top edge, repeat n | `"<key>:top:<n>:<width>x<height>"` |
 | bottom edge, repeat n | `"<key>:bottom:<n>:<width>x<height>"` |
+| left edge, repeat n | `"<key>:left:<n>:<width>x<height>"` |
 | right edge, repeat n | `"<key>:right:<n>:<width>x<height>"` |
+| top-left corner | `"<key>:top-left:<width>x<height>"` |
 | top-right corner | `"<key>:top-right:<width>x<height>"` |
 | bottom-left corner | `"<key>:bottom-left:<width>x<height>"` |
 | bottom-right corner | `"<key>:bottom-right:<width>x<height>"` |
 
-The pieces laid from the box's right or bottom carry its size, `<width>` and `<height>` being the box's.
-A box that moves at one size keeps every key, and the engine eases all of it together; a box drawn at a
-new size has those pieces in place on the frame it changes, as its cuts are, because the engine eases a
-sprite's position between ticks but never its regions ([concepts.md](concepts.md#keys-by-place)).
+A box that moves at one size keeps every key, and the engine eases all of it together. A box drawn at a
+new size shares no key with the box before it, so it is drawn whole on the tick it changes, every piece in
+place with its cut, whichever way it grew: the engine eases a sprite's position between ticks but never
+its regions ([concepts.md](concepts.md#keys-by-place)).
 
 **Each sprite** is its slot's `tile` and `size` from the border's sheet, its `atlas`, and the border's
 `palette`, with `x`/`y` the piece's top-left.
@@ -124,12 +126,12 @@ Over a border of 8×8 pieces:
 
 | Key | At |
 |---|---|
-| `w:fill:0:0` | (18, 28) |
-| `w:top:0` | (18, 20) |
+| `w:fill:0:0:24x24` | (18, 28) |
+| `w:top:0:24x24` | (18, 20) |
 | `w:bottom:0:24x24` | (18, 36) |
-| `w:left:0` | (10, 28) |
+| `w:left:0:24x24` | (10, 28) |
 | `w:right:0:24x24` | (26, 28) |
-| `w:top-left` | (10, 20) |
+| `w:top-left:24x24` | (10, 20) |
 | `w:top-right:24x24` | (26, 20) |
 | `w:bottom-left:24x24` | (10, 36) |
 | `w:bottom-right:24x24` | (26, 36) |
@@ -172,3 +174,16 @@ frame.layers.push_back(WindowKit::Window("status", kHudZ, box, border,
                                          {TextKit::Text("status:name", "HERO", {room.x, room.y}, font),
                                           Hearts(state, {room.x, room.y + 8})}));
 ```
+
+### With an animation
+
+```cpp
+retropp::DrawLayer Window(std::string_view key, std::int32_t z, retropp::IntRect box, const Border& border,
+                          const Animation& animation, const Style& style,
+                          std::initializer_list<LayerKit::Sprites> children,
+                          LayerKit::LayerOptions options = {});
+```
+
+A window that opens and closes over time: while closed, an empty sprite layer keyed `key` at `z`; while
+it opens or closes, the box alone drawn in `style` for where `animation` is; once open, the plain `Window`
+with its children. The animation and the styles are on [animation.md](animation.md).

@@ -7,6 +7,7 @@
 //     zorlduh::tick(state, zorlduh::readInput(in), config);   // once per tick
 #pragma once
 
+#include <chrono>
 #include <variant>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include "TextKit/reveal.h"
 #include "TopDownMovement/directions.h"
 #include "TopDownMovement/walker.h"
+#include "WindowKit/animation.h"
 #include "WindowKit/border.h"
 #include "WindowKit/dialog.h"
 #include "WorldKit/area.h"
@@ -42,14 +44,18 @@ struct AreaChanged {
 };
 using GameEvent = std::variant<AreaChanged>;
 
+// How long a message's box takes to open, and to close.
+inline constexpr std::chrono::milliseconds kMessageAnimationTime{300};
+
 // What the game is: the player's walker config, the world, and what a message is read in. Built once
 // from the loaded assets.
 struct Config {
     TopDownMovement::WalkerConfig player;
     WorldKit::World world;
-    TextKit::Font font;           // a message's text
-    Borders borders;              // the border of each material
-    retropp::IntRect messageBox;  // where a message's box is, on screen
+    TextKit::Font font;                        // a message's text
+    Borders borders;                           // the border of each material
+    retropp::IntRect messageBox;               // where a message's box is, on screen
+    WindowKit::Animation messageAnimation;     // how a message's box opens and closes; a message starts with a copy
 };
 
 // The game's config over `assets`, with the world shown in `view`, its areas' layers and actor slots
@@ -66,15 +72,17 @@ struct GameState {
     TextKit::Reveal nameReveal;  // how much of the current area's name has been typed into the HUD strip
     WindowKit::Dialog dialog;    // the message being read, if any
     Material reading = Material::Wood;  // what the thing being read is made of: the border its message is in
+    MessageStyle readingStyle = MessageStyle::Grow;  // how the message being read opens and closes
     std::vector<GameEvent> events;
 };
 
-// One tick. While a message is showing, Item confirms it (shows the page, turns it, closes it after
-// the last) and nothing else moves. Otherwise the player walks the current area unless a scroll or fade
-// is running, the camera follows the player's collision box and moves the player through any opening
-// it goes out by, and entering an area is recorded as an AreaChanged event and starts its name typing
-// out again; then Item, with no scroll or fade running, opens the message of the sign or rock the
-// player faces. The name's reveal advances every tick.
+// One tick. While a message is showing, Item finishes whatever it is doing (opens the box at once, shows
+// the page, turns it, closes it after the last, closes the box at once) and nothing else moves.
+// Otherwise the player walks the current area unless a scroll or fade is running, the camera follows the
+// player's collision box and moves the player through any opening it goes out by, and entering an area
+// is recorded as an AreaChanged event and starts its name typing out again; then Item, with no scroll or
+// fade running, opens the message of the sign or rock the player faces, in the border of its material
+// and the style of its own. The name's reveal advances every tick.
 void tick(GameState& state, const Input& input, const Config& config);
 
 }  // namespace zorlduh

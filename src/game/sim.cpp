@@ -7,12 +7,15 @@
 namespace zorlduh {
 
 Config gameConfig(const Assets& assets, CameraKit::View view, const AreaDepths& depths, retropp::IntRect messageBox) {
+    WindowKit::Animation messageAnimation;
+    messageAnimation.duration = kMessageAnimationTime;
     return Config{
         .player = PlayerConfig(assets),
         .world = gameWorld(assets, view, depths),
         .font = assets.font,
         .borders = assets.borders,
         .messageBox = messageBox,
+        .messageAnimation = messageAnimation,
     };
 }
 
@@ -51,6 +54,8 @@ void tick(GameState& state, const Input& input, const Config& config) {
         if (sign != nullptr) {
             const retropp::IntRect room = WindowKit::inside(config.messageBox, borderOf(config.borders, sign->material));
             state.reading = sign->material;
+            state.readingStyle = sign->style;
+            state.dialog.animation = config.messageAnimation;
             state.dialog.open(sign->text, {.width = room.width, .height = room.height}, config.font);
         }
     }
