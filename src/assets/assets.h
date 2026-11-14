@@ -123,14 +123,18 @@ struct Palettes {
     retropp::PaletteId hearts{};
     retropp::PaletteId text{};    // the glyphs: white; entry 0 is never drawn
     retropp::PaletteId shadow{};  // the glyphs' shadow: black; entry 0 is never drawn
+    retropp::PaletteId textDim{};       // a disabled menu item's glyphs: gray; entry 0 is never drawn
+    retropp::PaletteId textSelected{};  // the menu item under the cursor's glyphs: gold; entry 0 is never drawn
     retropp::PaletteId woodBorder{};   // the wood border: outline and panel, wood, grain; entry 0 is never drawn
     retropp::PaletteId stoneBorder{};  // the stone border: outline and panel, stone, highlight; entry 0 is never drawn
+    retropp::PaletteId plainBorder{};  // the menus' border: panel, line, arrow; entry 0 is never drawn
 };
 
-// The borders a message box is drawn in, each its sheet through its palette.
+// The borders a window is drawn in, each its sheet through its palette.
 struct Borders {
-    WindowKit::Border wood;   // a sign's
-    WindowKit::Border stone;  // a rock's
+    WindowKit::Border wood;   // a sign's message
+    WindowKit::Border stone;  // a rock's message
+    WindowKit::Border plain;  // the menus'
 };
 
 // One area's maps: the same size, one WorldCell value per cell in `tiles` and one CollisionCell value
@@ -193,10 +197,13 @@ struct Assets {
     retropp::AtlasManifest woodBorder;   // Tileset of 8×8 cells: the nine pieces in WindowKit::Piece
                                          // order, then the arrow
     retropp::AtlasManifest stoneBorder;  // the same, in stone
+    retropp::AtlasManifest plainBorder;  // the same, a plain line: the menus'
     Palettes palettes;
     AreaMapSet areas;
     TextKit::Font font;              // the glyph sheet as kGlyphOrder, through the text palette with
                                      // the shadow palette beneath
+    TextKit::Font dimFont;           // `font` through the dim text palette: a disabled menu item's
+    TextKit::Font selectedFont;      // `font` through the selected text palette: the item under the cursor
     Borders borders;                 // each border sheet through its palette
 };
 

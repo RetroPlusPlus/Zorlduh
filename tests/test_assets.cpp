@@ -128,7 +128,7 @@ TEST(Assets, EveryFileIsBakedIntoTheBinary) {
         const std::span<const std::uint8_t> baked = retropp::detail::findEmbeddedAsset(logical);
         EXPECT_TRUE(std::equal(baked.begin(), baked.end(), onDisk.begin(), onDisk.end())) << logical;
     }
-    EXPECT_EQ(files, 61);
+    EXPECT_EQ(files, 65);
 }
 
 // ── Sheets ───────────────────────────────────────────────────────────────────────────────────
@@ -260,6 +260,38 @@ TEST(Assets, GlyphSheetIsOneDistinctGlyphPerCharacterWithRoomForItsShadow) {
     }
 }
 
+// The menus' border: ten 8×8 slots three to a row, the nine pieces of a box and the arrow. Its line is
+// index 2, one pixel in from the box's edge, around a panel of index 1, with no transparent pixel in a
+// piece; the arrow is drawn in index 3.
+TEST(Assets, PlainBorderSheetIsALineAroundAFlatPanelAndTheArrow) {
+    const LoadedImage sheet = decode("gfx/hud/plain-border.png");
+    EXPECT_EQ(sheet.width, 24);
+    EXPECT_EQ(sheet.height, 32);
+    expectIndicesOnly(sheet);
+    const std::vector<retropp::AssetSlot> slots =
+        retropp::sliceLayout({.width = sheet.width, .height = sheet.height}, {.width = 8, .height = 8},
+                             ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                             static_cast<int>(WindowKit::kArrowSlot) + 1);
+    ASSERT_EQ(slots.size(), WindowKit::kArrowSlot + 1);
+    const auto at = [&](int x, int y) { return sheet.indices[static_cast<std::size_t>(y * sheet.width + x)]; };
+    // The whole box the nine pieces make, 24×24: the line one pixel in from each edge.
+    for (int y = 0; y < 24; ++y) {
+        for (int x = 0; x < 24; ++x) {
+            const bool edge = x == 0 || x == 23 || y == 0 || y == 23;
+            const bool line = !edge && (x == 1 || x == 22 || y == 1 || y == 22);
+            EXPECT_EQ(at(x, y), line ? 2 : 1) << x << "," << y;
+        }
+    }
+    int arrow = 0;
+    for (int y = 24; y < 32; ++y) {
+        for (int x = 0; x < 8; ++x) {
+            EXPECT_TRUE(at(x, y) == 0 || at(x, y) == 3) << x << "," << y;
+            arrow += at(x, y) == 3 ? 1 : 0;
+        }
+    }
+    EXPECT_GT(arrow, 0);
+}
+
 TEST(Assets, SpriteSheetsAreTransparentAtTheirCorners) {
     for (const char* path : {"gfx/sprites/player.png", "gfx/sprites/enemy.png", "gfx/sprites/sword.png",
                              "gfx/hud/hearts.png"}) {
@@ -288,7 +320,9 @@ TEST(Assets, PalettesOfSheetsWithAHoleLeaveEntryZeroUndrawn) {
     for (const char* path : {"palettes/sprites/player.png", "palettes/sprites/enemy.png",
                              "palettes/sprites/sword.png", "palettes/hud/hearts.png", "palettes/hud/text.png",
                              "palettes/hud/shadow.png", "palettes/tiles/canopy.png",
-                             "palettes/hud/wood-border.png", "palettes/hud/stone-border.png"}) {
+                             "palettes/hud/wood-border.png", "palettes/hud/stone-border.png",
+                             "palettes/hud/plain-border.png", "palettes/hud/text-dim.png",
+                             "palettes/hud/text-selected.png"}) {
         const std::vector<retropp::Rgba16> entries = retropp::slicePaletteImage(decode(path));
         ASSERT_EQ(entries.size(), 4u) << path;
         EXPECT_EQ(entries[0].a, 0) << path;

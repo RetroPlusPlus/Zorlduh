@@ -11,9 +11,11 @@ and collision map.
     assets/gfx/hud/glyphs.png                     the font: one glyph per character of GLYPH_ORDER
     assets/gfx/hud/{wood,stone}-border.png        the borders of the message box: nine pieces and
                                                   an arrow each
+    assets/gfx/hud/plain-border.png               the menus' border: nine pieces and the arrow
     assets/palettes/tiles/{floor,wall,water,grass,leaf,canopy}.png
     assets/palettes/sprites/{player,enemy,sword}.png
-    assets/palettes/hud/{hearts,text,shadow,wood-border,stone-border}.png
+    assets/palettes/hud/{hearts,text,shadow,text-dim,text-selected}.png
+    assets/palettes/hud/{wood,stone,plain}-border.png
     assets/maps/<layout>/<area>/tiles.png         one world id per cell, for each area of each layout
     assets/maps/<layout>/<area>/collision.png     one collision id per cell, for each area of each layout
     assets/maps/<layout>/<area>/<layer>.png       one overlay id per cell, for each further layer of an area
@@ -129,10 +131,15 @@ HEARTS_PAL = [UNUSED, (48, 16, 24, 255), (224, 48, 64, 255), (255, 255, 255, 255
 # Text: the glyphs are drawn in index 3, white through the text palette and black through the shadow's.
 TEXT_PAL = [UNUSED, (0, 0, 0, 255), (128, 128, 128, 255), (255, 255, 255, 255)]
 SHADOW_PAL = [UNUSED, (0, 0, 0, 255), (0, 0, 0, 255), (0, 0, 0, 255)]
+# A menu's labels: a disabled item's glyphs in gray, the one under the cursor in gold.
+TEXT_DIM_PAL = [UNUSED, (0, 0, 0, 255), (64, 64, 64, 255), (120, 120, 128, 255)]
+TEXT_SELECTED_PAL = [UNUSED, (0, 0, 0, 255), (128, 96, 0, 255), (255, 224, 96, 255)]
 # The borders: entry 1 is the outline and the panel inside, 2 the border's face, 3 its grain or
 # highlight and the arrow. Entry 0 is the transparent index, around a rounded corner.
 WOOD_BORDER_PAL = [UNUSED, (40, 24, 16, 255), (128, 84, 48, 255), (156, 108, 64, 255)]     # dark, wood, grain
 STONE_BORDER_PAL = [UNUSED, (32, 32, 40, 255), (112, 112, 120, 255), (160, 160, 168, 255)]  # dark, stone, highlight
+# The menus' border: entry 1 the panel, 2 the line around it, 3 the arrow.
+PLAIN_BORDER_PAL = [UNUSED, (16, 16, 40, 255), (200, 208, 232, 255), (255, 255, 255, 255)]  # panel, line, arrow
 
 # ── Pixel art ────────────────────────────────────────────────────────────────────────────────────
 #
@@ -1039,6 +1046,29 @@ STONE_TOP = parse([
     "11111111",
 ], 8, 8)
 
+# The menus' border: a one-pixel line a pixel in from the edge, around a flat panel, with square corners.
+PLAIN_TOP_LEFT = parse([
+    "11111111",
+    "12222222",
+    "12111111",
+    "12111111",
+    "12111111",
+    "12111111",
+    "12111111",
+    "12111111",
+], 8, 8)
+
+PLAIN_TOP = parse([
+    "11111111",
+    "22222222",
+    "11111111",
+    "11111111",
+    "11111111",
+    "11111111",
+    "11111111",
+    "11111111",
+], 8, 8)
+
 BORDER_FILL = parse(["11111111"] * 8, 8, 8)
 
 BORDER_ARROW = parse([
@@ -1065,6 +1095,7 @@ def border_sheet(top_left, top):
 
 WOOD_BORDER = border_sheet(WOOD_TOP_LEFT, WOOD_TOP)
 STONE_BORDER = border_sheet(STONE_TOP_LEFT, STONE_TOP)
+PLAIN_BORDER = border_sheet(PLAIN_TOP_LEFT, PLAIN_TOP)
 
 # ── The areas ────────────────────────────────────────────────────────────────────────────────────
 #
@@ -1208,6 +1239,7 @@ def files():
         "gfx/hud/glyphs.png": sheet_png(GLYPHS),
         "gfx/hud/wood-border.png": sheet_png(WOOD_BORDER),
         "gfx/hud/stone-border.png": sheet_png(STONE_BORDER),
+        "gfx/hud/plain-border.png": sheet_png(PLAIN_BORDER),
         "palettes/tiles/floor.png": palette_png(FLOOR_PAL),
         "palettes/tiles/wall.png": palette_png(WALL_PAL),
         "palettes/tiles/water.png": palette_png(WATER_PAL),
@@ -1220,8 +1252,11 @@ def files():
         "palettes/hud/hearts.png": palette_png(HEARTS_PAL),
         "palettes/hud/text.png": palette_png(TEXT_PAL),
         "palettes/hud/shadow.png": palette_png(SHADOW_PAL),
+        "palettes/hud/text-dim.png": palette_png(TEXT_DIM_PAL),
+        "palettes/hud/text-selected.png": palette_png(TEXT_SELECTED_PAL),
         "palettes/hud/wood-border.png": palette_png(WOOD_BORDER_PAL),
         "palettes/hud/stone-border.png": palette_png(STONE_BORDER_PAL),
+        "palettes/hud/plain-border.png": palette_png(PLAIN_BORDER_PAL),
     }
     for layout, areas in LAYOUTS.items():
         for name, spec in areas.items():

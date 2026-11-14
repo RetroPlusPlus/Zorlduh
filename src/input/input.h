@@ -1,5 +1,5 @@
 // The game's controls: its actions, what each is bound to, and the plain Input the simulation reads
-// each tick.
+// each tick. In a menu the directions move the cursor, Item confirms and Attack cancels.
 //
 //     platform.actions(zorlduh::actionMap());
 //     loop.simTick([&](const retropp::InputState& in) { zorlduh::tick(state, zorlduh::readInput(in), player); });
@@ -20,7 +20,8 @@ enum class Action : std::uint8_t { Up, Down, Left, Right, Attack, Item, Start };
 // Return or the pad's Start.
 [[nodiscard]] retropp::ActionMap actionMap();
 
-// This tick's Input, read from the engine's.
+// This tick's Input, read from the engine's: the directions, Item and Start, and the same buttons as a
+// menu reads them.
 [[nodiscard]] Input readInput(const retropp::InputState& input);
 
 }  // namespace zorlduh

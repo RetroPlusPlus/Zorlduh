@@ -108,7 +108,8 @@ zorlduh::Assets headlessAssets() {
 
 // The game as main makes it: the view and the depths from the render side.
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox,
+                                                 zorlduh::kMenuBoxes);
     config.player.timing = kHz60;
     return config;
 }
@@ -197,6 +198,7 @@ TEST(Player, IsDrawnAtTheActorsDepthInEveryAreaBetweenUnderfootAndOverhead) {
     EXPECT_GT(zorlduh::EffectsZ(config.world), zorlduh::kOverheadZ);
     EXPECT_GT(zorlduh::HudZ(config.world), zorlduh::EffectsZ(config.world));
     EXPECT_GT(zorlduh::DialogZ(config.world), zorlduh::HudZ(config.world));
+    EXPECT_GT(zorlduh::MenuZ(config.world), zorlduh::DialogZ(config.world));
 }
 
 // ── The controls ─────────────────────────────────────────────────────────────────────────────

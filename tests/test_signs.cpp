@@ -111,7 +111,8 @@ zorlduh::Assets headlessAssets() {
 }
 
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox,
+                                                 zorlduh::kMenuBoxes);
     config.player.timing = kHz60;
     return config;
 }

@@ -68,6 +68,10 @@ Assets loadAssets(retropp::Renderer& renderer) {
                                             ContentKind::Tileset, ReadOrder::LeftRightThenDown,
                                             kBorderSlots, kIndexZeroHole, /*framesPerAnimation=*/0,
                                             AssetPolicy::Embed);
+    assets.plainBorder = renderer.loadAtlas("assets/gfx/hud/plain-border.png", kCell,
+                                            ContentKind::Tileset, ReadOrder::LeftRightThenDown,
+                                            kBorderSlots, kIndexZeroHole, /*framesPerAnimation=*/0,
+                                            AssetPolicy::Embed);
 
     // The build bakes the first asset path in each statement, so every loader call is a statement of
     // its own.
@@ -83,8 +87,11 @@ Assets loadAssets(retropp::Renderer& renderer) {
     assets.palettes.hearts = renderer.loadPaletteImage("assets/palettes/hud/hearts.png");
     assets.palettes.text = renderer.loadPaletteImage("assets/palettes/hud/text.png");
     assets.palettes.shadow = renderer.loadPaletteImage("assets/palettes/hud/shadow.png");
+    assets.palettes.textDim = renderer.loadPaletteImage("assets/palettes/hud/text-dim.png");
+    assets.palettes.textSelected = renderer.loadPaletteImage("assets/palettes/hud/text-selected.png");
     assets.palettes.woodBorder = renderer.loadPaletteImage("assets/palettes/hud/wood-border.png");
     assets.palettes.stoneBorder = renderer.loadPaletteImage("assets/palettes/hud/stone-border.png");
+    assets.palettes.plainBorder = renderer.loadPaletteImage("assets/palettes/hud/plain-border.png");
 
     OverworldMaps& overworld = assets.areas.overworld;
     overworld.meadow.tiles = retropp::loadMapPng("assets/maps/overworld/meadow/tiles.png");
@@ -155,9 +162,14 @@ Assets loadAssets(retropp::Renderer& renderer) {
         .palette = assets.palettes.text,
         .shadow = assets.palettes.shadow,
     };
+    assets.dimFont = assets.font;
+    assets.dimFont.palette = assets.palettes.textDim;
+    assets.selectedFont = assets.font;
+    assets.selectedFont.palette = assets.palettes.textSelected;
     assets.borders = Borders{
         .wood = WindowKit::Border{.sheet = assets.woodBorder, .palette = assets.palettes.woodBorder},
         .stone = WindowKit::Border{.sheet = assets.stoneBorder, .palette = assets.palettes.stoneBorder},
+        .plain = WindowKit::Border{.sheet = assets.plainBorder, .palette = assets.palettes.plainBorder},
     };
 
     return assets;

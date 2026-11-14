@@ -4,7 +4,7 @@
 //
 // The world comes first: each area's ground, what lies under the player's feet, the actors, and what
 // hangs over them, handed to the world as kAreaDepths. Above the whole world, at depths counted from
-// its top, come the effects, then the HUD, then the message box.
+// its top, come the effects, then the HUD, then the message box, then the menus.
 #pragma once
 
 #include <cstdint>
@@ -44,6 +44,12 @@ inline constexpr AreaDepths kAreaDepths{
 // The message box, over the HUD.
 [[nodiscard]] inline std::int32_t DialogZ(const WorldKit::World& world) {
     return WorldKit::TopZ(world) + 3;
+}
+
+// The first menu, over the message box. Each menu opened over it takes the depth one above the one
+// beneath, so the menus take every depth from here up.
+[[nodiscard]] inline std::int32_t MenuZ(const WorldKit::World& world) {
+    return WorldKit::TopZ(world) + 4;
 }
 
 }  // namespace zorlduh

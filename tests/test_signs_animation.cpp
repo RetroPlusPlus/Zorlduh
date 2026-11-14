@@ -109,7 +109,8 @@ zorlduh::Assets headlessAssets() {
 // The game's config over the made-up assets. The message's animation resolves its time at the Game Boy
 // Color cadence, the engine's own until a game makes another active.
 zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
-    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox);
+    zorlduh::Config config = zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox,
+                                                 zorlduh::kMenuBoxes);
     config.player.timing = kHz60;
     config.messageAnimation.timing = retropp::TimingProfile::GameBoyColor;
     return config;

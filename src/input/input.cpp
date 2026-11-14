@@ -1,5 +1,6 @@
 #include "input/input.h"
 
+#include "MenuKit/input.h"
 #include "TopDownMovement/directions.h"
 
 namespace zorlduh {
@@ -21,6 +22,13 @@ Input readInput(const retropp::InputState& input) {
                                                  .left = Action::Left,
                                                  .right = Action::Right}),
         .item = input.justPressed(Action::Item),
+        .start = input.justPressed(Action::Start),
+        .menu = MenuKit::readMenuInput(input, {.up = Action::Up,
+                                               .down = Action::Down,
+                                               .left = Action::Left,
+                                               .right = Action::Right,
+                                               .confirm = Action::Item,
+                                               .cancel = Action::Attack}),
     };
 }
 
