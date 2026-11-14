@@ -24,7 +24,9 @@ typed out letter by letter each time the player enters an area. A wooden sign in
 rock beside the dungeon door can be read: their messages type out in a box framed in wood or stone that
 grows out of its middle and shrinks back into it, a page at a time, while the world holds still. In the
 shrine, six signs each open their message box in a different way: growing, clipped, squashed, faded,
-slid up from below, or standing still.
+slid up from below, or standing still. The game opens on a title screen with a menu, and Start pauses
+the world under another: options for how fast messages type and how the menus' windows open, nested a
+menu over a menu, and a list of every area, a page at a time, that puts the player in the one chosen.
 
 ## Progress
 
@@ -38,6 +40,9 @@ slid up from below, or standing still.
 - [x] **Windows** — boxes of any size from border sheets, opening and closing in five styles, message
   boxes
   ([`modules/WindowKit/`](modules/WindowKit/README.md))
+- [x] **Menus** — menus as trees of items, a cursor on a grid that repeats while held, pages and
+  scrolling, menus opening over menus, each in a window
+  ([`modules/MenuKit/`](modules/MenuKit/README.md))
 - [x] **Camera** — a camera value, the follow law, pans
   ([`modules/CameraKit/`](modules/CameraKit/README.md))
 - [x] **World** — layouts of areas with their own maps and art, each area drawn in layers at depths the
@@ -50,6 +55,7 @@ slid up from below, or standing still.
   doors, stairs and open walls; the player goes between them, over a path, under a canopy and under the
   rock of a cave mouth
 - [x] **Signs** — a sign and a rock read with Item, each in a border of its own
+- [x] **Title screen and pause menu** — START, CONTINUE and OPTIONS; RESUME, OPTIONS, WARP and TITLE
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
 - [ ] **HUD and pickups** — hearts and the heart pickup

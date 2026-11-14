@@ -33,3 +33,6 @@ One row per feature status change, newest last.
 | 2026-11-13 | window-kit | 🧪 testing | 🧪 testing | `1f15898` | Every piece of a box keyed by the box's size; a confirm finishes whatever a message is doing, the box opening and closing included; `close` plays the closing; 15 tests |
 | 2026-11-13 | signs | 🧪 testing | 🧪 testing | `1f15898` | Message boxes open and close over 300 ms; six signs on a grid in the shrine, each opening its box in one of the styles; 6 tests, and 5 more on the animation |
 | 2026-11-13 | assets | 🧪 testing | 🧪 testing | `1f15898` | The shrine's six sign cells on its maps; 61 files (21 tests) |
+| 2026-11-13 | menu-kit | — | 🧪 testing | `e4ec83c` | `MenuKit` in `modules/MenuKit/`: menus as trees of items, a cursor on a grid that repeats while held, pages and scrolling, menus over menus, confirm and cancel reported as a `Step`, every open menu drawn as a WindowKit window; with its guide and an example over its own art; 26 tests, one on a GPU device |
+| 2026-11-13 | menus | — | 🧪 testing | `e4ec83c` | The title screen and the pause menu, with OPTIONS (message speed, window style) and WARP (every area); 11 tests |
+| 2026-11-13 | assets | 🧪 testing | 🧪 testing | `e4ec83c` | The plain border sheet and its palette, and the dim and selected text palettes; 65 files (22 tests) |

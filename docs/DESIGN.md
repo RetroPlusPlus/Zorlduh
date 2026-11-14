@@ -108,12 +108,21 @@ The template's verbs and systems:
   the world holds still while a message is up, and each message is drawn in the border of what is read
   — wood for a sign, stone for a rock. The meadow's sign and the lake's rock grow from the box's middle;
   the shrine holds six signs on a grid, one for each style, each saying which it is.
+- **Menus:** a menu is a tree of items the game declares, shown as a window; a cursor moves over its
+  items on a grid, moving again while a direction is held; a menu with more items than it shows turns
+  pages or scrolls; an item opens another menu over it, and cancel goes back; one button finishes a
+  window's opening and closing as it does a message's; a disabled item cannot be chosen. The game opens
+  on a title screen — START, CONTINUE (not yet available), OPTIONS — and Start pauses the world under a
+  menu: RESUME, OPTIONS, WARP, TITLE. OPTIONS sets how fast messages type and how the menus' windows
+  open; WARP lists every area a page at a time and puts the player in the one chosen. Menus are drawn in
+  a plain border, the item under the cursor in gold and one that cannot be chosen in gray.
 - **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
 - **HUD:** hearts in half-heart steps; a heart pickup dropped by enemies.
 - **Sound:** one cue per game event, played from the simulation's event stream.
-- **Game states:** `Playing`, `Transition`, `GameOver`.
+- **Game states:** the title screen, and play — held still under a menu or a message, or moving through
+  a transition; later, game over.
 
 Terms used consistently: **area** (one map with its own art and openings; a room, a screen, a cave),
 **layout** (a set of areas sharing a cell size, a view and transition settings; the overworld, a
@@ -128,7 +137,9 @@ the character of each of its cells), **glyph** (one character's cell, drawn as o
 its palette), **window** (a box and what is put inside it, on one layer), **animation** (of a window: how
 far open it is, opening and closing over time), **style** (how a window looks while its animation moves:
 grow, clip, squash, fade, slide or pop), **message** (a passage read in a box, a page at a time), **sign**
-(a thing in the world that is read: a sign, a rock).
+(a thing in the world that is read: a sign, a rock), **menu** (a window of items, opened over the world
+or over another menu), **item** (one entry of a menu: a label, and what choosing it does or the menu it
+opens), **cursor** (the arrow on the item a confirm would choose).
 
 ## Hard constraints
 
@@ -168,9 +179,12 @@ grow, clip, squash, fade, slide or pop), **message** (a passage read in a box, a
   into the world through the engine's types (a solid query, a box, a move), so another kind of movement
   fits the same world.
 - Text is TextKit's, in `modules/TextKit/`, on the engine alone. Windows and messages are WindowKit's, in
-  `modules/WindowKit/`, on the engine, LayerKit and TextKit; menus will be windows composed into menus,
-  in MenuKit. How a window opens and closes is WindowKit's too: an animation is state the tick advances,
-  a style is a function of it, and a message's box is opened and closed by the message itself.
+  `modules/WindowKit/`, on the engine, LayerKit and TextKit. How a window opens and closes is
+  WindowKit's too: an animation is state the tick advances, a style is a function of it, and a message's
+  box is opened and closed by the message itself.
+- Menus are MenuKit's, in `modules/MenuKit/`, on the engine, LayerKit, TextKit and WindowKit: the game
+  declares what its menus hold and decides what a choice does; the module runs the open menus, their
+  cursors and windows, and draws them.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved
