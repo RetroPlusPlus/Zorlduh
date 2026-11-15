@@ -40,8 +40,18 @@ starts with no display and the GPU device is Vulkan's software driver (lavapipe)
 
 ## Baseline
 
-The same 334 tests are registered on every platform, and a run is green only when every job reports
-**334/334/0** (passed/total/skipped).
+The same 334 tests are registered on every platform.
+
+| Job | Passed / total / skipped |
+|---|---|
+| Linux (x64), Windows (x64), macOS (ARM64), Linux (ARM64) | **334/334/0** |
+| Windows (ARM64) | **327/334/7** |
+
+Windows on ARM has no production-representative GPU backend in CI — its runner offers SDL no GPU
+backend — and its production path (D3D12 + DXIL) is covered by the Windows x64 job. So there, and only
+there, the seven tests that need a GPU device skip with that reason, as the engine's own device tests
+do; on every other platform a missing device fails them. A run is green only when each job reports its
+baseline above.
 
 ## Design decisions
 
