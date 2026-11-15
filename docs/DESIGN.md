@@ -92,7 +92,8 @@ The template's verbs and systems:
   otherwise faces the one pressed more recently, the horizontal one when both were pressed together; a
   two-frame walk animation per facing, eight ticks a frame, resting on its first frame. The
   collision box is the bottom half of the 16×16 frame, 3 px in from each side. All of it is the
-  TopDownMovement module, which the player is configured into.
+  TopDownMovement module, which the player is configured into: the player is an input walker bound to a
+  position it holds, so the game's state copies whole.
 - **Text:** a font is a glyph sheet and the string of characters its cells are; text is sprites, one
   per glyph, wrapped to a width, aligned, shadowed, and typed out a character every few ticks. A font of
   one case draws the other case with it, so text is written in the case it reads best. The HUD strip
@@ -103,7 +104,7 @@ The template's verbs and systems:
   point, revealed through a clip, squashed, faded or slid — with what is inside it shown only once it is
   open. A message is wrapped and cut into pages that fit its box, typed out, and turned with one button,
   an arrow blinking while another page follows; that one button finishes whatever a message is doing,
-  the box opening and closing included. Signs and rocks are read with Item from beside them, the player
+  the box opening and closing included. Signs and rocks are read with Interact from beside them, the player
   turning to face one by pushing toward it; a message's box opens over 300 ms and closes the same way,
   the world holds still while a message is up, and each message is drawn in the border of what is read
   — wood for a sign, stone for a rock. The meadow's sign and the lake's rock grow from the box's middle;
@@ -184,8 +185,13 @@ processor when a script asks: a command with its arguments, or a change of a val
   A layer built through them with no options draws exactly as a plain engine layer would: every layer
   field beyond its key, depth, size and content passes through with the engine's own default, and the
   layer's size is the active viewport.
-- Walking is the TopDownMovement module's, in `modules/TopDownMovement/`: the game says what a walker is
-  and what is solid, and the module moves, turns, animates and draws it.
+- Walking is the TopDownMovement module's, in `modules/TopDownMovement/`: the game says what a walker is,
+  where it stands and what is solid, and the module moves, turns, animates and draws it. A walker walks a
+  position the game keeps, bound to it once. It is moved three ways — by the pad (an input walker, the
+  only one that remembers the order directions were pressed in), by a heading the game works out, or
+  along the engine's own `SpritePath`, whose pacing, waits and detours the module uses as they are. Two
+  switches on a walker's config: 8-way or 4-way movement, and 4 or 8 sprite directions; 8-way movement
+  with 4 sprite directions is the default.
 - The world is WorldKit's, in `modules/WorldKit/`, and the camera CameraKit's, in `modules/CameraKit/`.
   WorldKit composes LayerKit and CameraKit; no module depends on a movement module — movement plugs
   into the world through the engine's types (a solid query, a box, a move), so another kind of movement

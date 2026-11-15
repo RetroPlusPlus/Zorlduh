@@ -33,7 +33,8 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
 - [x] **Build** — the engine as a submodule, a lean Release executable, a GoogleTest suite
 - [x] **Layer kit** — sprite, tile, raster and image layers that gather components onto the screen
   ([`modules/LayerKit/`](modules/LayerKit/README.md))
-- [x] **Top-down movement** — walking in eight directions, collision shapes and maps, facing, walk
+- [x] **Top-down movement** — walkers moved by the pad, by a heading or along the engine's routes, in eight
+  or four directions with four or eight sprite directions; collision shapes and maps, facing, walk
   animations ([`modules/TopDownMovement/`](modules/TopDownMovement/README.md))
 - [x] **Text** — fonts from glyph sheets, wrapped and typed-out text
   ([`modules/TextKit/`](modules/TextKit/README.md))
@@ -57,7 +58,7 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
 - [x] **Areas** — an overworld of five areas, a dungeon of five rooms and a forest of seven, joined by
   doors, stairs and open walls; the player goes between them, over a path, under a canopy and under the
   rock of a cave mouth
-- [x] **Signs** — a sign and a rock read with Item, each in a border of its own
+- [x] **Signs** — a sign and a rock read with Interact, each in a border of its own
 - [x] **Title screen and pause menu** — START, CONTINUE and OPTIONS; RESUME, OPTIONS, WARP and TITLE
 - [ ] **Actors** — spawning, stable identity, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
