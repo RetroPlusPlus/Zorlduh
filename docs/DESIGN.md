@@ -116,6 +116,14 @@ The template's verbs and systems:
   menu: RESUME, OPTIONS, WARP, TITLE. OPTIONS sets how fast messages type and how the menus' windows
   open; WARP lists every area a page at a time and puts the player in the one chosen. Menus are drawn in
   a plain border, the item under the cursor in gold and one that cannot be chosen in gray.
+- **Scripts:** what a thing in the world does is a script: a rule — what sets it off and when that
+  applies — over a program written in C++ as a list of entries, with waits, branches, loops and calls.
+  A script processor in the game's state steps every running script a little each tick, in priority
+  order, on a budget; several scripts run side by side on one actor, and one can hold others still
+  while it runs and let them carry on where they were. A script reads typed values and changes nothing
+  itself: what it wants done comes out as requests — a command with its arguments, or a value that
+  should change — and the tick writes them, at one place, in an order the game chose. The module is in
+  place with its guide and an example program; the game's own scripts come with its actors.
 - **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
@@ -139,7 +147,11 @@ far open it is, opening and closing over time), **style** (how a window looks wh
 grow, clip, squash, fade, slide or pop), **message** (a passage read in a box, a page at a time), **sign**
 (a thing in the world that is read: a sign, a rock), **menu** (a window of items, opened over the world
 or over another menu), **item** (one entry of a menu: a label, and what choosing it does or the menu it
-opens), **cursor** (the arrow on the item a confirm would choose).
+opens), **cursor** (the arrow on the item a confirm would choose), **script** (a rule and the program it
+runs when the rule applies), **script processor** (the running state of a set of scripts, stepped each
+tick), **value** (of a script: a named, typed piece of the game's state it reads or asks to change),
+**command** (something a script can ask the game to do), **request** (what comes out of a script
+processor when a script asks: a command with its arguments, or a change of a value).
 
 ## Hard constraints
 
@@ -185,6 +197,9 @@ opens), **cursor** (the arrow on the item a confirm would choose).
 - Menus are MenuKit's, in `modules/MenuKit/`, on the engine, LayerKit, TextKit and WindowKit: the game
   declares what its menus hold and decides what a choice does; the module runs the open menus, their
   cursors and windows, and draws them.
+- Scripts are ScriptKit's, in `modules/ScriptKit/`, on the engine alone: a script reads only the values
+  its processor is handed and writes only requests, and the tick is the only thing that writes the
+  game's state.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved

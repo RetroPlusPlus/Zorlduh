@@ -43,6 +43,9 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
 - [x] **Menus** — menus as trees of items, a cursor on a grid that repeats while held, pages and
   scrolling, menus opening over menus, each in a window
   ([`modules/MenuKit/`](modules/MenuKit/README.md))
+- [x] **Scripts** — scripts written in C++ as rules over programs, run a little each tick by a script
+  processor that hands back what each one asks for, with typed values and commands the game handles
+  ([`modules/ScriptKit/`](modules/ScriptKit/README.md))
 - [x] **Camera** — a camera value, the follow law, pans
   ([`modules/CameraKit/`](modules/CameraKit/README.md))
 - [x] **World** — layouts of areas with their own maps and art, each area drawn in layers at depths the
