@@ -184,7 +184,7 @@ std::vector<retropp::TileCell> RoomCells(const retropp::IndexGrid& room, const A
     return cells;
 }
 
-// The wanderer's headings, clockwise from right: it turns to the next when it cannot move.
+// The wanderer's headings, clockwise from right: it turns to the next when it is blocked.
 const std::array<TopDownMovement::Directions, 8> kClockwise{{
     {.right = true}, {.down = true, .right = true}, {.down = true}, {.down = true, .left = true},
     {.left = true}, {.up = true, .left = true}, {.up = true}, {.up = true, .right = true},

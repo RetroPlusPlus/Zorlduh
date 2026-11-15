@@ -31,11 +31,11 @@ Each tick, `walk` tests the shape against the solids before every pixel it moves
 ```cpp
 enum class Cell : std::uint16_t { Open = 0, Wall = 1 };
 
-// Solids: a collision map with 8-pixel cells. Every cell that is not Cell::Open is solid.
+// Solids: a collision map with 8-pixel cells. Every cell except Cell::Open is solid.
 const retropp::IndexGrid map = retropp::loadMapPng("assets/maps/room.png");
 const TopDownMovement::TileCollision walls{.map = &map, .cellSize = 8, .open = Cell::Open};
 
-// The collision shape: a 10×8 box at the bottom of a 16×16 frame.
+// The collision shape: a box 10 wide and 8 tall, 3 pixels in and 8 down from the walker's top-left.
 const TopDownMovement::WalkerConfig heroConfig{
     .collision = retropp::IntRect{.x = 3, .y = 8, .width = 10, .height = 8},
 };
@@ -43,7 +43,9 @@ const TopDownMovement::WalkerConfig heroConfig{
 hero.walk(heroConfig, input, walls);
 ```
 
-The box covers the character's feet. The character's head can overlap a wall above it; its feet cannot.
+The frame size is the size of a cell on the walker's sheet. With 16×16 art, this box covers the bottom
+half of the frame, inset 3 pixels on each side: the character's feet. The character's head can overlap
+a wall above it, and its feet stop at the wall.
 
 ## Solids
 
@@ -60,7 +62,7 @@ const TopDownMovement::TileCollision walls{.map = &map, .cellSize = 8, .open = C
 
 | Rule | |
 |---|---|
-| A cell whose value equals `open` | not solid |
+| A cell whose value equals `open` | open |
 | Any other cell | solid |
 | Any pixel outside the map | solid |
 
@@ -97,8 +99,8 @@ const auto solids = [&](retropp::IntRect box) { return walls.solidBox(box) || do
 hero.walk(heroConfig, input, solids);
 ```
 
-The solids are passed on every call and are not stored, so each walker can have its own, and they can
-change from tick to tick.
+The solids are passed on every call and read only during it, so each walker can have its own, and they
+can change from tick to tick.
 
 ## Collision shapes
 
@@ -143,10 +145,9 @@ A box is the cheapest shape to test ([Cost](#cost)). Use it unless the character
 
 Consequences:
 
-- A walker stops with its shape exactly against a wall, with no gap.
-- A blocked axis does not block the other, so a diagonal into a wall moves along the wall.
-- Each pixel is tested from the walker's current position. The walker keeps no contact state between
-  ticks.
+- A walker stops with its shape flush against a wall.
+- A blocked axis leaves the other free, so a diagonal into a wall moves along the wall.
+- Each pixel is tested from the walker's current position, and each tick starts fresh from there.
 - A walker whose shape already overlaps something solid moves only when a one-pixel step puts the shape
   fully clear. Spawn walkers in open ground
   ([how-to.md](how-to.md#spawn-clear-of-walls)).
@@ -176,11 +177,11 @@ A set of pixels. The pixels are worked out once, when the shape is constructed.
 
 | Member | Returns |
 |---|---|
-| `CollisionShape()` | An empty shape. It covers nothing and never hits anything. |
-| `CollisionShape(box)` | Every pixel of `box`. A box with no width or height gives an empty shape. |
+| `CollisionShape()` | An empty shape. `hits` returns `false` for it. |
+| `CollisionShape(box)` | Every pixel of `box`. A box of zero width or height gives an empty shape. |
 | `CollisionShape(shape)` | Every pixel whose center is inside `shape`. |
 | `fromAnchors(anchors, labels)` | The polygon through the anchors named in `labels`, in that order, looked up in `anchors`. |
-| `empty()` | `true` if the shape covers no pixel. |
+| `empty()` | `true` if the shape is empty. |
 | `bounds()` | The smallest rectangle containing every covered pixel. All zeros for an empty shape. |
 | `covers(pixel)` | `true` if the shape covers `pixel`. |
 | `at(offset)` | A copy of the shape moved by `offset`. |
@@ -198,11 +199,11 @@ Exceptions:
 
 | Call | Throws | When |
 |---|---|---|
-| `CollisionShape(shape)` | `std::invalid_argument` | `shape` has no points and no curve |
+| `CollisionShape(shape)` | `std::invalid_argument` | `shape` is empty: zero points and zero curve segments |
 | `CollisionShape(shape)` | `std::invalid_argument` | `shape.invert` is set. An inverted shape covers everything outside it. |
-| `CollisionShape(shape)` | `std::invalid_argument` | `shape.transform` is not the identity. Move the shape's points instead. |
+| `CollisionShape(shape)` | `std::invalid_argument` | `shape` carries a transform other than the identity. Move the shape's points instead. |
 | `fromAnchors` | `std::invalid_argument` | fewer than three labels |
-| `fromAnchors` | `std::out_of_range` | a label is not in `anchors` |
+| `fromAnchors` | `std::out_of_range` | a label is missing from `anchors` |
 
 ## `TileCollision`
 
@@ -221,14 +222,14 @@ Solids read from a collision map.
 
 | Field | Meaning | Default |
 |---|---|---|
-| `map` | The collision map. Not owned; it must outlive the `TileCollision`. | `nullptr` |
+| `map` | A pointer to your collision map, which must outlive the `TileCollision`. | `nullptr` |
 | `cellSize` | The width and height of one cell, in pixels. Must be greater than 0. | `8` |
-| `open` | The cell value that is not solid. | `0` |
+| `open` | The cell value that can be walked on. | `0` |
 
 | Member | Returns |
 |---|---|
 | `solidAt(pixel)` | `true` if `pixel` is in a solid cell or outside the map. |
-| `solidBox(box)` | `true` if any pixel of `box` is in a solid cell or outside the map. `false` for a box with no width or height. |
+| `solidBox(box)` | `true` if any pixel of `box` is in a solid cell or outside the map. `false` for a box of zero width or height. |
 
 - The map's top-left cell is at world pixel (0, 0).
 - With `map` left as `nullptr`, everything is solid.
@@ -287,7 +288,7 @@ callable:
 ```cpp
 enum class Ground : std::uint16_t { Floor = 0, Water = 1, Wall = 2 };
 
-// Solid for a swimmer: anything that is not floor or water, and anything outside the map.
+// Solid for a swimmer: everything except floor and water, and everything outside the map.
 const auto swimmerSolids = [&](retropp::IntRect box) {
     if (box.x < 0 || box.y < 0) {
         return true;
@@ -307,14 +308,15 @@ const auto swimmerSolids = [&](retropp::IntRect box) {
 };
 ```
 
-**Walkers do not collide with each other.** To make them, include the other walkers in the solids
+**Walkers pass through each other.** To make them block each other, include the other walkers in the
+solids
 ([how-to.md](how-to.md#stop-walkers-walking-through-each-other)).
 
-**A walker on a route does not collide** ([routes.md](routes.md#collision)).
+**A walker on a route passes through solids** ([routes.md](routes.md#collision)).
 
 ## Cost
 
-`walk` allocates nothing. Its cost is the number of times it asks `solids`.
+`walk` is allocation-free. Its cost is the number of times it asks `solids`.
 
 | Collision shape | Queries per pixel tested |
 |---|---|
@@ -325,18 +327,15 @@ A tick tests up to `speed` pixels on each axis the walker heads along. A walker 
 `speed` 1 asks at most 2 queries per tick. A walker with a circle 8 pixels tall and `speed` 2 asks at
 most 32.
 
-`TileCollision::solidBox` checks every cell the rectangle overlaps. A rectangle no larger than one cell
-overlaps at most four.
+`TileCollision::solidBox` checks every cell the rectangle overlaps. A rectangle up to one cell in
+size overlaps at most four.
 
-What allocates:
+Heap allocation:
 
-| Call | Allocates |
+| | Calls |
 |---|---|
-| `walk`, `moveTo`, `face`, `place`, `hits`, `covers`, `frame` | no |
-| constructing a `CollisionShape` | yes |
-| `CollisionShape::at`, `Walker::collision` | yes: each returns a copy of the shape |
-| copying a `WalkerConfig` | yes: it copies the shape and the animations |
-| `routeFrom` | yes |
+| Allocation-free | `walk`, `moveTo`, `face`, `place`, `hits`, `covers`, `frame` |
+| Allocate | constructing a `CollisionShape`; `CollisionShape::at` and `Walker::collision`, which return a copy of the shape; copying a `WalkerConfig`, which copies the shape and the animations; `routeFrom` |
 
 Construct shapes and configs once, when the game loads. In per-tick code, use `hits` with an offset
 instead of `at`, and `config.collision.bounds()` instead of `walker.collision(config).bounds()`.

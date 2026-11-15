@@ -45,7 +45,7 @@ State
 
 ## Switch maps
 
-Pass the current map's solids on each call. A walker stores no map.
+Keep the current map in your game state and pass its solids on each call:
 
 ```cpp
 hero.walk(heroConfig, input, maps[state.currentMap].solids());
@@ -59,7 +59,7 @@ state.currentMap = door.leadsTo;
 hero.place(door.arrival);
 ```
 
-`place` does not test collision and resets the walk animation to frame 0.
+`place` puts the walker exactly at the position given and resets the walk animation to frame 0.
 
 The engine eases a sprite from its previous position to its new one. To make the walker appear at the
 entrance instead of sliding there, draw it with a different sprite key on that tick (the engine's
@@ -82,7 +82,7 @@ hero.walk(heroConfig, input, solids);
 ## Give different walkers different rules
 
 Solids are passed per call, so two walkers on one map can use different ones. Here water stops the hero
-and not the fish:
+and lets the fish through:
 
 ```cpp
 const auto landSolids = [&](retropp::IntRect box) { return walls.solidBox(box) || water.solidBox(box); };
@@ -96,8 +96,8 @@ fish.walk(fishConfig, fishHeading, swimmerSolids);
 
 ## Stop walkers walking through each other
 
-To make walkers block each other, add every other walker's collision box to the solids. The module does
-not do this on its own.
+To make walkers block each other, add every other walker's collision box to the solids. By default
+walkers pass through each other.
 
 ```cpp
 // The bounding box of a walker's collision shape, in world pixels.
@@ -125,7 +125,7 @@ for (TopDownMovement::Walker& bat : bats) {
 
 - The walker must skip itself, or it blocks its own movement.
 - Walkers move in loop order. A later walker sees the earlier ones where they are after moving.
-- Two walkers that overlap cannot move apart. Spawn them apart.
+- Two walkers that overlap hold each other in place. Spawn them apart.
 - `boxOf` uses the bounding box. It is exact for a box shape and larger than the shape for any other.
 
 ## Spawn clear of walls
@@ -139,7 +139,7 @@ if (!batConfig.collision.hits(walls, spawn)) {
 ```
 
 `hits(solids, position)` is the test `walk` uses. To search for a free position, try candidates until
-one does not hit:
+one is clear:
 
 ```cpp
 for (const retropp::Vec2i candidate : spawnPoints) {
@@ -164,13 +164,14 @@ const TopDownMovement::WalkerConfig heroConfig{
 
 With two directions held, an `InputWalker` moves along the one pressed more recently. A `Walker` given a
 two-axis heading moves the way it faces if that is one of the two directions, and otherwise
-horizontally. Routes are not affected.
+horizontally. Routes move diagonally either way.
 
 ## Walk slower than a pixel a tick
 
 `speed` is whole pixels per tick. There are two ways to go slower.
 
-**On a route.** A route's pace is in pixels per second and can be any value. A route does not collide.
+**On a route.** A route's pace is in pixels per second and can be any value. A route passes through
+walls.
 
 ```cpp
 retropp::SpritePath stroll = TopDownMovement::routeFrom(ghost, {
@@ -193,8 +194,8 @@ When the walker should stop, call `walk` with an empty heading so it shows frame
 
 ## Wander against walls
 
-Walk a heading, and change it when the walker is blocked. `moving()` is `false` after a `walk` that did
-not move the walker.
+Walk a heading, and change it when the walker is blocked. `moving()` is `false` after a `walk` in which
+the walker was blocked.
 
 ```cpp
 const std::array<TopDownMovement::Directions, 4> kClockwise{{
@@ -222,12 +223,13 @@ bat.walk(batConfig, toward, walls);
 ```
 
 The bat moves diagonally until it is level with the target on one axis, then straight. It slides along
-walls and does not find a way around them. To flee, swap the comparisons.
+walls and stops in dead ends. For a way around them, compute the heading from a path search. To flee,
+swap the comparisons.
 
 ## Push a walker
 
-To move a walker without turning it or changing its walk animation, write to its position. The position
-is yours. Test each pixel with `hits` to respect walls:
+To move a walker and keep its facing and its walk animation as they are, write to its position. The
+position is yours. Test each pixel with `hits` to respect walls:
 
 ```cpp
 // Knock the hero back up to 3 pixels. `push` is -1, 0 or 1 on each axis.
@@ -258,9 +260,9 @@ ghost.moveTo(ghostConfig,
              {drift.x - before.x, drift.y - before.y});
 ```
 
-- `moveTo` does not test collision.
+- `moveTo` puts the walker exactly where you say, walls included.
 - Pass the travel as floats, before rounding. A mover slower than a pixel a tick still animates.
-- Pass a zero travel on ticks the mover does not move. The walker then shows frame 0.
+- Pass a zero travel on ticks the mover stands still. The walker then shows frame 0.
 
 ## Patrol a route
 
@@ -326,7 +328,7 @@ if (state.walkingScript) {
 ```
 
 - The pad is ignored while the route runs.
-- A route does not collide. Draw it through open ground.
+- A route passes through walls. Draw it through open ground.
 - When control returns, a direction the player is still holding moves the hero on the next tick.
 
 ## Build a `DirectionalInput` by hand
@@ -355,8 +357,8 @@ A fixed input, for a test or a replay:
 hero.walk(heroConfig, {.held = {.right = true}, .pressed = {.right = true}}, walls);
 ```
 
-Set `pressed` only on the tick a direction goes down. If you never set it, the walker still moves by
-`held`; when two directions are held and it faces neither, it faces the horizontal one.
+Set `pressed` only on the tick a direction goes down. With `pressed` left empty, the walker still
+moves by `held`; when two directions are held and it faces a third, it faces the horizontal one.
 
 ## Give the diagonals their own sprites
 
@@ -374,7 +376,7 @@ const TopDownMovement::WalkerConfig knightConfig{
 - A walker moving diagonally shows the diagonal's animation. When it stops, it shows that animation's
   frame 0.
 - `facing()` still returns one of four directions.
-- A diagonal animation with no frames makes `frame` and `WalkerSprite` throw when the walker faces that
+- An empty diagonal animation makes `frame` and `WalkerSprite` throw when the walker faces that
   way.
 
 On a sheet with one row per direction in `Facing` order, the row number is the `Facing` value:
@@ -385,7 +387,7 @@ const std::size_t row = static_cast<std::size_t>(TopDownMovement::Facing::UpLeft
 
 ## Turn to face something
 
-`face` turns a walker without moving it:
+`face` turns a walker in place:
 
 ```cpp
 guard.face(retropp::Dir::Down);
@@ -407,7 +409,7 @@ retropp::Dir toward(retropp::Vec2i from, retropp::Vec2i to) {
 guard.face(toward(guard.position(), hero.position()));
 ```
 
-`face` does not change the walk animation's place. A walker that is walked turns again on its next tick
+`face` keeps the walk animation's place. A walker that is walked turns again on its next tick
 with a heading.
 
 ## Pin something to a walker
@@ -433,8 +435,8 @@ const retropp::Sprite body = TopDownMovement::WalkerSprite("hero", hero, heroCon
 const retropp::Point drawnHand = body.anchor("hand", retropp::Space::Layer);
 ```
 
-The anchor table must outlive the config. `anchor` throws `std::out_of_range` for a label that is not in
-the table. The engine's `docs/guide/anchors-and-articulation.md` covers anchors on sprites.
+The anchor table must outlive the config. `anchor` throws `std::out_of_range` for a label that is missing
+from the table. The engine's `docs/guide/anchors-and-articulation.md` covers anchors on sprites.
 
 ## Keep a walker and its position in one value
 
@@ -461,6 +463,5 @@ position.
 
 - The struct is safe in a `std::vector`. When the vector grows it copies the elements, and each copy
   binds to its own `at`.
-- The base class is constructed before `at`. That is safe here: binding stores the address and does not
-  read the position.
-- For a walker that is not steered by input, derive from `TopDownMovement::Walker` instead.
+- The base class is constructed before `at`. That is safe here: binding only stores the address.
+- For a walker moved by a heading or a route, derive from `TopDownMovement::Walker` instead.

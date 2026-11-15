@@ -19,8 +19,8 @@ enum class Ways : std::uint8_t { Four, Eight };
 // One of eight directions, clockwise from up: the way a walker's sprite faces.
 enum class Facing : std::uint8_t { Up, UpRight, Right, DownRight, Down, DownLeft, Left, UpLeft };
 
-// One flag per direction. As a walker's heading, opposite flags cancel: up and down together head
-// neither way.
+// One flag per direction. As a walker's heading, opposite flags cancel: up and down together leave
+// the walker's y as it is.
 struct Directions {
     bool up = false;
     bool down = false;

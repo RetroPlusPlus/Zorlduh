@@ -71,8 +71,9 @@ A plus means four and a star means eight. Press the key again to switch back.
 | `palettes/movement.png`, `palettes/sprites.png` | 4×1 | the colors of the two indicator cells: blue and orange |
 | `palettes/hero.png`, `palettes/wanderer.png`, `palettes/guard.png` | 4×1 | the colors of each walker |
 
-The sheets are indexed PNGs: each pixel is a palette index, not a color. On the walker sheet, index 0 is
-transparent. The three walkers share the one walker sheet and differ only in palette.
+The sheets are indexed PNGs: each pixel is a palette index, and a palette image supplies the colors. On
+the walker sheet, index 0 is transparent. The three walkers share the one walker sheet and differ only in
+palette.
 
 The program reads the files from the directory named by `TOPDOWNMOVEMENT_EXAMPLE_ASSETS`, which the
 module's `CMakeLists.txt` defines, and loads them with the engine's `loadAtlasFromMemory`:
@@ -112,7 +113,7 @@ can be walked on:
 const TopDownMovement::TileCollision walls{.map = &room, .cellSize = kCell, .open = Cell::Open};
 ```
 
-Every cell that is not `Cell::Open` is solid, and so is everything outside the grid. The same grid is
+Every cell except `Cell::Open` is solid, and so is everything outside the grid. The same grid is
 also drawn: each cell becomes a floor or wall tile.
 
 ## 5. The walk animations
@@ -162,11 +163,11 @@ TopDownMovement::WalkerConfig guardConfig = WalkerOf(art, art.guard);
 | `speed` | `1` | one pixel per tick on each axis the walker heads along |
 | `collision` | a 6×4 box at the bottom of the 8×8 frame | the part of the walker that collides. The tip of the arrowhead can overlap a wall above it. |
 | `walk` | the eight animations | what the walker shows |
-| `movement` | not set: `Ways::Eight` | moves in eight directions |
-| `sprites` | not set: `Ways::Four` | shows four sprite directions |
+| `movement` | the default, `Ways::Eight` | moves in eight directions |
+| `sprites` | the default, `Ways::Four` | shows four sprite directions |
 
 Z and X change `movement` and `sprites` on all three configs while the program runs. The configs are
-not `const` for that reason; in a game they usually are.
+mutable for that reason; in a game they are usually `const`.
 
 ## 7. The positions and the walkers
 
@@ -209,7 +210,7 @@ stands. The route has three legs, played in order:
 | `west` | (16, 120), where the route started | 30 pixels per second | walks back |
 
 At the program's 60 ticks per second, 30 pixels per second is half a pixel per tick. The route ends
-where it starts, so it loops without a jump.
+where it starts, so it loops smoothly.
 
 [routes.md](routes.md) covers routes.
 
@@ -242,12 +243,13 @@ them to the arrow keys, WASD and the d-pad. `walk` moves the hero against `walls
 advances its walk animation.
 
 **The wanderer.** `kClockwise` is an array of eight headings, clockwise from right. The wanderer walks
-the current one. `moving()` returns `false` after a tick in which it could not move, and the program
+the current one. `moving()` returns `false` after a tick in which it was blocked, and the program
 then selects the next heading.
 
 **The guard.** `follow` advances the patrol by one tick and moves the guard to the route's position. The
 guard faces the way the route travels, plays its walk animation while the route moves, and shows frame 0
-during the wait. A walker on a route does not collide, so this route is drawn through open floor.
+during the wait. A walker on a route goes exactly where the route goes, so this route is drawn through
+open floor.
 
 ## 10. Drawing
 
@@ -280,6 +282,6 @@ vector must stay alive while the renderer reads it.
 | How collision works, and what can be solid | [collision.md](collision.md) |
 | Routes: waits, detours, playback modes | [routes.md](routes.md) |
 | How to do a specific task | [how-to.md](how-to.md) |
-| Why something does not work | [troubleshooting.md](troubleshooting.md) |
+| How to fix a problem | [troubleshooting.md](troubleshooting.md) |
 | How to test code that uses the module | [testing.md](testing.md) |
 | Every type and member | [walker.md](walker.md) |

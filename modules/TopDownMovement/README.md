@@ -75,7 +75,7 @@ target_link_libraries(my-game PRIVATE TopDownMovement::TopDownMovement)
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms, causes and fixes. |
 | [Testing](docs/testing.md) | Testing code that uses the module. |
 | [Walker reference](docs/walker.md) | Every type and member. |
-| [Guide index](docs/README.md) | Every page, a task index, a name index, and what the module does and does not provide. |
+| [Guide index](docs/README.md) | Every page, a task index, a name index, and what the module provides and what it leaves to your game. |
 
 ## Layout
 
@@ -96,7 +96,7 @@ modules/TopDownMovement/
 
 | Header | Note |
 |---|---|
-| `walker_sprite.h` | The only header that creates a draw type (`retropp::Sprite`). Simulation code can include the others and draw nothing. |
+| `walker_sprite.h` | The only header that creates a draw type (`retropp::Sprite`). The other headers are for simulation code. |
 | `route.h` | The only header that includes the engine's `retropp/sprite_path.h`. |
 
 ## License

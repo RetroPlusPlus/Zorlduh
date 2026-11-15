@@ -32,7 +32,7 @@ New to the module? Read [getting-started.md](getting-started.md), then [concepts
 | Move a walker from my own code | [how-to.md](how-to.md#push-a-walker), [how-to.md](how-to.md#move-a-walker-with-your-own-mover) |
 | Walk the player through a scripted scene | [how-to.md](how-to.md#walk-the-player-along-a-route) |
 | Keep walkers in a `std::vector` or copy my game state | [concepts.md](concepts.md#lifetimes), [how-to.md](how-to.md#keep-a-walker-and-its-position-in-one-value) |
-| Fix a walker that does not move, or an animation that does not play | [troubleshooting.md](troubleshooting.md) |
+| Fix a walker that stands still, or an animation stuck on one frame | [troubleshooting.md](troubleshooting.md) |
 | Write tests | [testing.md](testing.md) |
 
 ## Find it by name
@@ -57,7 +57,7 @@ New to the module? Read [getting-started.md](getting-started.md), then [concepts
 |---|---|
 | Moves a walker a pixel at a time and stops it at solids | Keeps each walker's position in its own state |
 | Slides a walker along a wall on a diagonal | Says what is solid: a collision map or a callable |
-| Moves in 8 directions or 4, set per config | Decides the heading of anything that is not the player |
+| Moves in 8 directions or 4, set per config | Decides the heading of every character except the player |
 | Sets the walker's facing from where it heads | Builds the routes |
 | Shows 4 or 8 sprite directions, set per config | Provides the walk animations |
 | Plays the walk animation while the walker moves | Declares the input actions and their bindings |
@@ -65,28 +65,35 @@ New to the module? Read [getting-started.md](getting-started.md), then [concepts
 | Reads the four directions from the engine's input | |
 | Returns the walker's sprite | |
 
-## Feature status
+## Provided
 
-| Feature | Status | Page |
+| Feature | Page |
+|---|---|
+| A walker bound to a position the game keeps | [concepts.md](concepts.md#the-position-a-walker-is-bound-to) |
+| 8-way movement with sliding along walls | [concepts.md](concepts.md#a-tick-of-walking) |
+| 4-way movement, by input or by heading | [concepts.md](concepts.md#four-directions-only) |
+| Four facings, with the press order for input | [concepts.md](concepts.md#facing) |
+| 4 or 8 sprite directions, a walk animation for each | [concepts.md](concepts.md#sprite-directions) |
+| Walking by a heading from the game's own code | [how-to.md](how-to.md#wander-against-walls) |
+| Routes, waits, playback modes and detours, through the engine's `SpritePath` | [routes.md](routes.md) |
+| Movement slower than a pixel per tick, on a route | [how-to.md](how-to.md#walk-slower-than-a-pixel-a-tick) |
+| Collision shapes: box, any `ShapePoints`, polygon through anchors | [collision.md](collision.md#collision-shapes) |
+| Solids from a collision map or any callable | [collision.md](collision.md#solids) |
+| Reading directions from `retropp::InputState`, player slot 0 | [walker.md](walker.md#readdirections) |
+| A pathway of your own, by deriving from `Walker` | [walker.md](walker.md#writing-your-own-pathway) |
+| The walker's sprite, depth-sorted by the bottom of its collision shape | [walker.md](walker.md#walkersprite) |
+
+## Left to your game
+
+Each of these is yours to add. The page shows how.
+
+| Feature | How | Page |
 |---|---|---|
-| A walker bound to a position the game keeps | available | [concepts.md](concepts.md#the-position-a-walker-is-bound-to) |
-| 8-way movement with sliding along walls | available | [concepts.md](concepts.md#a-tick-of-walking) |
-| 4-way movement, by input or by heading | available | [concepts.md](concepts.md#four-directions-only) |
-| Four facings, with the press order for input | available | [concepts.md](concepts.md#facing) |
-| 4 or 8 sprite directions, a walk animation for each | available | [concepts.md](concepts.md#sprite-directions) |
-| Walking by a heading from the game's own code | available | [how-to.md](how-to.md#wander-against-walls) |
-| Routes, waits, playback modes and detours, through the engine's `SpritePath` | available | [routes.md](routes.md) |
-| Movement slower than a pixel per tick | available on a route, or by walking on some ticks | [how-to.md](how-to.md#walk-slower-than-a-pixel-a-tick) |
-| Collision shapes: box, any `ShapePoints`, polygon through anchors | available | [collision.md](collision.md#collision-shapes) |
-| Solids from a collision map or any callable | available | [collision.md](collision.md#solids) |
-| Reading directions from `retropp::InputState`, player slot 0 | available | [walker.md](walker.md#readdirections) |
-| A pathway of your own, by deriving from `Walker` | available | [walker.md](walker.md#writing-your-own-pathway) |
-| The walker's sprite, depth-sorted by the bottom of its collision shape | available | [walker.md](walker.md#walkersprite) |
-| Collision on a route | not provided | [routes.md](routes.md#collision) |
-| Collision between walkers | not provided; a recipe adds it | [how-to.md](how-to.md#stop-walkers-walking-through-each-other) |
-| A route that crosses from one map to another | not provided | [routes.md](routes.md#collision) |
-| A fractional `speed` | not provided; `speed` is whole pixels | [how-to.md](how-to.md#walk-slower-than-a-pixel-a-tick) |
-| A collision map placed away from world pixel (0, 0) | not provided; a callable adds it | [collision.md](collision.md#limits) |
-| More than one walkable value in a `TileCollision` | not provided; a callable adds it | [collision.md](collision.md#limits) |
-| Reading directions for player slots other than 0 | not provided; build the input by hand | [how-to.md](how-to.md#build-a-directionalinput-by-hand) |
-| Analog stick steering | not provided; an example shows how to add it | [walker.md](walker.md#writing-your-own-pathway) |
+| Stopping at walls on a route | Draw the route through open ground, or walk by a heading | [routes.md](routes.md#collision) |
+| Walkers that block each other | Add the other walkers to the solids | [how-to.md](how-to.md#stop-walkers-walking-through-each-other) |
+| A route across two maps | End the route, place the walker, start a new route | [routes.md](routes.md#collision) |
+| A `speed` below one pixel per tick | Walk on some ticks, or follow a route | [how-to.md](how-to.md#walk-slower-than-a-pixel-a-tick) |
+| A collision map placed away from world pixel (0, 0) | A callable that subtracts the map's origin | [collision.md](collision.md#limits) |
+| Several walkable values in one collision map | A callable that reads the cells | [collision.md](collision.md#limits) |
+| Input for player slots other than 0 | Build the `DirectionalInput` by hand | [how-to.md](how-to.md#build-a-directionalinput-by-hand) |
+| Analog stick steering | Derive from `Walker`; an example is included | [walker.md](walker.md#writing-your-own-pathway) |

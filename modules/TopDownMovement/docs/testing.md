@@ -1,8 +1,8 @@
 # Testing
 
 How to test code that uses the module. Walking is deterministic: a walker's next state depends only on
-its current state, the config, the input and the solids. There is no clock and no randomness, so a test
-can call `walk` in a loop and assert the result.
+its current state, the config, the input and the solids. A test can call `walk` in a
+loop and assert the result.
 
 The snippets use `assert`. Use your test framework's assertions in their place.
 
@@ -20,11 +20,11 @@ The snippets use `assert`. Use your test framework's assertions in their place.
 
 | Code under test | Needs |
 |---|---|
-| `Walker`, `InputWalker`, `CollisionShape`, `TileCollision`, `routeFrom`, `follow` | The engine library. No window, renderer or GPU device. |
-| `readDirections` | A `retropp::InputState`, which a `retropp::RunLoop` provides. No window. |
+| `Walker`, `InputWalker`, `CollisionShape`, `TileCollision`, `routeFrom`, `follow` | The engine library alone. Runs headless. |
+| `readDirections` | A `retropp::InputState`, which a `retropp::RunLoop` provides. Runs headless. |
 | `WalkerSprite` | A `retropp::Renderer` on a GPU device, with the walker's sheet loaded. |
 
-Keep `WalkerSprite` out of simulation code and most tests need nothing but the first row.
+Keep `WalkerSprite` out of simulation code and most tests fall in the first row.
 
 ## A test config
 
@@ -32,7 +32,7 @@ Keep `WalkerSprite` out of simulation code and most tests need nothing but the f
 constexpr retropp::TimingProfile kHz60{.tickPeriodNs = retropp::TickPeriodNs::Hz60};
 const std::chrono::nanoseconds kTick = kHz60.tickPeriod();
 
-// A two-frame animation, 8 ticks per frame. The sheet and palette ids are made up: no renderer reads them.
+// A two-frame animation, 8 ticks per frame. The sheet and palette ids are placeholders; the tests read labels.
 retropp::Animation clip(std::string_view first, std::string_view second) {
     return retropp::Animation{{
         {.label = first, .sheet = retropp::AtlasId{1}, .tileIndex = 0, .palette = retropp::PaletteId{1}, .duration = 8 * kTick},
@@ -50,7 +50,7 @@ const TopDownMovement::WalkerConfig config{
 ```
 
 - **Set `timing` explicitly.** The default is a global the engine sets at startup. A test that sets it
-  does not depend on what ran before.
+  gets the same result whatever ran before.
 - **Label the frames.** A test can then assert which frame shows by name.
 - **Write durations in ticks.** `8 * kTick` is exactly 8 ticks at the config's timing.
 
@@ -97,7 +97,8 @@ assert(!walls.solidAt({39, 24}));
 
 ## Test the walk animation
 
-`frame` returns the frame the walker shows. Reading its `label` or `tileIndex` needs no renderer.
+`frame` returns the frame the walker shows. Its `label` and `tileIndex` are plain fields, readable
+in a headless test.
 
 ```cpp
 retropp::Vec2i at{16, 16};
@@ -142,8 +143,8 @@ retropp::SpritePath::defaultTiming = was;
 
 ## Test `readDirections`
 
-`readDirections` needs an `InputState`. A `RunLoop` on a clock you control produces one per tick with no
-window:
+`readDirections` needs an `InputState`. A `RunLoop` on a clock you control produces one per tick,
+headless:
 
 ```cpp
 class ManualClock final : public retropp::Clock {
@@ -165,7 +166,7 @@ loop.simTick([&](const retropp::InputState& input) {
         input, {.up = Action::Up, .down = Action::Down, .left = Action::Left, .right = Action::Right});
 });
 loop.renderLoop([] {});
-loop.advance();   // the first call runs no tick
+loop.advance();   // the first call only starts the clock
 
 retropp::InputSample sample;
 sample.players[0].held.set(retropp::actionId(Action::Left), true);
@@ -181,7 +182,7 @@ Test this once. In every other test, write the `DirectionalInput` by hand.
 ## Test `WalkerSprite`
 
 `WalkerSprite` resolves the frame's art through a renderer, so it needs a GPU device and a loaded sheet.
-A renderer constructed with no window is enough:
+A renderer constructed with a null window is enough:
 
 ```cpp
 // `device` is an SDL_GPUDevice* from SDL_CreateGPUDevice.
@@ -215,4 +216,4 @@ assert(sprite.z == 30 + 16);              // y plus the bottom edge of the colli
 assert(sprite.tile == sheet[4].tile);     // row 2 (left), frame 0
 ```
 
-A machine with no GPU device cannot run this test. Keep it separate from the tests that need none.
+This test requires a GPU device. Keep it in its own target, apart from the headless tests.

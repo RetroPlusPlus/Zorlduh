@@ -7,7 +7,7 @@ The engine provides the route: its geometry, pacing, waits, playback modes and i
 module provides the walker on it: the position, a facing chosen from the route's travel, and the walk
 animation.
 
-A walker on a route does not collide with anything.
+A walker on a route goes exactly where the route goes, through walls included.
 
 ```cpp
 #include "TopDownMovement/route.h"   // routeFrom, follow; includes retropp/sprite_path.h
@@ -81,12 +81,11 @@ Returns a `SpritePath` over `nodes` whose `start` is the walker's current positi
   walker, so a walker that moved after `routeFrom` jumps to the route's start on the first `follow`.
 - **Timing.** The route takes the engine's active timing when it is constructed. Call `routeFrom` after
   `retropp::EngineConfig::setActive`.
-- **Node fields to leave unset.** `animation`, `facing`, `rotationDegrees` and `scale` are used by
-  `SpritePath::applyTo`. `follow` does not call it, so they have no effect on a walker. The walker
-  plays the walk animation in its `WalkerConfig`.
+- **Node fields to leave unset.** `animation`, `facing`, `rotationDegrees` and `scale` take effect
+  through `SpritePath::applyTo`, which is for a sprite the path writes directly. `follow` reads the
+  route's position only, and the walker plays the walk animation in its `WalkerConfig`.
 
-The route is an ordinary value. `routeFrom` does not tie it to the walker; `follow` takes both each
-tick.
+The route is an ordinary value, independent of the walker. `follow` takes both each tick.
 
 ## `follow`
 
@@ -104,13 +103,13 @@ TopDownMovement::follow(guard, guardConfig, patrol, retropp::PlaybackMode::singl
 
 - **Call it once per tick, instead of `route.advance()`.** `follow` advances the route. A route that is
   also advanced by your code runs at double speed.
-- **Do not also call `walk`** for the same walker on the same tick.
+- **Call one of `follow` and `walk`** for a walker on any one tick.
 - **It takes any walker.** An `InputWalker` can follow a route
   ([how-to.md](how-to.md#walk-the-player-along-a-route)).
 - **The walk animation plays on every tick the route moves,** including ticks where it moves less than
-  a pixel and the walker's position does not change. A route at 30 pixels per second on a 60 Hz tick
+  a pixel and the walker's position stays the same. A route at 30 pixels per second on a 60 Hz tick
   moves half a pixel per tick and animates normally.
-- **On a tick the route does not move,** the walker keeps its facing and shows frame 0.
+- **On a tick the route stands still,** the walker keeps its facing and shows frame 0.
 
 `mode` is the playback mode of the whole route:
 
@@ -121,8 +120,8 @@ TopDownMovement::follow(guard, guardConfig, patrol, retropp::PlaybackMode::singl
 | `PlaybackMode::loopNTimes(n)` | The route runs `n` times, then the walker stays at the end. |
 | `PlaybackMode::playForDuration(d)` | The route loops until `d` has passed, then the walker stays where it is. |
 
-A looping route starts again at its `start`. If the last leg does not end there, the walker jumps back
-to it. End a looping route where it starts.
+A looping route starts again at its `start`. If the last leg ends anywhere else, the walker jumps
+back to it. End a looping route where it starts.
 
 ## Facing from travel
 
@@ -144,7 +143,7 @@ On each tick the route moves, `follow` sets both facings from the route's travel
 
 With `sprites = Ways::Four` the sprite shows `facing()`.
 
-`config.movement` is not read. A route moves diagonally under `Ways::Four` and `Ways::Eight` alike.
+`config.movement` applies to `walk`. A route moves diagonally under `Ways::Four` and `Ways::Eight` alike.
 
 ## Waits, posts and playback modes
 
@@ -155,9 +154,9 @@ duration, keeps its facing, and shows frame 0.
 {.label = "wait", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::eased(500ms)},
 ```
 
-**A post** is a leg to a different point, paced `speed(0.0f)`. It never finishes. The walker stands at
-the leg's start until you interrupt the route or replace it. The engine's guide calls this a sentinel
-node.
+**A post** is a leg to a different point, paced `speed(0.0f)`. It lasts until you interrupt the route or
+replace it, and the walker stands at the leg's start for that long. The engine's guide calls this a
+sentinel node.
 
 ```cpp
 {.label = "post", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::speed(0.0f)},
@@ -210,20 +209,20 @@ returns to the starting point.
 
 ## Collision
 
-`follow` does not test the walker's collision shape. A route through a wall moves the walker through the
+`follow` moves the walker wherever the route goes. A route through a wall moves the walker through the
 wall. Draw routes through open ground.
 
 A character that must be stopped by walls uses a heading instead of a route:
 [how-to.md](how-to.md#wander-against-walls).
 
-A route does not carry a walker from one map to another. End the route, `place` the walker in the new
-map, and build a new route there.
+A route stays within one map. To continue in another map, end the route, `place` the walker there, and
+build a new route.
 
 ## Rounding
 
 A route's position is a `retropp::Vec2` of floats. A walker's position is a `retropp::Vec2i`. `follow`
 rounds with `std::lround` when it writes the walker's position. The route keeps its float position, so
-rounding does not accumulate.
+each tick rounds from the exact position.
 
 ## Engine behavior to know
 
@@ -231,7 +230,7 @@ Two behaviors of `SpritePath` at the engine version this module builds against a
 
 **A `speed` leg can last one tick longer than its length divided by its speed.** The engine converts
 pixels per second to a fractional number of pixels per tick. A leg of 24 pixels at 60 pixels per second
-on a 60 Hz tick takes 25 ticks, and the route does not move on the last one. On that tick the walker
+on a 60 Hz tick takes 25 ticks, and the route stands still on the last one. On that tick the walker
 stands and its walk animation returns to frame 0. For a leg that ends on an exact tick, pace it by
 duration:
 
@@ -243,4 +242,4 @@ const std::chrono::nanoseconds tick = retropp::SpritePath::defaultTiming.tickPer
 
 **A `Continue` detour resumes one tick early.** The route resumes from the position the walker had one
 tick before the detour's end. A detour of 8 pixels at one pixel per tick shifts the route by 7 pixels.
-`Return` is not affected.
+`Return` resumes at the exact position.

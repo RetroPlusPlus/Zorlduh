@@ -57,10 +57,10 @@ bool isSolid(const Q& query, retropp::IntRect box) {
 // implicitly, so a WalkerConfig takes any of them as `.collision`.
 class CollisionShape {
 public:
-    // Covers nothing, so it never hits anything.
+    // An empty shape: hits returns false for it.
     CollisionShape() = default;
 
-    // Every pixel of `box`. An empty box covers nothing.
+    // Every pixel of `box`. A box of zero width or height gives an empty shape.
     CollisionShape(retropp::IntRect box) {
         if (box.width <= 0 || box.height <= 0) {
             return;
@@ -74,8 +74,8 @@ public:
 
     // Every pixel whose center `shape.contains`: the same test a region drawn with this shape uses, so a
     // collision shape covers what it would color on screen. `radius` and `strokeWidth` apply. Throws
-    // std::invalid_argument for a shape with no points and no curve, an inverted shape (its outside is
-    // infinite), or a shape with a non-identity `transform` (move its points instead).
+    // std::invalid_argument for an empty shape (zero points and zero curve segments), an inverted shape
+    // (its outside is infinite), or a shape with a non-identity `transform` (move its points instead).
     CollisionShape(const retropp::ShapePoints& shape) {
         if (!shape.hasRegion()) {
             throw std::invalid_argument("CollisionShape: the shape has no points and no curve");
@@ -142,8 +142,8 @@ public:
     }
 
     // The polygon through the anchors named in `labels`, in that order, read from `anchors` (the art's
-    // anchor table). Throws std::out_of_range when a label is not in the table and std::invalid_argument
-    // for fewer than three labels.
+    // anchor table). Throws std::out_of_range when a label is missing from the table and
+    // std::invalid_argument for fewer than three labels.
     [[nodiscard]] static CollisionShape fromAnchors(std::span<const retropp::Anchor> anchors,
                                                     std::initializer_list<std::string_view> labels) {
         if (labels.size() < 3) {
@@ -161,7 +161,7 @@ public:
         return CollisionShape{polygon};
     }
 
-    // Whether the shape covers no pixel.
+    // Whether the shape is empty.
     [[nodiscard]] bool empty() const noexcept { return runs_.empty(); }
 
     // The smallest rectangle holding every covered pixel; all zeros when the shape is empty.
@@ -244,9 +244,9 @@ struct CellValue {
     constexpr CellValue(E cell) : value(static_cast<std::uint16_t>(cell)) {}
 };
 
-// Solid cells on a collision map: every cell of `map` whose value is not `open` is solid, and so is
+// Solid cells on a collision map: every cell of `map` except those holding `open` is solid, and so is
 // every pixel off the map. The map's top-left cell is at pixel (0, 0) and each cell is `cellSize` pixels
-// on a side; `cellSize` is greater than 0. Negative pixels lie off the map. With no map, everything is
+// on a side; `cellSize` is greater than 0. Negative pixels lie off the map. A null map makes everything
 // solid.
 struct TileCollision {
     const retropp::IndexGrid* map = nullptr;
@@ -258,7 +258,7 @@ struct TileCollision {
         return solidCell(cellOf(pixel.x), cellOf(pixel.y));
     }
 
-    // Whether any pixel of `box` is in a solid cell. An empty box covers no cell and is never solid.
+    // Whether any pixel of `box` is in a solid cell. A box of zero width or height is reported open.
     [[nodiscard]] bool solidBox(retropp::IntRect box) const noexcept {
         if (box.width <= 0 || box.height <= 0) {
             return false;

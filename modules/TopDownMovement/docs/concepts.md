@@ -26,7 +26,7 @@ for, and how a walker behaves at walls, on diagonals and on routes.
 // 1. The config: what a hero is. Build it once, after the art is loaded.
 const TopDownMovement::WalkerConfig heroConfig{
     .speed     = 1,                                                           // pixels per tick
-    .collision = retropp::IntRect{.x = 3, .y = 8, .width = 10, .height = 8},  // its feet, in a 16×16 frame
+    .collision = retropp::IntRect{.x = 3, .y = 8, .width = 10, .height = 8},  // 10 wide, 8 tall, at (3, 8)
     .walk      = {.up = walkUp, .down = walkDown, .left = walkLeft, .right = walkRight},
 };
 
@@ -48,7 +48,7 @@ Names from your game:
 
 | Name | What it is |
 |---|---|
-| `walkUp`, `walkDown`, `walkLeft`, `walkRight` | `retropp::Animation`s built from your sheet |
+| `walkUp`, `walkDown`, `walkLeft`, `walkRight` | `retropp::Animation`s built from your sheet. Its cells are 16×16 in this example, so the collision box covers the bottom half of the frame: the hero's feet. |
 | `collisionMap` | a `retropp::IndexGrid`; cells equal to `Cell::Open` can be walked on |
 | `input` | the tick's `retropp::InputState` |
 | `steering` | a `TopDownMovement::DirectionalActions` naming your four direction actions |
@@ -77,8 +77,8 @@ const retropp::Sprite sprite = TopDownMovement::WalkerSprite("bat", bat, batConf
 
 ## The position a walker is bound to
 
-A walker reads and writes a `retropp::Vec2i` that your game owns. It stores no position of its own. You
-bind the walker to yours when you construct the walker:
+A walker reads and writes a `retropp::Vec2i` that your game owns. The position lives in your game state,
+and you bind the walker to it when you construct the walker:
 
 ```cpp
 retropp::Vec2i heroAt{72, 56};
@@ -93,8 +93,8 @@ code read it there. Binding avoids a second copy that would have to be kept in s
 
 The binding is by address:
 
-- **The position must not move in memory** while a walker is bound to it, and it must outlive the
-  walker. See [Lifetimes](#lifetimes) for the `std::vector` case.
+- **The position must stay at the same address** for as long as a walker is bound to it, and it must
+  outlive the walker. See [Lifetimes](#lifetimes) for the `std::vector` case.
 - **A copied walker is bound to the original's position.** After copying a walker, call `bind` on the
   copy to give it its own position. [how-to.md](how-to.md#keep-a-walker-and-its-position-in-one-value) has a struct that does this automatically.
 
@@ -119,8 +119,9 @@ TopDownMovement::follow(guard, guardConfig, patrol);                            
 - **Free.** A plain `Walker` takes a heading: a `Directions` value with four flags. It collides with
   walls the same way the player does.
 - **Route.** `follow` moves a walker along a `retropp::SpritePath`, the engine's route type, which has
-  legs, waits and detours ([routes.md](routes.md)). A walker on a route does not collide with anything.
-  A route can move slower than one pixel per tick; the other two pathways cannot.
+  legs, waits and detours ([routes.md](routes.md)). A walker on a route goes exactly where the route goes,
+  through walls included. A route is also the way to move slower than one pixel per tick; the other
+  two pathways move in whole pixels.
 
 If the character must be stopped by walls, use input or a heading. If its path is fixed in advance and
 runs through open ground, use a route. A walker can switch pathways from one tick to the next.
@@ -143,13 +144,13 @@ pixel at a time and tests its collision shape before taking each pixel.
 | right, open floor | Moves `speed` pixels right. |
 | right, `speed` 3, wall 2 pixels ahead | Moves 2 pixels and stops against the wall. |
 | down-right, wall below | Moves right along the wall. |
-| down-right, into a corner | Does not move. |
-| left and right together | The two cancel. No movement on x. |
+| down-right, into a corner | Stays where it is. |
+| left and right together | The two cancel, and x stays put. |
 
 Notes:
 
-- The axes are tested separately, so a wall that blocks one axis does not block the other.
-- Every pixel is tested, so a walker does not pass through a thin wall at any speed.
+- The axes are tested separately, so a wall that blocks one axis leaves the other free.
+- Every pixel is tested, so a thin wall stops a walker at any speed.
 - `speed` is whole pixels per tick. For slower movement see
   [how-to.md](how-to.md#walk-slower-than-a-pixel-a-tick).
 - A diagonal moves `speed` pixels on both axes, so it covers more distance per tick than a straight
@@ -165,7 +166,7 @@ axes are requested, it chooses one:
 | `InputWalker` | The direction pressed more recently. When that one is released, the other. |
 | `Walker` with a heading | The direction it faces, if that is one of the two. Otherwise the horizontal one. |
 
-The default is `Ways::Eight`. Routes do not read `movement`; a route can move diagonally under either
+The default is `Ways::Eight`. `movement` applies to `walk`. A route moves diagonally under either
 setting.
 
 ## Facing
@@ -176,12 +177,12 @@ with or which way it attacks.
 
 Rules:
 
-- Facing follows the heading even when the walker cannot move. A walker heading into a wall turns to
-  face the wall.
-- With no heading, the facing does not change.
+- Facing follows the heading, including when the walker is blocked. A walker heading into a wall turns
+  to face the wall.
+- With an empty heading, the facing stays as it is.
 - With a heading on one axis, the walker faces that direction.
 - With a heading on both axes, the walker keeps its current facing if that is one of the two
-  directions. If it is neither, an `InputWalker` faces the direction pressed more recently (the
+  directions. Otherwise an `InputWalker` faces the direction pressed more recently (the
   horizontal one if both were pressed on the same tick), and a plain `Walker` faces the horizontal one.
 
 Examples with an `InputWalker`:
@@ -196,7 +197,7 @@ Examples with an `InputWalker`:
 On a route, a walker faces the axis it travels further along each tick
 ([routes.md](routes.md#facing-from-travel)).
 
-To turn a walker without moving it, call `walker.face(retropp::Dir::Left)`.
+To turn a walker in place, call `walker.face(retropp::Dir::Left)`.
 
 ## Sprite directions
 
@@ -224,17 +225,17 @@ animation. With `sprites = Ways::Four`, `spriteFacing` returns the same directio
 with `sprites = Ways::Eight` also `upLeft`, `upRight`, `downLeft`, `downRight`. They are ordinary engine
 animations built from your sheet (the engine's `docs/guide/animation.md`).
 
-The walker selects and advances the animation. You do not start or stop it.
+The walker selects, starts, advances and stops the animation.
 
 | Walker state | Frame shown |
 |---|---|
 | Moving | The animation for the sprite's direction, looping. |
-| Not moving (no heading, or blocked on every axis it heads along) | Frame 0 of that animation. |
+| Standing (an empty heading, or blocked on every axis it heads along) | Frame 0 of that animation. |
 | Turns while moving | The new direction's animation, at the same point in the stride. |
 | Sliding along a wall | The animation keeps playing. |
 
 The walker keeps one tick count for its stride and uses it for whichever direction is showing. Give
-every direction the same frame durations so a turn does not jump to a different point in the step.
+every direction the same frame durations so a turn keeps the same point in the step.
 
 Frame durations are real time. They are converted to ticks using `config.timing`, which defaults to
 the engine's active timing at the moment the config is constructed. Construct configs after calling
@@ -270,21 +271,21 @@ at the walker's position. It works the same for all three pathways. Add the spri
 | `WalkerSprite(…)` | every frame | drawing code |
 
 `walker_sprite.h` is the only header that creates a draw type. Simulation code includes `walker.h`,
-`input_walker.h` and `route.h` and needs no renderer.
+`input_walker.h` and `route.h` and runs with the engine library alone.
 
 ## Lifetimes
 
-What the module keeps a pointer or a view to, and what it does not:
+What the module keeps a pointer or a view to, and what it only reads during a call:
 
 | Object | Rule |
 |---|---|
 | The position | Must stay at the same address while a walker is bound to it. |
 | A `Walker` | A copy is bound to the same position as the original until you call `bind`. |
-| A `WalkerConfig` | Passed to each call. The walker stores nothing from it. The config holds its own copies of the animations. |
+| A `WalkerConfig` | Passed to each call and read there. The config holds its own copies of the animations. |
 | `config.anchors` | A span over your anchor table. The table must outlive the config. |
 | `TileCollision::map` | A pointer to your `IndexGrid`. The map must outlive the `TileCollision`. |
-| The `solids` argument | Used during the call only. |
-| A route | A value you own. `follow` stores nothing from it. |
+| The `solids` argument | Read during the call. |
+| A route | A value you own. `follow` reads and advances it during the call. |
 
 The common mistake is binding walkers to positions in a `std::vector` that later grows. Growth moves the
 elements, and the walkers are left bound to freed memory:
@@ -303,5 +304,5 @@ Two ways to avoid it:
 
 - Keep each walker and its position in one struct that calls `bind` when copied
   ([how-to.md](how-to.md#keep-a-walker-and-its-position-in-one-value)). This is safe in a vector.
-- Keep the positions in a container that does not move them: a vector with `reserve` called up front,
+- Keep the positions in a container that keeps them in place: a vector with `reserve` called up front,
   or a `std::deque` that is only added to at its ends.
