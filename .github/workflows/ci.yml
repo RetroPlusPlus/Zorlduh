@@ -109,6 +109,38 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      # The build runs Python for the test that checks the placeholder art matches its script. The runner
+      # service runs under an account of its own, whose PATH and registry need not show a Python installed
+      # for another user, so this step finds one wherever it is — the py launcher, python on PATH, then
+      # the usual install folders, every user's included — runs each candidate to prove it works (the
+      # Microsoft Store placeholder does not), and hands the first that does to CMake.
+      - name: Find Python
+        shell: powershell
+        run: |
+          $candidates = @()
+          $py = Get-Command py -ErrorAction SilentlyContinue
+          if ($py) { $candidates += (& $py.Source -3 -c "import sys; print(sys.executable)" 2>$null) }
+          foreach ($name in 'python', 'python3') {
+            Get-Command $name -All -ErrorAction SilentlyContinue | ForEach-Object { $candidates += $_.Source }
+          }
+          $candidates += Get-ChildItem -Path 'C:\Program Files\Python3*\python.exe', 'C:\Python3*\python.exe', `
+                                             'C:\Users\*\AppData\Local\Programs\Python\Python3*\python.exe' `
+                                       -ErrorAction SilentlyContinue | Sort-Object FullName -Descending |
+                                       ForEach-Object { $_.FullName }
+          foreach ($candidate in $candidates) {
+            if (-not $candidate) { continue }
+            & $candidate -c "import sys; assert sys.version_info >= (3,)" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Python: $candidate"
+              Add-Content -Path $env:GITHUB_ENV -Value "ZORLDUH_PYTHON=$candidate"
+              exit 0
+            }
+          }
+          Write-Host "No working Python 3 for the account $(whoami). Looked at:"
+          $candidates | ForEach-Object { Write-Host "  $_" }
+          Write-Host "Install it for every account: ci/runner-setup/windows/deps-install.ps1"
+          exit 1
+
       # ClangCL, not MSVC: SameBoy's Windows shims use #include_next, which MSVC rejects (C1021). The build
       # is at a short root path: a FetchContent _deps tree nested under the runner's workspace passes the
       # 260-character path limit.
@@ -116,14 +148,14 @@ jobs:
         shell: powershell
         run: |
           cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
-            -G "Visual Studio 17 2022" -A x64 -T ClangCL
+            -G "Visual Studio 17 2022" -A x64 -T ClangCL "-DPython3_EXECUTABLE=$env:ZORLDUH_PYTHON"
           if ($LASTEXITCODE -ne 0) {
             # A cache written by another generator or toolset cannot be reused, and CMake will not
             # overwrite it; each FetchContent sub-build keeps its own cache too, so the whole directory
             # goes rather than the parts that look guilty.
             Remove-Item C:\zorlduh-ci-build -Recurse -Force -ErrorAction SilentlyContinue
             cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
-              -G "Visual Studio 17 2022" -A x64 -T ClangCL
+              -G "Visual Studio 17 2022" -A x64 -T ClangCL "-DPython3_EXECUTABLE=$env:ZORLDUH_PYTHON"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
@@ -287,16 +319,44 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      # See the Windows x64 job.
+      - name: Find Python
+        shell: powershell
+        run: |
+          $candidates = @()
+          $py = Get-Command py -ErrorAction SilentlyContinue
+          if ($py) { $candidates += (& $py.Source -3 -c "import sys; print(sys.executable)" 2>$null) }
+          foreach ($name in 'python', 'python3') {
+            Get-Command $name -All -ErrorAction SilentlyContinue | ForEach-Object { $candidates += $_.Source }
+          }
+          $candidates += Get-ChildItem -Path 'C:\Program Files\Python3*\python.exe', 'C:\Python3*\python.exe', `
+                                             'C:\Users\*\AppData\Local\Programs\Python\Python3*\python.exe' `
+                                       -ErrorAction SilentlyContinue | Sort-Object FullName -Descending |
+                                       ForEach-Object { $_.FullName }
+          foreach ($candidate in $candidates) {
+            if (-not $candidate) { continue }
+            & $candidate -c "import sys; assert sys.version_info >= (3,)" 2>$null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Python: $candidate"
+              Add-Content -Path $env:GITHUB_ENV -Value "ZORLDUH_PYTHON=$candidate"
+              exit 0
+            }
+          }
+          Write-Host "No working Python 3 for the account $(whoami). Looked at:"
+          $candidates | ForEach-Object { Write-Host "  $_" }
+          Write-Host "Install it for every account: ci/runner-setup/windows/deps-install.ps1"
+          exit 1
+
       - name: Configure
         shell: powershell
         run: |
           cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
-            -G "Visual Studio 17 2022" -A ARM64 -T ClangCL
+            -G "Visual Studio 17 2022" -A ARM64 -T ClangCL "-DPython3_EXECUTABLE=$env:ZORLDUH_PYTHON"
           if ($LASTEXITCODE -ne 0) {
             # See the Windows x64 job.
             Remove-Item C:\zorlduh-ci-build -Recurse -Force -ErrorAction SilentlyContinue
             cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
-              -G "Visual Studio 17 2022" -A ARM64 -T ClangCL
+              -G "Visual Studio 17 2022" -A ARM64 -T ClangCL "-DPython3_EXECUTABLE=$env:ZORLDUH_PYTHON"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
