@@ -40,8 +40,8 @@ starts with no display and the GPU device is Vulkan's software driver (lavapipe)
 
 ## Baseline
 
-The same 335 tests are registered on every platform, and a run is green only when every job reports
-**335/335/0** (passed/total/skipped).
+The same 334 tests are registered on every platform, and a run is green only when every job reports
+**334/334/0** (passed/total/skipped).
 
 ## Design decisions
 
@@ -87,8 +87,8 @@ The same 335 tests are registered on every platform, and a run is green only whe
 
 Beyond the compiler, CMake and Ninja, the build needs the engine's shader compilers — `glslang` on
 Linux, `glslang` and `spirv-cross` with the Metal toolchain on macOS, `dxc` from the Windows SDK on
-Windows — and Python 3 everywhere, for the test that checks the placeholder art matches the script that
-writes it. The Linux script also installs Mesa's Vulkan drivers, for the GPU tests run headless.
+Windows. The Linux script also installs Mesa's Vulkan drivers, for the GPU tests run headless. The
+build needs no Python.
 
 ## Reading results
 

@@ -1,8 +1,7 @@
 # Windows runner dependency installer (x64 and ARM64 alike). Run once in PowerShell as Administrator.
 # Installs VS 2022 Build Tools (the C++ toolchain, the Windows SDK — whose bin directory carries dxc,
-# the shader compiler the engine's build runs — and the clang-cl toolset), CMake, Ninja, Git and
-# Python 3 (for the check that the placeholder art matches the script that writes it). On ARM64 it adds
-# the ARM64 C++ tools.
+# the shader compiler the engine's build runs — and the clang-cl toolset), CMake, Ninja and Git. On
+# ARM64 it adds the ARM64 C++ tools.
 # After running, open a NEW PowerShell window so PATH reflects the new installs, then verify.
 #
 # CI configures with `-T ClangCL`: SameBoy's Windows shims use #include_next, which MSVC rejects.
@@ -35,16 +34,8 @@ winget install --id Ninja-build.Ninja --silent --accept-source-agreements --acce
 Write-Host "Installing Git..."
 winget install --id Git.Git --silent --accept-source-agreements --accept-package-agreements
 
-Write-Host "Installing Python 3 for every account..."
-# --scope machine: winget installs Python for the current user alone by default, and the runner service
-# runs under another account, which would not find it.
-winget install --id Python.Python.3.12 --scope machine --silent --accept-source-agreements --accept-package-agreements
-
 Write-Host ""
-Write-Host "Restart the runner service so it reads the new PATH:"
-Write-Host "  Get-Service actions.runner.* | Restart-Service"
-Write-Host "Then open a NEW PowerShell window and verify:"
+Write-Host "Done. Open a NEW PowerShell window and verify:"
 Write-Host "  cmake --version"
 Write-Host "  ninja --version"
-Write-Host "  python --version"
 Write-Host "  clang-cl --version  (from a Developer PowerShell for VS 2022)"

@@ -70,8 +70,8 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
 Requirements are the engine's: CMake 3.28+, a C++20 compiler (GCC 13+, Clang 16+, AppleClang 15+ or
 MSVC 19.38+), and the engine's build-time shader toolchain — see the engine's
 [build guide](https://github.com/RetroPlusPlus/Polyrhythm/blob/main/docs/guide/build-and-consume.md).
-Python 3 is needed too: the test suite runs
-`tools/placeholder_art.py --check` to confirm the committed art is what the script writes.
+The placeholder art under `assets/` is written by `tools/placeholder_art.py` (Python 3);
+`python3 tools/placeholder_art.py --check` confirms the committed files are what it writes.
 
 ```sh
 git clone --recurse-submodules https://github.com/RetroPlusPlus/Zorlduh.git

@@ -4,8 +4,7 @@
 #
 # The engine builds SDL3, SameBoy and Snaggletooth from its own submodules, so no package of theirs is
 # needed — only the platform headers SDL3 compiles against, the shader compiler the engine's build runs,
-# Vulkan's software driver for the tests that open a GPU device with no display, and Python 3 for the
-# check that the placeholder art matches the script that writes it.
+# and Vulkan's software driver for the tests that open a GPU device with no display.
 set -euo pipefail
 
 apt-get update -y
@@ -16,7 +15,6 @@ apt-get install -y \
     git \
     pkg-config \
     ccache \
-    python3 \
     glslang-tools \
     libvulkan-dev \
     mesa-vulkan-drivers \
@@ -33,4 +31,4 @@ apt-get install -y \
     libxi-dev \
     libxtst-dev
 
-echo "Done. Verify: cmake --version && ninja --version && gcc --version && glslang --version && python3 --version"
+echo "Done. Verify: cmake --version && ninja --version && gcc --version && glslang --version"

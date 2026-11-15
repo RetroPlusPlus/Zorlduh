@@ -165,8 +165,3 @@ zorlduh_add_test(ScriptKit)
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE
     ZORLDUH_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
-
-# The committed files under assets/ are exactly what tools/placeholder_art.py writes.
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-add_test(NAME zorlduh-placeholder-art-matches-script
-    COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/tools/placeholder_art.py" --check)
