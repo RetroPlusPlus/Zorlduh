@@ -35,11 +35,15 @@ winget install --id Ninja-build.Ninja --silent --accept-source-agreements --acce
 Write-Host "Installing Git..."
 winget install --id Git.Git --silent --accept-source-agreements --accept-package-agreements
 
-Write-Host "Installing Python 3..."
-winget install --id Python.Python.3.12 --silent --accept-source-agreements --accept-package-agreements
+Write-Host "Installing Python 3 for every account..."
+# --scope machine: winget installs Python for the current user alone by default, and the runner service
+# runs under another account, which would not find it.
+winget install --id Python.Python.3.12 --scope machine --silent --accept-source-agreements --accept-package-agreements
 
 Write-Host ""
-Write-Host "Done. Open a NEW PowerShell window and verify:"
+Write-Host "Restart the runner service so it reads the new PATH:"
+Write-Host "  Get-Service actions.runner.* | Restart-Service"
+Write-Host "Then open a NEW PowerShell window and verify:"
 Write-Host "  cmake --version"
 Write-Host "  ninja --version"
 Write-Host "  python --version"
