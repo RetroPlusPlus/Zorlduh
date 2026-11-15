@@ -1,5 +1,5 @@
 // The things in the world that can be read: a sign, a rock with words cut into it. Each stands on one
-// cell of an area, which its map marks solid, and is read by pressing Item while facing it.
+// cell of an area, which its map marks solid, and is read by pressing Interact while facing it.
 #pragma once
 
 #include <span>

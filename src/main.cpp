@@ -44,7 +44,7 @@ int main() {
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
     const zorlduh::Config config =
         zorlduh::gameConfig(assets, zorlduh::kView, zorlduh::kAreaDepths, zorlduh::kDialogBox, zorlduh::kMenuBoxes);
-    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart},
+    zorlduh::GameState state{.player = {zorlduh::kPlayerStart},
                              .screen = zorlduh::Screen::Title};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
 

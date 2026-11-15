@@ -150,7 +150,7 @@ const WindowKit::Border& borderOf(const Borders& borders, Material material) noe
 }
 
 void returnToTitle(GameState& state, const Config& config) {
-    state.player = TopDownMovement::Walker{kPlayerStart};
+    state.player = Player{kPlayerStart};
     state.camera = WorldKit::Camera{kStartLayout, kStartArea};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     state.nameReveal = TextKit::Reveal{};
@@ -178,7 +178,7 @@ void tick(GameState& state, const Input& input, const Config& config) {
     // A message holds the world still. The press that opens one is never also its first confirm: the
     // tick that opens it does not advance it.
     if (state.dialog.showing()) {
-        state.dialog.advance(input.item);
+        state.dialog.advance(input.interact);
         state.nameReveal.advance();
         return;
     }
@@ -197,7 +197,7 @@ void tick(GameState& state, const Input& input, const Config& config) {
         state.nameReveal = TextKit::Reveal{};
     }
 
-    if (input.item && !state.camera.transitioning()) {
+    if (input.interact && !state.camera.transitioning()) {
         const Sign* sign = signFaced(static_cast<Layout>(state.camera.layout()), state.camera.area(),
                                      state.player.collision(config.player).bounds(), state.player.facing());
         if (sign != nullptr) {

@@ -123,7 +123,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 }
 
 zorlduh::GameState start(const zorlduh::Config& config) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    zorlduh::GameState state{.player = zorlduh::Player{zorlduh::kPlayerStart}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }
@@ -212,7 +212,7 @@ TEST(AreaName, EnteringAnAreaTypesItsNameFromTheStart) {
 TEST(AreaName, ANameWithASpaceDrawsEveryLetterAndNothingForTheSpace) {
     const zorlduh::Assets assets = headlessAssets();
     const zorlduh::Config config = headlessConfig(assets);
-    zorlduh::GameState state{.player = TopDownMovement::Walker{{.x = 40, .y = 24}}};
+    zorlduh::GameState state{.player = zorlduh::Player{{.x = 40, .y = 24}}};
     state.camera = WorldKit::Camera{Layout::DungeonOne, Room::WestWing};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
 

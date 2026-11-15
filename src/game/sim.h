@@ -2,7 +2,7 @@
 // tick changes the state; everything on screen only reads it.
 //
 //     const zorlduh::Config config = zorlduh::gameConfig(assets, kView, kAreaDepths, kDialogBox, kMenuBoxes);
-//     zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart},
+//     zorlduh::GameState state{.player = {zorlduh::kPlayerStart},
 //                              .screen = zorlduh::Screen::Title};
 //     state.camera.place(config.world, state.player.collision(config.player).bounds());
 //     zorlduh::tick(state, zorlduh::readInput(in), config);   // once per tick
@@ -32,6 +32,7 @@
 #include "assets/assets.h"
 #include "game/areas.h"
 #include "game/menus.h"
+#include "game/player.h"
 #include "game/signs.h"
 
 namespace zorlduh {
@@ -42,9 +43,9 @@ enum class Screen : std::uint8_t { Title, Playing };
 // What the player asked for this tick.
 struct Input {
     TopDownMovement::DirectionalInput move{};  // the directions held and pressed
-    bool item = false;                         // Item was pressed this tick
+    bool interact = false;                     // Interact was pressed this tick
     bool start = false;                        // Start was pressed this tick
-    MenuKit::MenuInput menu{};                 // the directions, and Item and Attack as confirm and cancel
+    MenuKit::MenuInput menu{};                 // the directions, and Interact and Attack as confirm and cancel
 };
 
 // What the tick says happened. Presentation and audio read these; the tick clears them first.
@@ -87,7 +88,7 @@ struct Config {
 [[nodiscard]] const WindowKit::Border& borderOf(const Borders& borders, Material material) noexcept;
 
 struct GameState {
-    TopDownMovement::Walker player;
+    Player player;
     WorldKit::Camera camera{kStartLayout, kStartArea};  // which area, where the screen looks, any scroll or fade running
     TextKit::Reveal nameReveal;  // how much of the current area's name has been typed into the HUD strip
     WindowKit::Dialog dialog;    // the message being read, if any
@@ -117,12 +118,12 @@ void returnToTitle(GameState& state, const Config& config);
 // returns to the title screen; an area chosen from WARP puts the player there and closes the menu; an
 // option is applied and the menu steps back to OPTIONS.
 //
-// While a message is showing, Item finishes whatever it is doing (opens the box at once, shows the page,
+// While a message is showing, Interact finishes whatever it is doing (opens the box at once, shows the page,
 // turns it, closes it after the last, closes the box at once) and nothing else moves.
 //
 // Otherwise the player walks the current area unless a scroll or fade is running, the camera follows the
 // player's collision box and moves the player through any opening it goes out by, and entering an area
-// is recorded as an AreaChanged event and starts its name typing out again; then Item, with no scroll or
+// is recorded as an AreaChanged event and starts its name typing out again; then Interact, with no scroll or
 // fade running, opens the message of the sign or rock the player faces, in the border of its material,
 // the style of its own and the speed TEXT set; then Start, with no scroll or fade running and no message
 // showing, opens the pause menu. The name's reveal advances every tick but on the title screen.

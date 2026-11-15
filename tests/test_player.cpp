@@ -115,7 +115,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 }
 
 zorlduh::GameState start(const zorlduh::Config& config) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    zorlduh::GameState state{.player = {zorlduh::kPlayerStart}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }
@@ -237,7 +237,7 @@ TEST(Controls, EveryActionIsBound) {
     const retropp::ActionMap map = zorlduh::actionMap();
     for (const zorlduh::Action action :
          {zorlduh::Action::Up, zorlduh::Action::Down, zorlduh::Action::Left, zorlduh::Action::Right,
-          zorlduh::Action::Attack, zorlduh::Action::Item, zorlduh::Action::Start}) {
+          zorlduh::Action::Attack, zorlduh::Action::Interact, zorlduh::Action::Start}) {
         bool bound = false;
         for (const retropp::ActionBinding& row : map.rows()) {
             bound = bound || row.action == retropp::actionId(action);
@@ -306,7 +306,7 @@ TEST_F(PlayerOnDevice, ThePlayerComponentIsOneSpriteKeyedPlayer) {
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
     TopDownMovement::WalkerConfig player = zorlduh::PlayerConfig(assets);
     player.timing = kHz60;
-    const zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    const zorlduh::GameState state{.player = {zorlduh::kPlayerStart}};
 
     const LayerKit::Sprites sprites = zorlduh::Player(state, player);
     ASSERT_EQ(sprites.size(), 1u);
