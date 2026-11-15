@@ -13,6 +13,9 @@ option(TOPDOWNMOVEMENT_BUILD_EXAMPLES "Build the TopDownMovement module's exampl
 if(TOPDOWNMOVEMENT_BUILD_EXAMPLES)
     add_executable(TopDownMovement-example-getting-started examples/getting_started.cpp)
     target_link_libraries(TopDownMovement-example-getting-started PRIVATE TopDownMovement::TopDownMovement)
+    # The example reads its sheets and palettes from examples/assets/ in this directory.
+    target_compile_definitions(TopDownMovement-example-getting-started PRIVATE
+        TOPDOWNMOVEMENT_EXAMPLE_ASSETS="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
     if(MSVC)
         target_compile_options(TopDownMovement-example-getting-started PRIVATE /W4)
     else()

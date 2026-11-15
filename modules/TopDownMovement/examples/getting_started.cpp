@@ -1,6 +1,15 @@
-// A complete program built on the TopDownMovement module: a walled room with four pillars, and a walker
-// steered with the arrow keys, WASD or a d-pad. It walks in eight directions, keeps moving along a wall
-// it walks into diagonally, faces where it walks and steps through its walk animation.
+// A complete program built on the TopDownMovement module: a walled room with four pillars and three
+// walkers, one for each way a walker is moved.
+//
+//   - The hero is steered with the arrow keys, WASD or a d-pad (an InputWalker).
+//   - The wanderer walks its heading until something stops it, then turns clockwise (a Walker given a
+//     heading by this program's own rule).
+//   - The guard patrols a route along the bottom of the room, pausing at its east end (a Walker on the
+//     engine's SpritePath).
+//
+// Z or a pad's A button switches every walker between 8-way and 4-way movement; X or B between 4 and 8
+// sprite directions. The two cells in the room's top-left corner say which are on: the blue one is the
+// movement, the orange one the sprite directions, each a plus for four and a star for eight.
 //
 // docs/getting-started.md walks through it part by part.
 
@@ -8,8 +17,11 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <span>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "retropp/animation.h"
@@ -20,20 +32,26 @@
 #include "retropp/input.h"
 #include "retropp/input_actions.h"
 #include "retropp/palette.h"
+#include "retropp/path_walker.h"
 #include "retropp/renderer.h"
 #include "retropp/run_loop.h"
 #include "retropp/sdl_platform.h"
+#include "retropp/sprite_path.h"
 #include "retropp/timing.h"
 #include "retropp/windowed_host.h"
 
 #include "TopDownMovement/collision.h"
 #include "TopDownMovement/directions.h"
+#include "TopDownMovement/input_walker.h"
+#include "TopDownMovement/route.h"
 #include "TopDownMovement/walker.h"
 #include "TopDownMovement/walker_sprite.h"
 
 namespace {
 
-enum class Action : std::uint8_t { Up, Down, Left, Right };
+using namespace std::chrono_literals;
+
+enum class Action : std::uint8_t { Up, Down, Left, Right, Movement, Sprites };
 
 // The room: the whole Game Boy Color screen, 20×18 cells of 8 px.
 constexpr int kCell = 8;
@@ -42,6 +60,9 @@ constexpr int kRoomHeight = 18;
 
 // The values in the room's collision map.
 enum class Cell : std::uint16_t { Open = 0, Wall = 1 };
+
+// The cells of the tile sheet, in its order.
+enum class Tile : std::size_t { Floor, Wall, Four, Eight };
 
 // The room's collision map: wall round the edge and four 2×2 pillars.
 retropp::IndexGrid Room() {
@@ -59,81 +80,115 @@ retropp::IndexGrid Room() {
     return room;
 }
 
-// The art: one tile sheet (floor, wall), one walker sheet, one palette.
-struct Art {
-    retropp::AtlasId tiles{};
-    retropp::AtlasManifest walker;
-    retropp::PaletteId palette{};
-};
-
-// The walker sheet: 8×8 frames, two per row, one row per facing in the order Up, Down, Left, Right.
-// Each frame is an arrowhead pointing the way the row faces; the second frame sits one pixel further
-// along, so walking reads as a bob.
-Art uploadArt(retropp::Renderer& renderer) {
-    Art art;
-
-    std::array<std::uint8_t, 16 * 8> tiles{};
-    for (int y = 0; y < kCell; ++y) {
-        for (int x = 0; x < kCell; ++x) {
-            const bool rim = x == 0 || y == 0 || x == kCell - 1 || y == kCell - 1;
-            tiles[static_cast<std::size_t>(y) * 16 + x] = 1;
-            tiles[static_cast<std::size_t>(y) * 16 + kCell + x] = rim ? 3 : 2;
-        }
+// The bytes of a file under this example's assets/ directory.
+std::vector<std::uint8_t> readAsset(const std::string& name) {
+    std::ifstream in(std::string(TOPDOWNMOVEMENT_EXAMPLE_ASSETS) + "/" + name, std::ios::binary);
+    if (!in) {
+        throw std::runtime_error("cannot open assets/" + name);
     }
-    art.tiles = renderer.uploadAtlas(tiles.data(), 16, 8).atlasId;
-
-    constexpr int kSheetWidth = 16;
-    constexpr int kSheetHeight = 32;
-    std::array<std::uint8_t, kSheetWidth * kSheetHeight> walker{};
-    for (int row = 0; row < 4; ++row) {
-        for (int frame = 0; frame < 2; ++frame) {
-            for (int y = 0; y < kCell; ++y) {
-                for (int x = 0; x < kCell; ++x) {
-                    // Distance along the facing (0 at the back, 7 at the tip) and across it; the
-                    // second frame sits one pixel further along.
-                    const int along = (row == 0 ? 7 - y : row == 1 ? y : row == 2 ? 7 - x : x) - frame;
-                    const int across = row < 2 ? x : y;
-                    const bool inside = along >= 0 && std::abs(2 * across - 7) <= 7 - along;
-                    walker[static_cast<std::size_t>(row * kCell + y) * kSheetWidth +
-                           static_cast<std::size_t>(frame * kCell + x)] = inside ? 3 : 0;
-                }
-            }
-        }
-    }
-    art.walker = renderer.uploadAtlas(walker.data(), kSheetWidth, kSheetHeight,
-                                      retropp::AssetDimensions{.width = 8, .height = 8},
-                                      retropp::ContentKind::AnimationSeries,
-                                      retropp::ReadOrder::LeftRightThenDown, /*count=*/0,
-                                      retropp::TransparentIndices::of({0}), /*framesPerAnimation=*/2);
-
-    const std::array<retropp::Rgba8, 4> colors{
-        {{20, 24, 40}, {60, 90, 70}, {110, 140, 120}, {240, 230, 200}}};
-    art.palette = renderer.uploadPalette(std::span<const retropp::Rgba8>(colors));
-    return art;
+    return {std::istreambuf_iterator<char>(in), {}};
 }
 
-// One row of the walker sheet as a walk animation: two frames of eight ticks each.
-retropp::Animation WalkRow(const Art& art, std::size_t row) {
-    constexpr auto kFrame = 8 * std::chrono::nanoseconds{
-                                    static_cast<std::chrono::nanoseconds::rep>(retropp::TickPeriodNs::Hz60)};
+// A palette image from this example's assets/ directory, uploaded.
+retropp::PaletteId loadPalette(retropp::Renderer& renderer, const std::string& name) {
+    const std::vector<retropp::Rgba16> colors =
+        retropp::slicePaletteImage(retropp::loadPngFromMemory(readAsset(name)));
+    return renderer.uploadPalette(std::span<const retropp::Rgba16>(colors));
+}
+
+// The art: the tile sheet (floor, wall, the plus and the star), the walker sheet, and a palette for the
+// room, for each of the two indicators and for each walker.
+struct Art {
+    retropp::AtlasManifest tiles;
+    retropp::AtlasManifest walker;
+    retropp::PaletteId room{};
+    retropp::PaletteId movement{};
+    retropp::PaletteId sprites{};
+    retropp::PaletteId hero{};
+    retropp::PaletteId wanderer{};
+    retropp::PaletteId guard{};
+};
+
+Art loadArt(retropp::Renderer& renderer) {
+    return Art{
+        .tiles = renderer.loadAtlasFromMemory(readAsset("tiles.png"), retropp::AssetDimensions{.width = kCell, .height = kCell},
+                                              retropp::ContentKind::Tileset, retropp::ReadOrder::LeftRightThenDown,
+                                              /*count=*/4),
+        // Eight rows of 8×8 frames, two to a row, one row per sprite direction in the order of
+        // TopDownMovement::Facing: Up, UpRight, Right, DownRight, Down, DownLeft, Left, UpLeft. Index 0 is
+        // transparent.
+        .walker = renderer.loadAtlasFromMemory(readAsset("walker.png"), retropp::AssetDimensions{.width = kCell, .height = kCell},
+                                               retropp::ContentKind::AnimationSeries, retropp::ReadOrder::LeftRightThenDown,
+                                               /*count=*/0, retropp::TransparentIndices::of({0}),
+                                               /*framesPerAnimation=*/2),
+        .room = loadPalette(renderer, "palettes/room.png"),
+        .movement = loadPalette(renderer, "palettes/movement.png"),
+        .sprites = loadPalette(renderer, "palettes/sprites.png"),
+        .hero = loadPalette(renderer, "palettes/hero.png"),
+        .wanderer = loadPalette(renderer, "palettes/wanderer.png"),
+        .guard = loadPalette(renderer, "palettes/guard.png"),
+    };
+}
+
+// The walker sheet's row for `facing` as a walk animation in `palette`: two frames of eight ticks each.
+retropp::Animation WalkRow(const Art& art, TopDownMovement::Facing facing, retropp::PaletteId palette) {
+    const std::size_t first = static_cast<std::size_t>(facing) * 2;
     return retropp::Animation{{
-        {.sheet = art.walker.atlasId, .tileIndex = row * 2, .palette = art.palette, .duration = kFrame},
-        {.sheet = art.walker.atlasId, .tileIndex = row * 2 + 1, .palette = art.palette, .duration = kFrame},
+        {.sheet = art.walker.atlasId, .tileIndex = first, .palette = palette, .duration = 8 * 1s / 60},
+        {.sheet = art.walker.atlasId, .tileIndex = first + 1, .palette = palette, .duration = 8 * 1s / 60},
     }};
 }
 
-// The room's cells for its tile layer: wall where the collision map is solid, floor elsewhere.
-std::vector<retropp::TileCell> RoomCells(const retropp::IndexGrid& room, const Art& art) {
+// Every row of the walker sheet, in `palette`.
+TopDownMovement::DirectionalAnimations WalkAnimations(const Art& art, retropp::PaletteId palette) {
+    using TopDownMovement::Facing;
+    return {
+        .up = WalkRow(art, Facing::Up, palette),
+        .down = WalkRow(art, Facing::Down, palette),
+        .left = WalkRow(art, Facing::Left, palette),
+        .right = WalkRow(art, Facing::Right, palette),
+        .upLeft = WalkRow(art, Facing::UpLeft, palette),
+        .upRight = WalkRow(art, Facing::UpRight, palette),
+        .downLeft = WalkRow(art, Facing::DownLeft, palette),
+        .downRight = WalkRow(art, Facing::DownRight, palette),
+    };
+}
+
+// A walker of 8×8 art, one pixel a tick, colliding with a 6×4 box across the bottom of its art.
+TopDownMovement::WalkerConfig WalkerOf(const Art& art, retropp::PaletteId palette) {
+    return TopDownMovement::WalkerConfig{
+        .speed = 1,
+        .collision = retropp::IntRect{.x = 1, .y = 4, .width = 6, .height = 4},
+        .walk = WalkAnimations(art, palette),
+    };
+}
+
+// The room's cells for its tile layer: wall where the collision map is solid, floor elsewhere; and in
+// the top-left corner the two indicators, a plus for Ways::Four and a star for Ways::Eight.
+std::vector<retropp::TileCell> RoomCells(const retropp::IndexGrid& room, const Art& art, TopDownMovement::Ways movement,
+                                         TopDownMovement::Ways sprites) {
+    const auto cell = [&](Tile tile, retropp::PaletteId palette) {
+        return retropp::TileCell{.atlas = art.tiles.atlasId,
+                                 .tile = art.tiles[static_cast<std::size_t>(tile)].tile,
+                                 .palette = palette};
+    };
+    const auto ways = [](TopDownMovement::Ways w) { return w == TopDownMovement::Ways::Four ? Tile::Four : Tile::Eight; };
+
     std::vector<retropp::TileCell> cells;
     cells.reserve(room.values.size());
     for (const std::uint16_t value : room.values) {
-        const bool wall = value == static_cast<std::uint16_t>(Cell::Wall);
-        cells.push_back(retropp::TileCell{.atlas = art.tiles,
-                                          .tile = static_cast<std::uint16_t>(wall ? 1 : 0),
-                                          .palette = art.palette});
+        cells.push_back(cell(value == static_cast<std::uint16_t>(Cell::Wall) ? Tile::Wall : Tile::Floor, art.room));
     }
+    cells[0] = cell(ways(movement), art.movement);
+    cells[1] = cell(ways(sprites), art.sprites);
     return cells;
 }
+
+// The wanderer's headings, clockwise from right: it turns to the next when it cannot move.
+const std::array<TopDownMovement::Directions, 8> kClockwise{{
+    {.right = true}, {.down = true, .right = true}, {.down = true}, {.down = true, .left = true},
+    {.left = true}, {.up = true, .left = true}, {.up = true}, {.up = true, .right = true},
+}};
 
 }  // namespace
 
@@ -149,34 +204,81 @@ int main() {
     retropp::SdlPlatform platform;
     retropp::Renderer renderer{platform.device(), platform.sdlWindow()};
     retropp::RunLoop loop{clock};
-    platform.actions(
-        retropp::presets::directional(Action::Up, Action::Down, Action::Left, Action::Right));
-
-    const Art art = uploadArt(renderer);
-    const retropp::IndexGrid room = Room();
-    const std::vector<retropp::TileCell> roomCells = RoomCells(room, art);
-
-    // What the walker is: one pixel per tick, a 6×4 collision box across the bottom of its 8×8 art, and
-    // a walk animation per facing.
-    const TopDownMovement::WalkerConfig hero{
-        .speed = 1,
-        .collision = retropp::IntRect{.x = 1, .y = 4, .width = 6, .height = 4},
-        .walk = {.up = WalkRow(art, 0), .down = WalkRow(art, 1),
-                 .left = WalkRow(art, 2), .right = WalkRow(art, 3)},
+    retropp::ActionMap actions{
+        {Action::Movement, {SDL_SCANCODE_Z, retropp::PadButton::FaceLabelA}},
+        {Action::Sprites, {SDL_SCANCODE_X, retropp::PadButton::FaceLabelB}},
     };
+    actions.add(retropp::presets::directional(Action::Up, Action::Down, Action::Left, Action::Right));
+    platform.actions(actions);
+
+    const Art art = loadArt(renderer);
+    const retropp::IndexGrid room = Room();
     const TopDownMovement::TileCollision walls{.map = &room, .cellSize = kCell, .open = Cell::Open};
     const TopDownMovement::DirectionalActions steering{
         .up = Action::Up, .down = Action::Down, .left = Action::Left, .right = Action::Right};
 
-    TopDownMovement::Walker walker{{76, 68}};
+    // What each walker is: the same shape and speed, its own colors. The two switches start at their
+    // defaults, 8-way movement with 4 sprite directions.
+    TopDownMovement::WalkerConfig heroConfig = WalkerOf(art, art.hero);
+    TopDownMovement::WalkerConfig wandererConfig = WalkerOf(art, art.wanderer);
+    TopDownMovement::WalkerConfig guardConfig = WalkerOf(art, art.guard);
+
+    // Where each walker stands: positions this program keeps, each walker bound to its own.
+    retropp::Vec2i heroAt{76, 68};
+    retropp::Vec2i wandererAt{76, 24};
+    retropp::Vec2i guardAt{16, 120};
+
+    TopDownMovement::InputWalker hero{heroAt};
+    TopDownMovement::Walker wanderer{wandererAt};
+    TopDownMovement::Walker guard{guardAt};
+
+    // The guard's patrol, along row 15 and back, half a pixel a tick, resting half a second at the east
+    // end. The route is the engine's SpritePath, departing from where the guard stands.
+    retropp::SpritePath patrol = TopDownMovement::routeFrom(guard, {
+        {.label = "east", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::speed(30.0f)},
+        {.label = "wait", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::eased(500ms)},
+        {.label = "west", .move = retropp::SpritePathMove::to({16.0f, 120.0f}), .pacing = retropp::PathPacing::speed(30.0f)},
+    });
+
+    std::size_t heading = 0;   // the wanderer's, in kClockwise
     loop.simTick([&](const retropp::InputState& input) {
-        walker.walk(hero, TopDownMovement::readDirections(input, steering), walls);
+        // The two switches, on every walker at once.
+        if (input.justPressed(Action::Movement)) {
+            const TopDownMovement::Ways movement = heroConfig.movement == TopDownMovement::Ways::Eight
+                                                       ? TopDownMovement::Ways::Four
+                                                       : TopDownMovement::Ways::Eight;
+            heroConfig.movement = wandererConfig.movement = guardConfig.movement = movement;
+        }
+        if (input.justPressed(Action::Sprites)) {
+            const TopDownMovement::Ways sprites = heroConfig.sprites == TopDownMovement::Ways::Four
+                                                      ? TopDownMovement::Ways::Eight
+                                                      : TopDownMovement::Ways::Four;
+            heroConfig.sprites = wandererConfig.sprites = guardConfig.sprites = sprites;
+        }
+
+        // The input pathway: the pad.
+        hero.walk(heroConfig, TopDownMovement::readDirections(input, steering), walls);
+
+        // The free pathway: a heading from this program's own rule.
+        wanderer.walk(wandererConfig, kClockwise[heading], walls);
+        if (!wanderer.moving()) {
+            heading = (heading + 1) % kClockwise.size();
+        }
+
+        // The route pathway: one tick along the patrol.
+        TopDownMovement::follow(guard, guardConfig, patrol);
     });
 
     retropp::FrameDrawState frame;
+    std::vector<retropp::TileCell> roomCells;
     std::vector<retropp::Sprite> sprites;
     loop.renderLoop([&] {
-        sprites = {TopDownMovement::WalkerSprite("hero", walker, hero)};
+        roomCells = RoomCells(room, art, heroConfig.movement, heroConfig.sprites);
+        sprites = {
+            TopDownMovement::WalkerSprite("hero", hero, heroConfig),
+            TopDownMovement::WalkerSprite("wanderer", wanderer, wandererConfig),
+            TopDownMovement::WalkerSprite("guard", guard, guardConfig),
+        };
         frame.layers = {
             retropp::DrawLayer{.key = "room",
                                .z = 0,

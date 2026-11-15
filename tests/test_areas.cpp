@@ -127,7 +127,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 }
 
 zorlduh::GameState start(const zorlduh::Config& config) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    zorlduh::GameState state{.player = zorlduh::Player{zorlduh::kPlayerStart}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }

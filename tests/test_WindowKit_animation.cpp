@@ -540,6 +540,14 @@ TEST(DialogBox, WhileTheBoxMovesIsTheBoxAloneAndPassesItsOptionsOnceOpen) {
 
 // ── A box grown, drawn (through a renderer on a GPU device) ───────────────────────────────────────
 
+// Windows on ARM has no production-representative GPU backend in CI; its production path (D3D12 + DXIL)
+// is covered by the Windows x64 job, so a missing device there is a skip. Everywhere else it fails.
+#if defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__))
+inline constexpr bool kDeviceOptional = true;
+#else
+inline constexpr bool kDeviceOptional = false;
+#endif
+
 class GrowOnDevice : public ::testing::Test {
 protected:
     static inline SDL_GPUDevice* device_ = nullptr;
@@ -568,6 +576,10 @@ protected:
 
     void SetUp() override {
         if (device_ == nullptr) {
+            if (kDeviceOptional) {
+                GTEST_SKIP() << "Windows on ARM has no production-representative GPU backend in CI; the "
+                                "Windows x64 job covers the D3D12 path. (" << error_ << ")";
+            }
             FAIL() << "no GPU device: " << error_ << ". A grown box is read back from a renderer, which needs one.";
         }
     }

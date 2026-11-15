@@ -1,6 +1,6 @@
 // The things the player reads: the meadow's wooden sign and the lake's stone rock over the real maps —
 // where they stand, which one the player faces from each side, reading one through the tick with the
-// world held still while the message is up, the pages turned with Item to the close, and the message
+// world held still while the message is up, the pages turned with Interact to the close, and the message
 // box drawn in the border of what is read. No renderer is needed: the maps are decoded from the bytes
 // baked into the test binary, and the sheets, font and borders are handles the test makes up.
 
@@ -119,7 +119,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 
 // The player at `at` facing `facing`, in the meadow.
 zorlduh::GameState standing(const zorlduh::Config& config, Vec2i at, Dir facing) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{at, facing}};
+    zorlduh::GameState state{.player = zorlduh::Player{at, facing}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }
@@ -192,7 +192,7 @@ TEST(Signs, ItemFacingTheSignOpensItsMessageAndTheWorldHoldsStill) {
     const zorlduh::Assets assets = headlessAssets();
     const zorlduh::Config config = headlessConfig(assets);
     zorlduh::GameState state = standing(config, kBelowTheSign, Dir::Up);
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);
     ASSERT_TRUE(state.dialog.showing());
     EXPECT_EQ(state.dialog.animation.phase(), WindowKit::Phase::Opening);
     EXPECT_EQ(state.dialog.page(), 0u);
@@ -210,21 +210,21 @@ TEST(Signs, ItemShowsEachPageTurnsItAndClosesTheMessageAfterTheLast) {
     const zorlduh::Assets assets = headlessAssets();
     const zorlduh::Config config = headlessConfig(assets);
     zorlduh::GameState state = standing(config, kBelowTheSign, Dir::Up);
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);
     // 144×32 inside the box's 8 px border: 18 characters by 4 lines, four pages of the meadow's sign.
     EXPECT_EQ(state.dialog.pageCount(), 4u);
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // opens the box at once
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);  // opens the box at once
     EXPECT_EQ(state.dialog.animation.phase(), WindowKit::Phase::Open);
     EXPECT_EQ(state.dialog.shown(), 0u);
     for (std::size_t page = 0; page < 4; ++page) {
         EXPECT_EQ(state.dialog.page(), page);
-        zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // shows the page whole
+        zorlduh::tick(state, zorlduh::Input{.interact = true}, config);  // shows the page whole
         EXPECT_TRUE(state.dialog.pageDone());
-        zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // turns it, or starts the close after the last
+        zorlduh::tick(state, zorlduh::Input{.interact = true}, config);  // turns it, or starts the close after the last
     }
     EXPECT_TRUE(state.dialog.showing());
     EXPECT_EQ(state.dialog.animation.phase(), WindowKit::Phase::Closing);
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);  // closes the box at once
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);  // closes the box at once
     EXPECT_FALSE(state.dialog.showing());
     zorlduh::tick(state, zorlduh::Input{.move = Hold({.left = true})}, config);
     EXPECT_EQ(state.player.position(), (Vec2i{kBelowTheSign.x - 1, kBelowTheSign.y}));
@@ -234,14 +234,14 @@ TEST(Signs, ItemFacingNothingOrDuringAScrollOpensNothing) {
     const zorlduh::Assets assets = headlessAssets();
     const zorlduh::Config config = headlessConfig(assets);
     zorlduh::GameState away = standing(config, kBelowTheSign, Dir::Down);
-    zorlduh::tick(away, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(away, zorlduh::Input{.interact = true}, config);
     EXPECT_FALSE(away.dialog.showing());
 
     zorlduh::GameState walking = standing(config, zorlduh::kPlayerStart, Dir::Right);
     while (!walking.camera.transitioning()) {
         zorlduh::tick(walking, zorlduh::Input{.move = Hold({.right = true})}, config);
     }
-    zorlduh::tick(walking, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(walking, zorlduh::Input{.interact = true}, config);
     EXPECT_FALSE(walking.dialog.showing());
 }
 
@@ -256,7 +256,7 @@ TEST(Signs, TheMessageBoxIsDrawnInTheBorderOfWhatIsRead) {
     EXPECT_EQ(closed.z, 21);
     EXPECT_TRUE(std::get<retropp::SpriteContent>(closed.content).sprites.empty());
 
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);
     untilOpen(state, config);
     const retropp::DrawLayer wood = zorlduh::Dialog(state, assets, 21);
     const std::span<const retropp::Sprite> woodSprites = std::get<retropp::SpriteContent>(wood.content).sprites;
@@ -272,10 +272,10 @@ TEST(Signs, TheMessageBoxIsDrawnInTheBorderOfWhatIsRead) {
     EXPECT_EQ(corner->atlas, assets.borders.wood.sheet.atlasId);
 
     // The rock's message is in stone.
-    zorlduh::GameState atTheRock{.player = TopDownMovement::Walker{{.x = 220, .y = 16}, Dir::Up},
+    zorlduh::GameState atTheRock{.player = zorlduh::Player{{.x = 220, .y = 16}, Dir::Up},
                                  .camera = WorldKit::Camera{Layout::Overworld, Area::Lake}};
     atTheRock.camera.place(config.world, atTheRock.player.collision(config.player).bounds());
-    zorlduh::tick(atTheRock, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(atTheRock, zorlduh::Input{.interact = true}, config);
     ASSERT_TRUE(atTheRock.dialog.showing());
     EXPECT_EQ(atTheRock.reading, Material::Stone);
     EXPECT_EQ(atTheRock.dialog.pageCount(), 2u);

@@ -115,7 +115,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 }
 
 zorlduh::GameState start(const zorlduh::Config& config) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    zorlduh::GameState state{.player = {zorlduh::kPlayerStart}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }
@@ -237,7 +237,7 @@ TEST(Controls, EveryActionIsBound) {
     const retropp::ActionMap map = zorlduh::actionMap();
     for (const zorlduh::Action action :
          {zorlduh::Action::Up, zorlduh::Action::Down, zorlduh::Action::Left, zorlduh::Action::Right,
-          zorlduh::Action::Attack, zorlduh::Action::Item, zorlduh::Action::Start}) {
+          zorlduh::Action::Attack, zorlduh::Action::Interact, zorlduh::Action::Start}) {
         bool bound = false;
         for (const retropp::ActionBinding& row : map.rows()) {
             bound = bound || row.action == retropp::actionId(action);
@@ -247,6 +247,14 @@ TEST(Controls, EveryActionIsBound) {
 }
 
 // ── The player's art and component (through a renderer on a GPU device) ──────────────────────
+
+// Windows on ARM has no production-representative GPU backend in CI; its production path (D3D12 + DXIL)
+// is covered by the Windows x64 job, so a missing device there is a skip. Everywhere else it fails.
+#if defined(_WIN32) && (defined(_M_ARM64) || defined(__aarch64__))
+inline constexpr bool kDeviceOptional = true;
+#else
+inline constexpr bool kDeviceOptional = false;
+#endif
 
 class PlayerOnDevice : public ::testing::Test {
 protected:
@@ -276,6 +284,10 @@ protected:
 
     void SetUp() override {
         if (device_ == nullptr) {
+            if (kDeviceOptional) {
+                GTEST_SKIP() << "Windows on ARM has no production-representative GPU backend in CI; the "
+                                "Windows x64 job covers the D3D12 path. (" << error_ << ")";
+            }
             FAIL() << "no GPU device: " << error_
                    << ". The player's art resolves through the renderer, which needs one.";
         }
@@ -306,7 +318,7 @@ TEST_F(PlayerOnDevice, ThePlayerComponentIsOneSpriteKeyedPlayer) {
     const zorlduh::Assets assets = zorlduh::loadAssets(renderer);
     TopDownMovement::WalkerConfig player = zorlduh::PlayerConfig(assets);
     player.timing = kHz60;
-    const zorlduh::GameState state{.player = TopDownMovement::Walker{zorlduh::kPlayerStart}};
+    const zorlduh::GameState state{.player = {zorlduh::kPlayerStart}};
 
     const LayerKit::Sprites sprites = zorlduh::Player(state, player);
     ASSERT_EQ(sprites.size(), 1u);

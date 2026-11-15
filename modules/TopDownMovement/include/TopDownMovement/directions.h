@@ -1,5 +1,5 @@
-// The four directions a walker is steered by, read from the engine's input through the game's own
-// actions.
+// Directions: the four a walker is steered by, read from the engine's input through the game's own
+// actions; how many directions a walker moves in and shows; and the eight its sprite can face.
 //
 //     const TopDownMovement::DirectionalInput move = TopDownMovement::readDirections(
 //         input, {.up = Action::Up, .down = Action::Down, .left = Action::Left, .right = Action::Right});
@@ -7,11 +7,20 @@
 // A game reads them once per tick, at its input boundary, and hands the plain value to whatever walks.
 #pragma once
 
+#include <cstdint>
+
 #include "retropp/input.h"
 
 namespace TopDownMovement {
 
-// One flag per direction.
+// How many directions: the four cardinal ones, or those and the four diagonals.
+enum class Ways : std::uint8_t { Four, Eight };
+
+// One of eight directions, clockwise from up: the way a walker's sprite faces.
+enum class Facing : std::uint8_t { Up, UpRight, Right, DownRight, Down, DownLeft, Left, UpLeft };
+
+// One flag per direction. As a walker's heading, opposite flags cancel: up and down together head
+// neither way.
 struct Directions {
     bool up = false;
     bool down = false;

@@ -137,7 +137,7 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
 
 // The player at `at` facing `facing`, in the meadow, in play.
 zorlduh::GameState standing(const zorlduh::Config& config, Vec2i at = zorlduh::kPlayerStart, Dir facing = Dir::Down) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{at, facing}};
+    zorlduh::GameState state{.player = zorlduh::Player{at, facing}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
     return state;
 }
@@ -312,7 +312,7 @@ TEST(Menus, StartDoesNothingDuringAMessageOrAScroll) {
     const zorlduh::Config config = headlessConfig(assets);
     // Below the meadow's sign, facing it.
     zorlduh::GameState reading = standing(config, {.x = 44, .y = 32}, Dir::Up);
-    zorlduh::tick(reading, {.item = true}, config);
+    zorlduh::tick(reading, {.interact = true}, config);
     ASSERT_TRUE(reading.dialog.showing());
     zorlduh::tick(reading, {.start = true}, config);
     EXPECT_FALSE(reading.pause.showing());
@@ -341,7 +341,7 @@ TEST(Menus, TextSetsHowFastTheNextMessageTypesAndStepsBack) {
 
     zorlduh::tick(state, {.start = true}, config);
     until(state, config, [&] { return !state.pause.showing(); });
-    zorlduh::tick(state, {.item = true}, config);
+    zorlduh::tick(state, {.interact = true}, config);
     ASSERT_TRUE(state.dialog.showing());
     until(state, config, [&] { return state.dialog.animation.phase() == WindowKit::Phase::Open; });
     const std::size_t typed = state.dialog.shown();

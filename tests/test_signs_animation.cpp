@@ -1,5 +1,5 @@
 // A message's box opening and closing in the game, over the real maps: its length at the Game Boy Color
-// cadence, Item finishing the opening and the closing, and the box drawn growing from its middle with
+// cadence, Interact finishing the opening and the closing, and the box drawn growing from its middle with
 // nothing typed in it until it is open. No renderer is needed: the maps are decoded from the bytes
 // baked into the test binary, and the sheets, font and borders are handles the test makes up.
 
@@ -116,11 +116,11 @@ zorlduh::Config headlessConfig(const zorlduh::Assets& assets) {
     return config;
 }
 
-// Below the meadow's sign, facing it, with Item pressed: its message is starting.
+// Below the meadow's sign, facing it, with Interact pressed: its message is starting.
 zorlduh::GameState readingTheSign(const zorlduh::Config& config) {
-    zorlduh::GameState state{.player = TopDownMovement::Walker{{.x = 44, .y = 32}, Dir::Up}};
+    zorlduh::GameState state{.player = zorlduh::Player{{.x = 44, .y = 32}, Dir::Up}};
     state.camera.place(config.world, state.player.collision(config.player).bounds());
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);
     return state;
 }
 
@@ -131,7 +131,7 @@ void wait(zorlduh::GameState& state, const zorlduh::Config& config, int ticks) {
 }
 
 void press(zorlduh::GameState& state, const zorlduh::Config& config) {
-    zorlduh::tick(state, zorlduh::Input{.item = true}, config);
+    zorlduh::tick(state, zorlduh::Input{.interact = true}, config);
 }
 
 TEST(SignsAnimation, AMessagesBoxOpensOverEighteenTicksAndTypesOnceOpen) {
@@ -240,7 +240,7 @@ TEST(SignsAnimation, TheShrinesSixSignsEachOpenTheirBoxInTheirOwnStyle) {
 
         // Below the sign, its collision box's middle under the sign's cell, facing up.
         zorlduh::GameState state{
-            .player = TopDownMovement::Walker{{.x = sign.cell.x * 8 - 4, .y = sign.cell.y * 8}, Dir::Up},
+            .player = zorlduh::Player{{.x = sign.cell.x * 8 - 4, .y = sign.cell.y * 8}, Dir::Up},
             .camera = WorldKit::Camera{zorlduh::Layout::Overworld, zorlduh::Area::Shrine}};
         state.camera.place(config.world, state.player.collision(config.player).bounds());
         press(state, config);

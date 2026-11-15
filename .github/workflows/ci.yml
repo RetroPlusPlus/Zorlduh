@@ -1,0 +1,325 @@
+name: CI
+
+# Triggers fire on ci/** only — not main, not pull_request. Source reaches main only by a squash-merge
+# from a ci/<branch> that already ran green; running again on the squashed main would rebuild the same
+# source for no new signal.
+#
+# Self-hosted-runner safety: there is deliberately no pull_request-family trigger. The repository is
+# public and the runners are personal machines; anyone can open a fork pull request, and with push-only
+# triggers a fork pull request schedules nothing onto them. A run can be started only by someone who can
+# push here. Do not add pull_request / pull_request_target / workflow_run, or a push trigger on main,
+# without weighing that again.
+on:
+  push:
+    branches:
+      - 'ci/**'
+
+# Each runner has one workspace and one fixed build directory per platform, so two runs on the same
+# branch would fight over both. Superseding the older run makes that impossible.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# The engine (Polyrhythm) is a submodule, with SDL3, SameBoy and Snaggletooth as submodules of its own;
+# all of them are public, so the checkout needs no credential. Checkout runs without submodules and a
+# following step initializes the engine, recursively. These runners keep their workspace between runs,
+# so that step syncs the submodule's URL first — a clone left by an earlier run keeps the URL it was made
+# with — and, if the update still fails, removes the leftover clone and fetches it again.
+
+jobs:
+
+  # ── Linux x64 (beefserve) ────────────────────────────────────────────────────
+  build-linux:
+    name: Linux (beefserve, x64)
+    runs-on: [self-hosted, Linux, X64, beefserve]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The build lives at $GITHUB_WORKSPACE/build and persists between runs. The checkout default
+          # runs `git clean -ffdx`, which would delete it every run and make every build cold.
+          clean: false
+
+      - name: Init engine submodule
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git submodule sync --recursive -- engine
+          if ! git submodule update --init --recursive -- engine; then
+            git submodule deinit -f -- engine
+            rm -rf "$GITHUB_WORKSPACE/.git/modules/engine"
+            git submodule sync --recursive -- engine
+            git submodule update --init --recursive -- engine
+          fi
+
+      - name: Configure
+        run: |
+          cmake -S "$GITHUB_WORKSPACE" -B "$GITHUB_WORKSPACE/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build "$GITHUB_WORKSPACE/build" --parallel
+
+      # The whole build directory, never just the binary — anything the build lays out beside the
+      # executable comes along. The workspace lives under the runner's service account; /tmp is where the
+      # machine's owner can launch the result. The rm clears only the previous staged copy.
+      - name: Stage build for manual testing
+        run: rm -rf /tmp/zorlduh-build && cp -R "$GITHUB_WORKSPACE/build" /tmp/zorlduh-build
+
+      - name: Test
+        run: |
+          set -o pipefail   # without this, tee's exit code (always 0) masks a ctest failure
+          export SDL_VIDEODRIVER=offscreen   # headless: SDL's video starts and the GPU device (lavapipe) is reachable
+          mkdir -p "$GITHUB_WORKSPACE/ci-output"
+          ctest --test-dir "$GITHUB_WORKSPACE/build" --output-on-failure \
+            2>&1 | tee "$GITHUB_WORKSPACE/ci-output/linux-test-results.txt"
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-results
+          path: ci-output/
+
+  # ── Windows x64 (WINDOWS-BVDA56O) ────────────────────────────────────────────
+  build-windows:
+    name: Windows clang-cl (WINDOWS-BVDA56O, x64)
+    runs-on: [self-hosted, Windows, X64, WINDOWS-BVDA56O]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init engine submodule
+        shell: powershell
+        run: |
+          cd $env:GITHUB_WORKSPACE
+          # See the Linux job for why the URL is synced first and why the retry exists.
+          git submodule sync --recursive -- engine
+          git submodule update --init --recursive -- engine
+          if ($LASTEXITCODE -ne 0) {
+            git submodule deinit -f -- engine
+            Remove-Item -Recurse -Force .git\modules\engine -ErrorAction SilentlyContinue
+            git submodule sync --recursive -- engine
+            git submodule update --init --recursive -- engine
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      # ClangCL, not MSVC: SameBoy's Windows shims use #include_next, which MSVC rejects (C1021). The build
+      # is at a short root path: a FetchContent _deps tree nested under the runner's workspace passes the
+      # 260-character path limit.
+      - name: Configure
+        shell: powershell
+        run: |
+          cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
+            -G "Visual Studio 17 2022" -A x64 -T ClangCL
+          if ($LASTEXITCODE -ne 0) {
+            # A cache written by another generator or toolset cannot be reused, and CMake will not
+            # overwrite it; each FetchContent sub-build keeps its own cache too, so the whole directory
+            # goes rather than the parts that look guilty.
+            Remove-Item C:\zorlduh-ci-build -Recurse -Force -ErrorAction SilentlyContinue
+            cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
+              -G "Visual Studio 17 2022" -A x64 -T ClangCL
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build
+        shell: powershell
+        run: cmake --build C:\zorlduh-ci-build --config Release --parallel
+
+      - name: Test
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\ci-output | Out-Null
+          # A held handle on a fixed results name can lock this step; a run-unique name (and a best-effort
+          # clear of deletable stale ones) means a stale handle never blocks the write.
+          Get-ChildItem C:\ci-output\zorlduh-windows-test-results*.txt -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+          $results = "C:\ci-output\zorlduh-windows-test-results-${{ github.run_id }}-${{ github.run_attempt }}.txt"
+          cmd /c "ctest --test-dir C:\zorlduh-ci-build -C Release --output-on-failure 2>&1" |
+            Tee-Object -FilePath $results
+          # Tee-Object does not update $LASTEXITCODE, so the cmd /c exit code is read after the pipeline
+          # and raised: without it a ctest failure would report green.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-results
+          path: C:\ci-output\zorlduh-windows-test-results-${{ github.run_id }}-${{ github.run_attempt }}.txt
+
+  # ── macOS ARM64 (ericmacmini) ────────────────────────────────────────────────
+  # The three ARM64 jobs share one host — macOS on the metal, Linux and Windows in VMs on it — which
+  # cannot hold three C++ builds at once, so they run in series: macOS, then Linux, then Windows, the
+  # slowest, last. `if: always()` keeps the chain going for every platform's result when a link fails.
+  build-macos:
+    name: macOS (ericmacmini, ARM64)
+    runs-on: [self-hosted, macOS, ARM64, ericmacmini]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # See the Linux job.
+          clean: false
+
+      - name: Init engine submodule
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # See the Linux job for why the URL is synced first and why the retry exists.
+          git submodule sync --recursive -- engine
+          if ! git submodule update --init --recursive -- engine; then
+            git submodule deinit -f -- engine
+            rm -rf "$GITHUB_WORKSPACE/.git/modules/engine"
+            git submodule sync --recursive -- engine
+            git submodule update --init --recursive -- engine
+          fi
+
+      - name: Configure
+        run: |
+          cmake -S "$GITHUB_WORKSPACE" -B "$GITHUB_WORKSPACE/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build "$GITHUB_WORKSPACE/build" --parallel
+
+      - name: Stage build for manual testing
+        run: rm -rf /tmp/zorlduh-build && cp -R "$GITHUB_WORKSPACE/build" /tmp/zorlduh-build
+
+      - name: Test
+        run: |
+          set -o pipefail   # see the Linux job
+          mkdir -p "$GITHUB_WORKSPACE/ci-output"
+          ctest --test-dir "$GITHUB_WORKSPACE/build" --output-on-failure \
+            2>&1 | tee "$GITHUB_WORKSPACE/ci-output/macos-test-results.txt"
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-test-results
+          path: ci-output/
+
+  # ── Linux ARM64 (linmac-arm64) ───────────────────────────────────────────────
+  # Second link of the ARM64 chain — see the macOS job.
+  build-linux-arm64:
+    name: Linux (linmac-arm64, ARM64)
+    runs-on: [self-hosted, Linux, ARM64, linmac-arm64]
+    needs: build-macos
+    if: ${{ always() }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # See the Linux x64 job.
+          clean: false
+
+      - name: Init engine submodule
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # See the Linux x64 job for why the URL is synced first and why the retry exists.
+          git submodule sync --recursive -- engine
+          if ! git submodule update --init --recursive -- engine; then
+            git submodule deinit -f -- engine
+            rm -rf "$GITHUB_WORKSPACE/.git/modules/engine"
+            git submodule sync --recursive -- engine
+            git submodule update --init --recursive -- engine
+          fi
+
+      - name: Configure
+        run: |
+          cmake -S "$GITHUB_WORKSPACE" -B "$GITHUB_WORKSPACE/build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build "$GITHUB_WORKSPACE/build" --parallel
+
+      - name: Stage build for manual testing
+        run: rm -rf /tmp/zorlduh-build && cp -R "$GITHUB_WORKSPACE/build" /tmp/zorlduh-build
+
+      - name: Test
+        run: |
+          set -o pipefail   # see the Linux x64 job
+          export SDL_VIDEODRIVER=offscreen
+          mkdir -p "$GITHUB_WORKSPACE/ci-output"
+          ctest --test-dir "$GITHUB_WORKSPACE/build" --output-on-failure \
+            2>&1 | tee "$GITHUB_WORKSPACE/ci-output/linux-arm64-test-results.txt"
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-test-results
+          path: ci-output/
+
+  # ── Windows ARM64 (WINMACARM64) ──────────────────────────────────────────────
+  # Last link of the ARM64 chain, being the slowest — see the macOS job.
+  build-windows-arm64:
+    name: Windows clang-cl (WINMACARM64, ARM64)
+    runs-on: [self-hosted, Windows, ARM64, WINMACARM64]
+    needs: build-linux-arm64
+    if: ${{ always() }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init engine submodule
+        shell: powershell
+        run: |
+          cd $env:GITHUB_WORKSPACE
+          # See the Linux x64 job for why the URL is synced first and why the retry exists.
+          git submodule sync --recursive -- engine
+          git submodule update --init --recursive -- engine
+          if ($LASTEXITCODE -ne 0) {
+            git submodule deinit -f -- engine
+            Remove-Item -Recurse -Force .git\modules\engine -ErrorAction SilentlyContinue
+            git submodule sync --recursive -- engine
+            git submodule update --init --recursive -- engine
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Configure
+        shell: powershell
+        run: |
+          cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
+            -G "Visual Studio 17 2022" -A ARM64 -T ClangCL
+          if ($LASTEXITCODE -ne 0) {
+            # See the Windows x64 job.
+            Remove-Item C:\zorlduh-ci-build -Recurse -Force -ErrorAction SilentlyContinue
+            cmake -S $env:GITHUB_WORKSPACE -B C:\zorlduh-ci-build `
+              -G "Visual Studio 17 2022" -A ARM64 -T ClangCL
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build
+        shell: powershell
+        run: cmake --build C:\zorlduh-ci-build --config Release --parallel
+
+      - name: Test
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\ci-output | Out-Null
+          # Run-unique results name — see the Windows x64 job.
+          Get-ChildItem C:\ci-output\zorlduh-windows-arm64-test-results*.txt -ErrorAction SilentlyContinue |
+            Remove-Item -Force -ErrorAction SilentlyContinue
+          $results = "C:\ci-output\zorlduh-windows-arm64-test-results-${{ github.run_id }}-${{ github.run_attempt }}.txt"
+          cmd /c "ctest --test-dir C:\zorlduh-ci-build -C Release --output-on-failure 2>&1" |
+            Tee-Object -FilePath $results
+          # See the Windows x64 job.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64-test-results
+          path: C:\ci-output\zorlduh-windows-arm64-test-results-${{ github.run_id }}-${{ github.run_attempt }}.txt
