@@ -1,18 +1,16 @@
 # Getting started
 
-This page builds a complete program on the module: a walled room with four pillars and three walkers,
-each moved a different way.
+This page walks through a complete program that uses the module: a walled room with four pillars and
+three walkers, one for each way of moving a walker.
 
-- **The hero** is steered with the arrow keys, WASD or a d-pad.
-- **The wanderer** walks a heading until something stops it, then turns clockwise.
-- **The guard** patrols a route along the bottom of the room, resting at its east end.
+| Walker | Color | Moved by |
+|---|---|---|
+| The hero | gold | the arrow keys, WASD or a d-pad |
+| The wanderer | green | a heading that the program changes when the walker is blocked |
+| The guard | red | a route along the bottom of the room |
 
-Two keys switch all three between the module's settings. **Z** (or a pad's A button) toggles 8-way and
-4-way movement, and **X** (or B) toggles 4 and 8 sprite directions.
-
-The full source is [`examples/getting_started.cpp`](../examples/getting_started.cpp), and its art is in
-[`examples/assets/`](../examples/assets/). It builds as the `TopDownMovement-example-getting-started`
-target whenever `TOPDOWNMOVEMENT_BUILD_EXAMPLES` is on, so what you read here is what compiles.
+The source is [`examples/getting_started.cpp`](../examples/getting_started.cpp) and its art is in
+[`examples/assets/`](../examples/assets/). The code on this page is taken from that file.
 
 ## Contents
 
@@ -21,17 +19,17 @@ target whenever `TOPDOWNMOVEMENT_BUILD_EXAMPLES` is on, so what you read here is
 - [3. The art](#3-the-art)
 - [4. The room and its collision map](#4-the-room-and-its-collision-map)
 - [5. The walk animations](#5-the-walk-animations)
-- [6. What each walker is](#6-what-each-walker-is)
-- [7. Where each walker stands](#7-where-each-walker-stands)
+- [6. The configs](#6-the-configs)
+- [7. The positions and the walkers](#7-the-positions-and-the-walkers)
 - [8. The guard's route](#8-the-guards-route)
 - [9. The tick](#9-the-tick)
-- [10. Drawing it](#10-drawing-it)
-- [11. Where to go next](#11-where-to-go-next)
+- [10. Drawing](#10-drawing)
+- [11. Next](#11-next)
 
 ## 1. Build it
 
-The module needs the engine as the CMake target `retropp::engine`; the engine's
-`docs/guide/build-and-consume.md` covers building it. Add the module and turn its examples on:
+The module needs the engine as the CMake target `retropp::engine`. The engine's
+`docs/guide/build-and-consume.md` covers building it. Add the module and turn its example on:
 
 ```cmake
 add_subdirectory(engine)
@@ -44,39 +42,40 @@ cmake -S . -B build
 cmake --build build --target TopDownMovement-example-getting-started
 ```
 
-The executable lands in the build tree under `modules/TopDownMovement/`. Close the window to quit.
+The executable is written to `build/modules/TopDownMovement/`. Close the window to quit.
 
 ## 2. Run it
 
-A dark green floor inside a lighter wall, four square pillars, and three arrowheads: gold in the
-middle, green near the top, red at the bottom left.
+The window shows a dark green floor inside a lighter wall, four square pillars, and three arrowheads.
 
-| What you do | What happens |
+| Do this | Result |
 |---|---|
-| Walk the gold one | It turns to point the way it goes and bobs a pixel back and forth with each step. Walked diagonally into a wall or a pillar, it slides along it. |
-| Watch the green one | It walks right until a wall stops it, then turns an eighth of a turn clockwise and walks on. Heading diagonally, it slides along a wall until it reaches a corner. |
-| Watch the red one | It walks right along the bottom row at half a pixel a tick, stands for half a second at the end, and walks back. It walks through nothing: its route is drawn in open floor. |
-| Press Z | The blue cell in the top-left corner turns from a star to a plus: all three move in four directions only. The gold one held on two axes moves along the one you pressed last. |
-| Press X | The orange cell beside it turns from a plus to a star: the arrowheads point diagonally when they head diagonally. |
+| Hold a direction | The gold arrowhead moves, points the way it goes, and bobs one pixel with each step. |
+| Hold two directions into a wall or a pillar | It slides along the wall. |
+| Watch the green arrowhead | It walks until it is blocked, then turns 45° clockwise and walks again. |
+| Watch the red arrowhead | It walks right along the bottom row at half a pixel per tick, stands for half a second, and walks back. |
+| Press Z, or A on a pad | The blue cell in the top-left corner changes from a star to a plus. All three walkers now move in four directions only. |
+| Press X, or B on a pad | The orange cell beside it changes from a plus to a star. All three walkers now show diagonal sprites when they move diagonally. |
+
+A plus means four and a star means eight. Press the key again to switch back.
 
 ## 3. The art
 
-[`examples/assets/`](../examples/assets/) holds two sheets of 8×8 cells and six palette images. Open them
-in any image viewer alongside this page.
+`examples/assets/` holds two sheets of 8×8 cells and six palette images.
 
-| File | Size | Cells, in read order |
+| File | Size | Contents |
 |---|---|---|
-| `tiles.png` | 32×8 | floor, wall, a plus, a star |
-| `walker.png` | 16×64 | eight rows of two frames: an arrowhead pointing up, up-right, right, down-right, down, down-left, left, up-left |
+| `tiles.png` | 32×8 | four cells: floor, wall, a plus, a star |
+| `walker.png` | 16×64 | eight rows of two frames. Each row is an arrowhead pointing one way: up, up-right, right, down-right, down, down-left, left, up-left |
+| `palettes/room.png` | 4×1 | the colors of the floor and wall |
+| `palettes/movement.png`, `palettes/sprites.png` | 4×1 | the colors of the two indicator cells: blue and orange |
+| `palettes/hero.png`, `palettes/wanderer.png`, `palettes/guard.png` | 4×1 | the colors of each walker |
 
-Each sheet is an indexed PNG whose pixels are palette indices, not colors. The tiles draw all four
-indices. On the walker sheet index 0 is transparent, 1 is an outline, and 2 and 3 are the arrowhead's
-edge and body. Each row's second frame sits a pixel further along, so walking reads as a bob.
+The sheets are indexed PNGs: each pixel is a palette index, not a color. On the walker sheet, index 0 is
+transparent. The three walkers share the one walker sheet and differ only in palette.
 
-A palette image is 4×1 pixels, one per entry. The room's tiles draw through `palettes/room.png`, the
-two indicators through `palettes/movement.png` (blue) and `palettes/sprites.png` (orange). The one walker
-sheet draws all three walkers, each through its own palette: `palettes/hero.png`,
-`palettes/wanderer.png`, `palettes/guard.png`.
+The program reads the files from the directory named by `TOPDOWNMOVEMENT_EXAMPLE_ASSETS`, which the
+module's `CMakeLists.txt` defines, and loads them with the engine's `loadAtlasFromMemory`:
 
 ```cpp
 .walker = renderer.loadAtlasFromMemory(readAsset("walker.png"), retropp::AssetDimensions{.width = kCell, .height = kCell},
@@ -85,13 +84,13 @@ sheet draws all three walkers, each through its own palette: `palettes/hero.png`
                                        /*framesPerAnimation=*/2),
 ```
 
-The program reads the files' bytes from the directory the build names in `TOPDOWNMOVEMENT_EXAMPLE_ASSETS`
-and hands them to the engine's `loadAtlasFromMemory` and `loadPngFromMemory`.
+The engine's `docs/guide/images-and-transparency.md` covers sheets and
+`docs/guide/tiles-and-color.md` covers palettes.
 
 ## 4. The room and its collision map
 
-The room is a collision map: an `IndexGrid` of 20×18 cells, one value per cell, wall round the edge and
-four 2×2 pillars.
+The room is a `retropp::IndexGrid` of 20×18 cells. Each cell holds `Cell::Open` or `Cell::Wall`. The
+edge and four 2×2 pillars are wall.
 
 ```cpp
 enum class Cell : std::uint16_t { Open = 0, Wall = 1 };
@@ -104,20 +103,21 @@ retropp::IndexGrid Room() {
 }
 ```
 
-A game usually loads this from a map PNG with `retropp::loadMapPng`; it is built in code here because it
-is four rectangles. The same grid is drawn: each cell becomes a floor or wall `TileCell` on the room's tile
-layer, and the two corner cells show the switches.
+The program builds the grid in code. A game usually loads one from a PNG with `retropp::loadMapPng`.
 
-The module reads it through a `TileCollision`, which says how big a cell is and which value is open.
-Everything else, and everything off the map, is solid:
+A `TileCollision` turns the grid into solids. It needs the size of a cell in pixels and the value that
+can be walked on:
 
 ```cpp
 const TopDownMovement::TileCollision walls{.map = &room, .cellSize = kCell, .open = Cell::Open};
 ```
 
+Every cell that is not `Cell::Open` is solid, and so is everything outside the grid. The same grid is
+also drawn: each cell becomes a floor or wall tile.
+
 ## 5. The walk animations
 
-Each row of the walker sheet is one sprite direction's walk animation, two frames of eight ticks:
+Each row of the walker sheet is the walk animation for one direction: two frames, eight ticks each.
 
 ```cpp
 retropp::Animation WalkRow(const Art& art, TopDownMovement::Facing facing, retropp::PaletteId palette) {
@@ -129,13 +129,19 @@ retropp::Animation WalkRow(const Art& art, TopDownMovement::Facing facing, retro
 }
 ```
 
-The sheet's rows are in the order of `TopDownMovement::Facing`, so a direction is its own row number.
-`WalkAnimations(art, palette)` builds all eight, one per field of `DirectionalAnimations`: `up`, `down`,
-`left`, `right`, and the four diagonals. The diagonals are read only while the sprites are set to eight
-directions. These are ordinary engine animations (the engine's `docs/guide/animation.md`); the module
-plays them.
+The sheet's rows are in the order of the `TopDownMovement::Facing` enum, so the row number is the enum
+value.
 
-## 6. What each walker is
+`WalkAnimations(art, palette)` calls `WalkRow` eight times and returns a `DirectionalAnimations`: one
+animation for each of `up`, `down`, `left`, `right`, `upLeft`, `upRight`, `downLeft` and `downRight`.
+
+These are ordinary engine animations (the engine's `docs/guide/animation.md`). The module chooses which
+one to show and which frame.
+
+## 6. The configs
+
+A `WalkerConfig` describes a kind of walker. The three walkers have the same speed and shape and
+different palettes, so one function builds all three configs:
 
 ```cpp
 TopDownMovement::WalkerConfig WalkerOf(const Art& art, retropp::PaletteId palette) {
@@ -151,18 +157,18 @@ TopDownMovement::WalkerConfig wandererConfig = WalkerOf(art, art.wanderer);
 TopDownMovement::WalkerConfig guardConfig = WalkerOf(art, art.guard);
 ```
 
-- **`speed`**: one pixel per tick on each axis a walker heads along.
-- **`collision`**: a 6×4 box across the bottom of the 8×8 art, so the tip of an arrowhead can overlap a
-  wall above it while its base cannot. It is in the walker's own pixels; the module moves it with the
-  walker. A circle, a polygon or named points in the art work too ([collision.md](collision.md)).
-- **`walk`**: the eight animations, in the walker's own colors.
-- **`movement`** and **`sprites`** are left at their defaults, 8-way movement and 4 sprite directions.
-  Z and X change them on all three configs at once.
+| Field | Value | Meaning |
+|---|---|---|
+| `speed` | `1` | one pixel per tick on each axis the walker heads along |
+| `collision` | a 6×4 box at the bottom of the 8×8 frame | the part of the walker that collides. The tip of the arrowhead can overlap a wall above it. |
+| `walk` | the eight animations | what the walker shows |
+| `movement` | not set: `Ways::Eight` | moves in eight directions |
+| `sprites` | not set: `Ways::Four` | shows four sprite directions |
 
-A config says what a walker *is*. The three here differ only in color; in a game they differ in
-everything.
+Z and X change `movement` and `sprites` on all three configs while the program runs. The configs are
+not `const` for that reason; in a game they usually are.
 
-## 7. Where each walker stands
+## 7. The positions and the walkers
 
 ```cpp
 retropp::Vec2i heroAt{76, 68};
@@ -174,13 +180,14 @@ TopDownMovement::Walker wanderer{wandererAt};
 TopDownMovement::Walker guard{guardAt};
 ```
 
-Where a walker stands is the program's: three positions it keeps, each walker bound to its own when it is
-made. The walker reads and writes that position from then on, so `heroAt` is always where the hero is.
-In a game the position is wherever the thing that stands there keeps it
-([concepts.md](concepts.md#the-position-a-walker-is-bound-to)).
+The program keeps the three positions. Each walker is bound to one of them and reads and writes it from
+then on, so `heroAt` is always where the hero is. A position is the top-left of the walker's frame, in
+pixels.
 
-The hero is an `InputWalker` because the pad steers it, and only the pad needs to remember which
-direction was pressed last. The other two are plain walkers.
+The hero is an `InputWalker` because the pad steers it. The other two are plain `Walker`s.
+
+In a game the positions are fields of your game state
+([concepts.md](concepts.md#the-position-a-walker-is-bound-to)).
 
 ## 8. The guard's route
 
@@ -192,23 +199,26 @@ retropp::SpritePath patrol = TopDownMovement::routeFrom(guard, {
 });
 ```
 
-The route is the engine's `SpritePath`: three legs played back to back, each departing from where the
-last ended. `routeFrom` starts it where the guard stands.
+`routeFrom` returns a `retropp::SpritePath`, the engine's route type, that starts where the guard
+stands. The route has three legs, played in order:
 
-- **`east`** and **`west`** are straight legs at 30 pixels a second, half a pixel a tick at the program's
-  60 ticks a second.
-- **`wait`** is the engine's wait node: a leg to the point it starts from, paced over half a second, so
-  the guard stands there for that long.
+| Leg | Goes to | Pace | Result |
+|---|---|---|---|
+| `east` | (136, 120) | 30 pixels per second | walks right |
+| `wait` | (136, 120), where it already is | half a second | stands |
+| `west` | (16, 120), where the route started | 30 pixels per second | walks back |
 
-The engine's guide (`docs/guide/sprite-path.md`) covers everything else a route can do: curved legs,
-other paces, playing once or N times, detours. [routes.md](routes.md) covers a walker on one.
+At the program's 60 ticks per second, 30 pixels per second is half a pixel per tick. The route ends
+where it starts, so it loops without a jump.
+
+[routes.md](routes.md) covers routes.
 
 ## 9. The tick
 
 ```cpp
 std::size_t heading = 0;   // the wanderer's, in kClockwise
 loop.simTick([&](const retropp::InputState& input) {
-    // … Z and X flip movement and sprites on all three configs …
+    // ... Z and X flip movement and sprites on all three configs ...
 
     // The input pathway: the pad.
     hero.walk(heroConfig, TopDownMovement::readDirections(input, steering), walls);
@@ -224,20 +234,22 @@ loop.simTick([&](const retropp::InputState& input) {
 });
 ```
 
-One line per pathway.
+Each walker gets one call per tick.
 
-- **The hero.** `readDirections` reads which of the program's four actions are held and which were just
-  pressed; `presets::directional` binds them to the arrows, WASD and the d-pad. `walk` moves the hero a
-  pixel along each held axis if its collision box there is clear, turns it, and advances its walk
-  animation ([concepts.md](concepts.md#a-tick-of-walking)).
-- **The wanderer.** It is handed a heading, one of eight in `kClockwise`, and walks it against the same
-  walls. When `moving()` says it got nowhere, the program turns it to the next.
-- **The guard.** `follow` advances the patrol a tick and puts the guard where the route is now, facing
-  the way it went. It walks on every tick the route moves, so its arrowhead bobs at half a pixel a tick,
-  and stands on frame 0 through the wait. Nothing collides on a route, which is why this one is drawn in
-  open floor.
+**The hero.** `readDirections` reads the four direction actions from the tick's input and returns the
+directions held and pressed. `steering` names the program's four actions; `presets::directional` binds
+them to the arrow keys, WASD and the d-pad. `walk` moves the hero against `walls`, sets its facing and
+advances its walk animation.
 
-## 10. Drawing it
+**The wanderer.** `kClockwise` is an array of eight headings, clockwise from right. The wanderer walks
+the current one. `moving()` returns `false` after a tick in which it could not move, and the program
+then selects the next heading.
+
+**The guard.** `follow` advances the patrol by one tick and moves the guard to the route's position. The
+guard faces the way the route travels, plays its walk animation while the route moves, and shows frame 0
+during the wait. A walker on a route does not collide, so this route is drawn through open floor.
+
+## 10. Drawing
 
 ```cpp
 sprites = {
@@ -251,19 +263,23 @@ frame.layers = {
 };
 ```
 
-`WalkerSprite` returns a walker's current frame as a `retropp::Sprite` at its position, whichever way it
-was moved: the frame of the animation for the way its sprite faces. The sprites' `z` is the bottom of
-each one's collision box, so a walker lower on the screen draws over one above it. The program puts them
-on a plain engine sprite layer; a game that builds its screen from components puts them on whatever
-sprite layer it uses. The sprite and cell vectors live outside the render callback because a layer's
-content is a span the renderer reads while it draws.
+`WalkerSprite` returns a `retropp::Sprite` for a walker: its current frame at its position. The three
+sprites go on one sprite layer above the room's tile layer.
 
-## 11. Where to go next
+Each sprite's `z` is the bottom of its walker's collision box, so a walker lower on the screen draws in
+front of one above it.
 
-- The model: the config, the bound position, the three pathways, facing and sprite directions —
-  [concepts.md](concepts.md).
-- Routes: the engine's pathing, waits and detours, facing from travel — [routes.md](routes.md).
-- How collision works and what can be solid — [collision.md](collision.md).
-- Recipes: patrols, wandering, four directions only, diagonal sprites, a walker in a copyable struct —
-  [how-to.md](how-to.md).
-- Every type and member — [walker.md](walker.md).
+The `sprites` vector is declared outside the render callback. A layer's content is a span, and the
+vector must stay alive while the renderer reads it.
+
+## 11. Next
+
+| To learn | Read |
+|---|---|
+| How the parts fit together and how a walker behaves | [concepts.md](concepts.md) |
+| How collision works, and what can be solid | [collision.md](collision.md) |
+| Routes: waits, detours, playback modes | [routes.md](routes.md) |
+| How to do a specific task | [how-to.md](how-to.md) |
+| Why something does not work | [troubleshooting.md](troubleshooting.md) |
+| How to test code that uses the module | [testing.md](testing.md) |
+| Every type and member | [walker.md](walker.md) |

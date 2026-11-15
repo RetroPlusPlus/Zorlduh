@@ -1,41 +1,70 @@
 # Routes
 
-The route pathway: a walker moved along the engine's `SpritePath`. A patrol, a scripted walk, a guard
-taking a detour and coming back are all routes. The engine already has routes — their geometry, their
-pacing, waits, sequence modes and an interrupt stack — so the module uses them as they are and adds only
-the walker on top: the position it is bound to, the facing chosen from the route's travel, and the walk
-animation's stride.
+`follow` moves a walker along a `retropp::SpritePath`, the engine's route type. Use a route for movement
+that is decided in advance: a patrol, a scripted walk, a detour and return.
+
+The engine provides the route: its geometry, pacing, waits, playback modes and interrupt stack. This
+module provides the walker on it: the position, a facing chosen from the route's travel, and the walk
+animation.
+
+A walker on a route does not collide with anything.
 
 ```cpp
-#include "TopDownMovement/route.h"   // routeFrom, follow (and, through it, retropp/sprite_path.h)
+#include "TopDownMovement/route.h"   // routeFrom, follow; includes retropp/sprite_path.h
 using namespace std::chrono_literals;
 ```
 
 ## Contents
 
-- [The engine's pieces](#the-engines-pieces)
+- [A patrol](#a-patrol)
+- [What the engine provides](#what-the-engine-provides)
 - [`routeFrom`](#routefrom)
 - [`follow`](#follow)
 - [Facing from travel](#facing-from-travel)
-- [Waits, sentinels and sequence modes](#waits-sentinels-and-sequence-modes)
+- [Waits, posts and playback modes](#waits-posts-and-playback-modes)
+- [Reading and controlling a route](#reading-and-controlling-a-route)
 - [Detours](#detours)
-- [Nothing collides on a route](#nothing-collides-on-a-route)
-- [Where the position is rounded](#where-the-position-is-rounded)
+- [Collision](#collision)
+- [Rounding](#rounding)
+- [Engine behavior to know](#engine-behavior-to-know)
 
-## The engine's pieces
+## A patrol
 
-Every one of these is the engine's, documented in its guide; this page only says how a walker rides on
-them.
+```cpp
+retropp::Vec2i guardAt{16, 120};
+TopDownMovement::Walker guard{guardAt};
 
-| Piece | What it is | The engine's page |
+// Build the route when the walker sets off. It starts at the walker's position.
+retropp::SpritePath patrol = TopDownMovement::routeFrom(guard, {
+    {.label = "east", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::speed(30.0f)},
+    {.label = "wait", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::eased(500ms)},
+    {.label = "west", .move = retropp::SpritePathMove::to({16.0f, 120.0f}),  .pacing = retropp::PathPacing::speed(30.0f)},
+});
+
+// Every tick.
+TopDownMovement::follow(guard, guardConfig, patrol);
+```
+
+The guard walks east at 30 pixels per second, stands for half a second, walks back, and repeats. It
+faces the direction it travels and plays its walk animation while the route moves.
+
+Keep `patrol` in your game state next to the walker. `guardConfig` is the guard's `WalkerConfig`.
+
+## What the engine provides
+
+These are engine types. Each is documented in the engine's guide.
+
+| Type | What it is | Engine page |
 |---|---|---|
-| `Curve`, `ArcLengthTable` | a route leg's geometry: a line, a curve through points, a Hermite arc | `docs/guide/curve.md` |
-| `PathPacing` | how fast a leg is walked: `speed(pxPerSecond)`, `eased(duration, easing)`, or a `Tween<float>` of distance | `docs/guide/path-walker.md` |
-| `PathWalker` | elapsed ticks to a position and a facing along one curve | `docs/guide/path-walker.md` |
-| `SpritePath`, `SpritePathNode`, `SpritePathMove` | a route of legs played back to back, each departing from where the last ended | `docs/guide/sprite-path.md` |
-| the wait node, the sentinel node | standing for a time; standing until something moves the route on | `docs/guide/sprite-path.md` |
-| sequence modes | loop, play once, N laps, play for a duration | `docs/guide/sprite-path.md` |
-| `interrupt`, `popInterrupt`, `ResumePolicy` | a detour from where the walker stands, and how the route takes up again after it | `docs/guide/sprite-path.md` |
+| `SpritePath` | a route: a list of nodes played in order, plus the playback state | `docs/guide/sprite-path.md` |
+| `SpritePathNode` | one leg: a `label`, a `move` and a `pacing` | `docs/guide/sprite-path.md` |
+| `SpritePathMove` | where a leg goes: `to(point)`, `through(points)`, `hermite(…)`, `onCurve(curve)` | `docs/guide/sprite-path.md` |
+| `PathPacing` | how fast: `speed(pxPerSecond)`, `eased(duration, easing)`, `distanceTween(tween)` | `docs/guide/path-walker.md` |
+| `PlaybackMode` | what happens after the last leg: loop, play once, N laps, play for a duration | `docs/guide/animation.md` |
+| `interrupt`, `popInterrupt`, `ResumePolicy` | a detour, and how the route resumes after it | `docs/guide/sprite-path.md` |
+| `Curve` | the geometry behind a curved leg | `docs/guide/curve.md` |
+
+Each leg starts where the previous leg ended. The first leg starts at the route's `start`.
 
 ## `routeFrom`
 
@@ -43,28 +72,21 @@ them.
 retropp::SpritePath routeFrom(const Walker& walker, std::vector<retropp::SpritePathNode> nodes);
 ```
 
-A route over `nodes` that departs from where `walker` stands: a `SpritePath` whose `start` is the
-walker's position. It is resolved at its first tick before it is returned, so `route.position()` is the
-walker's position from the start.
+Returns a `SpritePath` over `nodes` whose `start` is the walker's current position. The returned route's
+`position()` equals the walker's position before the first `follow`.
 
-```cpp
-retropp::Vec2i guardAt{16, 120};
-TopDownMovement::Walker guard{guardAt};
+- **Coordinates.** Route points are in the same pixels as the walker's position, and they name the
+  walker's top-left.
+- **When to call it.** On the tick the walker sets off. `follow` writes the route's position to the
+  walker, so a walker that moved after `routeFrom` jumps to the route's start on the first `follow`.
+- **Timing.** The route takes the engine's active timing when it is constructed. Call `routeFrom` after
+  `retropp::EngineConfig::setActive`.
+- **Node fields to leave unset.** `animation`, `facing`, `rotationDegrees` and `scale` are used by
+  `SpritePath::applyTo`. `follow` does not call it, so they have no effect on a walker. The walker
+  plays the walk animation in its `WalkerConfig`.
 
-retropp::SpritePath patrol = TopDownMovement::routeFrom(guard, {
-    {.label = "east", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::speed(30.0f)},
-    {.label = "wait", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::eased(500ms)},
-    {.label = "west", .move = retropp::SpritePathMove::to({16.0f, 120.0f}),  .pacing = retropp::PathPacing::speed(30.0f)},
-});
-```
-
-The route is the game's, kept in its state beside the walker. It is an ordinary `SpritePath`: the game
-reads `route.currentNode()->label` and `route.finished()`, interrupts it, pops it and restarts it through
-the engine's own surface. A node's `animation` stays null and its `facing` policy stays `None`: the walk
-animation is the walker's, chosen by the way its sprite faces.
-
-The route's points are in the same pixels as the walker's position, and they name the walker's top-left,
-as its position does.
+The route is an ordinary value. `routeFrom` does not tie it to the walker; `follow` takes both each
+tick.
 
 ## `follow`
 
@@ -73,77 +95,152 @@ void follow(Walker& walker, const WalkerConfig& config, retropp::SpritePath& rou
             retropp::PlaybackMode mode = retropp::PlaybackMode::loopIndefinitely());
 ```
 
-One tick on `route`. It advances the route once under `mode` — the playback mode of the route's own
-nodes, as `SpritePath::advance` takes it, so the default loops — and moves the walker to where the route
-is now, through `Walker::moveTo`, with how far the route moved this tick as the travel.
+Advances `route` by one tick, then moves `walker` to the route's position.
 
 ```cpp
-TopDownMovement::follow(guard, guardConfig, patrol);   // once per tick, in place of patrol.advance()
+TopDownMovement::follow(guard, guardConfig, patrol);                                  // loops
+TopDownMovement::follow(guard, guardConfig, patrol, retropp::PlaybackMode::single()); // plays once
 ```
 
-`follow` is the route's advance for the tick: a route a walker follows is not also advanced by the game.
-Because it measures the route's own movement before rounding, the walker walks on every tick the route
-moves at all: a route of `speed(30.0f)` at 60 ticks a second moves half a pixel a tick, and the walker's
-stride counts every tick of it.
+- **Call it once per tick, instead of `route.advance()`.** `follow` advances the route. A route that is
+  also advanced by your code runs at double speed.
+- **Do not also call `walk`** for the same walker on the same tick.
+- **It takes any walker.** An `InputWalker` can follow a route
+  ([how-to.md](how-to.md#walk-the-player-along-a-route)).
+- **The walk animation plays on every tick the route moves,** including ticks where it moves less than
+  a pixel and the walker's position does not change. A route at 30 pixels per second on a 60 Hz tick
+  moves half a pixel per tick and animates normally.
+- **On a tick the route does not move,** the walker keeps its facing and shows frame 0.
+
+`mode` is the playback mode of the whole route:
+
+| Mode | After the last leg |
+|---|---|
+| `PlaybackMode::loopIndefinitely()` (default) | The route starts again from its first leg. |
+| `PlaybackMode::single()` | The walker stays at the end. `route.finished()` returns `true`. |
+| `PlaybackMode::loopNTimes(n)` | The route runs `n` times, then the walker stays at the end. |
+| `PlaybackMode::playForDuration(d)` | The route loops until `d` has passed, then the walker stays where it is. |
+
+A looping route starts again at its `start`. If the last leg does not end there, the walker jumps back
+to it. End a looping route where it starts.
 
 ## Facing from travel
 
-On a tick the route moves, the walker faces along its travel (`Walker::moveTo`):
+On each tick the route moves, `follow` sets both facings from the route's travel that tick.
 
-- its **sprite** faces the nearest of the eight directions: a diagonal when the smaller part of the
-  travel is at least 0.4142 of the larger (the tangent of 22.5°, halfway between a cardinal and a
-  diagonal), a cardinal otherwise;
-- the walker **faces** along the axis of the larger part. When the two are equal, it keeps its facing if
-  that is one of the two, and otherwise faces the horizontal one.
+- `facing()` is the axis with the larger travel. If the two are equal, the walker keeps its facing when
+  that is one of the two directions, and otherwise faces the horizontal one.
+- `spriteFacing(config)` is the nearest of the eight directions. It is a diagonal when the smaller
+  component is at least 0.4142 of the larger (the tangent of 22.5°).
 
-So a leg east faces right, a leg north faces up, and a leg at 30° below east faces right with a
-down-right sprite under `sprites = Ways::Eight`. `config.movement` is not read: a route goes where it is
-drawn, diagonals included, whatever the walker's own movement is.
+| Travel direction | `facing()` | `spriteFacing` with `sprites = Ways::Eight` |
+|---|---|---|
+| east | `Right` | `Right` |
+| 20° below east | `Right` | `Right` |
+| 30° below east | `Right` | `DownRight` |
+| 45° below east | `Right` or `Down`: the current facing if it is one of these, otherwise `Right` | `DownRight` |
+| 60° below east | `Down` | `DownRight` |
+| south | `Down` | `Down` |
 
-On a tick the route does not move, the walker keeps both facings and stands, on frame 0.
+With `sprites = Ways::Four` the sprite shows `facing()`.
 
-## Waits, sentinels and sequence modes
+`config.movement` is not read. A route moves diagonally under `Ways::Four` and `Ways::Eight` alike.
 
-All three are the engine's, and a walker following them does what they say:
+## Waits, posts and playback modes
 
-- a **wait node** — a leg to the point it starts from, paced `eased(duration)` — stands the walker still
-  for the duration, facing the way it came, on frame 0;
-- a **sentinel node** — a leg with `speed(0.0f)` — stands it until the game moves the route on;
-- the **sequence mode** passed to `follow` decides what happens after the last leg: the default loops,
-  `single()` stands the walker at the route's end.
+**A wait** is a leg to the point it starts from, paced `eased(duration)`. The walker stands for the
+duration, keeps its facing, and shows frame 0.
+
+```cpp
+{.label = "wait", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::eased(500ms)},
+```
+
+**A post** is a leg to a different point, paced `speed(0.0f)`. It never finishes. The walker stands at
+the leg's start until you interrupt the route or replace it. The engine's guide calls this a sentinel
+node.
+
+```cpp
+{.label = "post", .move = retropp::SpritePathMove::to({136.0f, 120.0f}), .pacing = retropp::PathPacing::speed(0.0f)},
+```
+
+## Reading and controlling a route
+
+The route is a `retropp::SpritePath`. Use its own members.
+
+| Call | Use |
+|---|---|
+| `route.currentNode()->label` | Which leg the walker is on. |
+| `route.finished()` | Whether a route played with `single()`, `loopNTimes` or `playForDuration` has ended. |
+| `route.pause()`, `route.play()` | Stop and resume. A walker following a paused route stands. |
+| `route.interrupt(…)`, `route.popInterrupt()` | Start and end a detour ([Detours](#detours)). |
+| `route.interrupted()` | Whether a detour is running. |
+
+To send a walker on a new route from where it stands, build a new one:
+
+```cpp
+patrol = TopDownMovement::routeFrom(guard, {
+    {.move = retropp::SpritePathMove::to({16.0f, 40.0f}), .pacing = retropp::PathPacing::speed(30.0f)},
+});
+```
+
+`route.restart()` rewinds a route to its original `start`. A walker that is somewhere else jumps there
+on the next `follow`.
 
 ## Detours
 
-`route.interrupt(nodes, mode, resume)` starts a detour from where the walker stands; the next `follow`
-walks it. When the detour ends the route takes up again, under the `ResumePolicy` given:
-
-- **`Continue`** (the engine's default) — the route carries on from where the detour left the walker,
-  its legs moved with it;
-- **`Return`** — the walker is put back where it stood when the detour began, and the route carries on
-  from there. On the tick of the hand-back the walker's travel is that jump, so it faces back along it.
-
-`route.popInterrupt()` ends a detour at once; it is the only way out of a detour played under
-`loopIndefinitely()`.
+`route.interrupt(nodes, mode, resume)` suspends the route and starts a detour from the walker's current
+position. The next `follow` walks the detour. When the detour ends, the route resumes.
 
 ```cpp
-// The guard breaks off toward a noise, then goes back to his post.
+// The guard walks to a noise and then returns to where he left the patrol.
 patrol.interrupt({{.move = retropp::SpritePathMove::to(noise), .pacing = retropp::PathPacing::speed(60.0f)}},
                  retropp::PlaybackMode::single(), retropp::ResumePolicy::Return);
 ```
 
-## Nothing collides on a route
+| `ResumePolicy` | When the detour ends |
+|---|---|
+| `Continue` (the engine's default) | The route resumes from where the detour ended. The rest of the route is shifted by the detour's displacement. |
+| `Return` | The walker is put back where it was when the detour began, in one tick, and the route resumes from there. On that tick the walker faces along the jump. |
 
-A route goes where it is drawn: the walker's collision shape is not tested on the way, so a route through
-a wall walks through it. Draw routes in open space. A walker that should be stopped by walls — one that
-wanders, chases or flees — takes the free pathway instead (`Walker::walk` with a heading) and turns by
-the game's own rule when something stops it ([how-to.md](how-to.md#wander-against-walls)).
+A detour played with `PlaybackMode::single()` ends on its own. A detour played with
+`loopIndefinitely()` ends only when you call `route.popInterrupt()`.
 
-A route's points are in one area's pixels. A route that should go on into another area is ended at the
-edge and a new one begun in the next.
+`Return` moves the walker back in a single tick. To have it walk back, add a leg to the detour that
+returns to the starting point.
 
-## Where the position is rounded
+## Collision
 
-A route's position is in float pixels; a walker's is in whole ones. `follow` rounds the route's position
-with `std::lround` when it writes the walker's, the same rounding the engine's `SpritePath::applyTo`
-uses for a sprite. The route keeps its float position, so a slow route arrives exactly where it is drawn
-however long it takes.
+`follow` does not test the walker's collision shape. A route through a wall moves the walker through the
+wall. Draw routes through open ground.
+
+A character that must be stopped by walls uses a heading instead of a route:
+[how-to.md](how-to.md#wander-against-walls).
+
+A route does not carry a walker from one map to another. End the route, `place` the walker in the new
+map, and build a new route there.
+
+## Rounding
+
+A route's position is a `retropp::Vec2` of floats. A walker's position is a `retropp::Vec2i`. `follow`
+rounds with `std::lround` when it writes the walker's position. The route keeps its float position, so
+rounding does not accumulate.
+
+## Engine behavior to know
+
+Two behaviors of `SpritePath` at the engine version this module builds against affect walkers.
+
+**A `speed` leg can last one tick longer than its length divided by its speed.** The engine converts
+pixels per second to a fractional number of pixels per tick. A leg of 24 pixels at 60 pixels per second
+on a 60 Hz tick takes 25 ticks, and the route does not move on the last one. On that tick the walker
+stands and its walk animation returns to frame 0. For a leg that ends on an exact tick, pace it by
+duration:
+
+```cpp
+const std::chrono::nanoseconds tick = retropp::SpritePath::defaultTiming.tickPeriod();
+
+{.move = retropp::SpritePathMove::to({40.0f, 16.0f}), .pacing = retropp::PathPacing::eased(24 * tick, retropp::Easing::Linear)},
+```
+
+**A `Continue` detour resumes one tick early.** The route resumes from the position the walker had one
+tick before the detour's end. A detour of 8 pixels at one pixel per tick shifts the route by 7 pixels.
+`Return` is not affected.

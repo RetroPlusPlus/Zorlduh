@@ -8,10 +8,10 @@
 //
 //     TopDownMovement::follow(guard, guardConfig, patrol);   // once per tick
 //
-// The route is the game's own retropp::SpritePath, kept in its state: the engine's pacing, wait and
-// sentinel nodes, sequence modes and interrupt stack all apply, through the engine's own surface. What
-// this header adds is the walker on it: its bound position, the facing chosen from the route's travel,
-// and the walk animation's stride. Nothing collides on a route.
+// The route is a retropp::SpritePath the game keeps in its state. The engine's pacing, wait and
+// sentinel nodes, playback modes and interrupt stack all apply, through SpritePath's own members. This
+// header adds the walker on the route: its position, a facing chosen from the route's travel, and its
+// walk animation. A walker on a route is not tested for collision.
 #pragma once
 
 #include <cmath>
@@ -26,9 +26,9 @@
 
 namespace TopDownMovement {
 
-// A route over `nodes` that departs from where `walker` stands: a SpritePath whose `start` is the
-// walker's position, resolved at its first tick so that its position is the walker's before the first
-// follow.
+// A route over `nodes` that starts at `walker`'s position: a SpritePath whose `start` is that position,
+// resolved once so that route.position() equals it before the first follow. The route takes
+// SpritePath::defaultTiming as it stands at this call.
 [[nodiscard]] inline retropp::SpritePath routeFrom(const Walker& walker, std::vector<retropp::SpritePathNode> nodes) {
     const retropp::Vec2i at = walker.position();
     retropp::SpritePath route{.nodes = std::move(nodes),
@@ -37,10 +37,11 @@ namespace TopDownMovement {
     return route;
 }
 
-// One tick on `route`: advances it once under `mode` — the playback mode of its own nodes, as
-// SpritePath::advance takes it — and moves `walker` to where it is now, its float position rounded with
-// std::lround, facing along how far the route moved this tick (Walker::moveTo). So the walker walks while
-// the route moves, however slowly, and stands on frame 0 through a wait node.
+// One tick on `route`: advances it once under `mode`, the playback mode SpritePath::advance takes for
+// the route's nodes, and moves `walker` to the route's position, rounded with std::lround. The walker
+// faces along the distance the route moved this tick (Walker::moveTo). Its walk animation advances on
+// every tick the route moves, however little, and shows frame 0 on a tick it does not. Call it once per
+// tick in place of route.advance().
 inline void follow(Walker& walker, const WalkerConfig& config, retropp::SpritePath& route,
                    retropp::PlaybackMode mode = retropp::PlaybackMode::loopIndefinitely()) {
     const retropp::Vec2 before = route.position();

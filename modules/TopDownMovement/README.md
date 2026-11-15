@@ -1,71 +1,81 @@
-# TopDownMovement — walking a top-down world
+# TopDownMovement
 
-`TopDownMovement` gives a game on the [Polyrhythm](https://github.com/RetroPlusPlus/Polyrhythm) engine things
-that walk a top-down world: stopped by walls, facing the way they go, playing a walk animation for the
-way their sprite faces. Walking diagonally into a wall keeps them moving along it: the direction the
-wall blocks stops, and the other carries on. A walker walks a position the game keeps, and it is moved
-three ways: by the pad, by a heading the game works out, or along a route of the engine's own.
+Walking characters for a top-down game on the [Polyrhythm](https://github.com/RetroPlusPlus/Polyrhythm)
+engine.
+
+A walker moves a pixel at a time, stops at walls, slides along them on a diagonal, faces the way it
+goes, and plays a walk animation while it moves. You can move one three ways: by the player's input, by
+a heading your code computes, or along a route.
 
 ```cpp
-// What a walker is. Two switches: 8-way or 4-way movement, 4 or 8 sprite directions.
+#include "TopDownMovement/input_walker.h"    // InputWalker, WalkerConfig, TileCollision, readDirections
+#include "TopDownMovement/walker_sprite.h"   // WalkerSprite
+
+// The config: what a hero is. Build it once, after the art is loaded.
 const TopDownMovement::WalkerConfig heroConfig{
     .speed     = 1,
-    .movement  = TopDownMovement::Ways::Eight,
-    .sprites   = TopDownMovement::Ways::Four,
     .collision = retropp::IntRect{.x = 3, .y = 8, .width = 10, .height = 8},
     .walk      = {.up = walkUp, .down = walkDown, .left = walkLeft, .right = walkRight},
 };
-const TopDownMovement::TileCollision walls{.map = &collisionMap, .cellSize = 8, .open = Cell::Open};
 
-// Where it stands is the game's; the walker is bound to it once.
+// The position is a value in your game state. The walker is bound to it.
 retropp::Vec2i heroAt{72, 56};
 TopDownMovement::InputWalker hero{heroAt};
 
-// Each tick: the pad. A plain Walker takes a heading; follow moves one along a SpritePath.
+// Every tick.
+const TopDownMovement::TileCollision walls{.map = &collisionMap, .cellSize = 8, .open = Cell::Open};
 hero.walk(heroConfig, TopDownMovement::readDirections(input, steering), walls);
 
-// Each frame.
-TopDownMovement::WalkerSprite("hero", hero, heroConfig);
+// Every frame.
+const retropp::Sprite sprite = TopDownMovement::WalkerSprite("hero", hero, heroConfig);
 ```
 
-| Piece | What it is | Page |
+[docs/concepts.md](docs/concepts.md#overview) explains each line.
+
+## Contents
+
+| Type or function | Purpose | Reference |
 |---|---|---|
-| `WalkerConfig`, `Ways` | what a walker is: speed, how it may move, how many sprite directions it has, collision shape, anchors, a walk animation per sprite direction | [docs/walker.md](docs/walker.md#walkerconfig) |
-| `Walker` | something that walks: bound to a position, walked by a heading, moved by something else, turned, drawn | [docs/walker.md](docs/walker.md#walker) |
-| `InputWalker` | a walker steered by the pad, which also keeps the order directions were pressed in | [docs/walker.md](docs/walker.md#inputwalker) |
-| `routeFrom`, `follow` | a walker moved along the engine's `SpritePath` | [docs/routes.md](docs/routes.md) |
-| `Facing` | the eight directions a walker's sprite can face | [docs/walker.md](docs/walker.md#facing) |
-| `CollisionShape`, `TileCollision` | what a walker collides with, and a collision map's solid cells | [docs/collision.md](docs/collision.md) |
-| `readDirections` | the four directions, read from the engine's input through the game's own actions | [docs/walker.md](docs/walker.md#reading-the-directions) |
-| `WalkerSprite` | the sprite a walker is | [docs/walker.md](docs/walker.md#walkersprite) |
+| `WalkerConfig` | Describes a kind of walker: speed, 8-way or 4-way movement, 4 or 8 sprite directions, collision shape, walk animations. | [docs/walker.md](docs/walker.md#walkerconfig) |
+| `Walker` | One walking character. Moved by a heading. | [docs/walker.md](docs/walker.md#walker) |
+| `InputWalker` | A `Walker` moved by the player's input. | [docs/walker.md](docs/walker.md#inputwalker) |
+| `routeFrom`, `follow` | Move a walker along the engine's `SpritePath`. | [docs/routes.md](docs/routes.md) |
+| `CollisionShape` | The pixels of a walker that collide: a box, a circle, a polygon. | [docs/collision.md](docs/collision.md#collisionshape) |
+| `TileCollision` | Solids read from a collision map. | [docs/collision.md](docs/collision.md#tilecollision) |
+| `readDirections` | Reads the four directions from the engine's input. | [docs/walker.md](docs/walker.md#readdirections) |
+| `WalkerSprite` | Returns the sprite for a walker. | [docs/walker.md](docs/walker.md#walkersprite) |
 
-The module is header-only, depends on the engine alone (`retropp::engine`), includes no header from the
-game it sits in, and needs C++20. It is meant to leave this repository as a standalone module.
+## Requirements
 
-## Using it
+- C++20
+- The Polyrhythm engine, as the CMake target `retropp::engine`
+
+The module is header-only and depends on the engine alone.
+
+## Install
 
 ```cmake
 add_subdirectory(modules/TopDownMovement)
 target_link_libraries(my-game PRIVATE TopDownMovement::TopDownMovement)
 ```
 
-The directory's `CMakeLists.txt` defines the INTERFACE target `TopDownMovement` (alias
-`TopDownMovement::TopDownMovement`) and expects the engine as the target `retropp::engine`.
-`TOPDOWNMOVEMENT_BUILD_EXAMPLES` (on by default when the directory is the top-level project) builds
-`TopDownMovement-example-getting-started`, the program [docs/getting-started.md](docs/getting-started.md)
-walks through.
+| CMake option | Default | Effect |
+|---|---|---|
+| `TOPDOWNMOVEMENT_BUILD_EXAMPLES` | `ON` when this directory is the top-level project, otherwise `OFF` | Builds the example program as the target `TopDownMovement-example-getting-started`. |
 
 ## Documentation
 
 | Page | Read it for |
 |---|---|
-| **[Getting started](docs/getting-started.md)** | **Start here:** the example program, three walkers in a room, part by part |
-| [Concepts](docs/concepts.md) | The model: the config, the bound position, the three pathways, facing and sprite directions |
-| [Routes](docs/routes.md) | Walking the engine's `SpritePath`: waits, detours, facing from travel |
-| [Collision](docs/collision.md) | What is solid, what collides, and how the two meet each tick |
-| [How-to](docs/how-to.md) | Recipes: patrols, wandering, four directions only, diagonal sprites and more |
-| [Walker reference](docs/walker.md) | Every type and member |
-| [Guide index](docs/README.md) | Every page, and what the module covers and leaves to the game |
+| **[Getting started](docs/getting-started.md)** | **Start here.** A complete example program, explained step by step. |
+| [Concepts](docs/concepts.md) | How the module works. |
+| [Collision](docs/collision.md) | Solids and collision shapes. |
+| [Routes](docs/routes.md) | Patrols, waits and detours. |
+| [How-to](docs/how-to.md) | Recipes for specific tasks. |
+| [Troubleshooting](docs/troubleshooting.md) | Symptoms, causes and fixes. |
+| [Testing](docs/testing.md) | Testing code that uses the module. |
+| [Walker reference](docs/walker.md) | Every type and member. |
+| [Guide index](docs/README.md) | Every page, a task index, a name index, and what the module does and does not provide. |
 
 ## Layout
 
@@ -79,11 +89,16 @@ modules/TopDownMovement/
     input_walker.h                  InputWalker
     route.h                         routeFrom, follow
     walker_sprite.h                 WalkerSprite
-  examples/getting_started.cpp      the getting-started program
+  examples/getting_started.cpp      the example program
   examples/assets/                  its sheets and palette images
   docs/                             the guide
 ```
 
-`walker_sprite.h` is the only header that builds a draw type (`retropp::Sprite`), so a game's
-simulation can include the rest without anything to draw. `route.h` is the only header that includes the
-engine's `retropp/sprite_path.h`.
+| Header | Note |
+|---|---|
+| `walker_sprite.h` | The only header that creates a draw type (`retropp::Sprite`). Simulation code can include the others and draw nothing. |
+| `route.h` | The only header that includes the engine's `retropp/sprite_path.h`. |
+
+## License
+
+MIT. See [LICENSE](LICENSE).

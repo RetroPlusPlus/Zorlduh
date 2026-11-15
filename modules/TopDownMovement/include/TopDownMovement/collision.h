@@ -245,8 +245,9 @@ struct CellValue {
 };
 
 // Solid cells on a collision map: every cell of `map` whose value is not `open` is solid, and so is
-// every pixel off the map. Pixels are the map's cells scaled up by `cellSize`; negative pixels lie off
-// the map. With no map, everything is solid.
+// every pixel off the map. The map's top-left cell is at pixel (0, 0) and each cell is `cellSize` pixels
+// on a side; `cellSize` is greater than 0. Negative pixels lie off the map. With no map, everything is
+// solid.
 struct TileCollision {
     const retropp::IndexGrid* map = nullptr;
     int cellSize = 8;

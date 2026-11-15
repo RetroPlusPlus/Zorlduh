@@ -1,4 +1,4 @@
-// WalkerSprite — the sprite a walker is.
+// WalkerSprite — the sprite for a walker.
 //
 //     LayerKit::SpriteLayer("actors", kActorsZ, {{TopDownMovement::WalkerSprite("hero", walker, hero)}},
 //                         {.scroll = camera});
