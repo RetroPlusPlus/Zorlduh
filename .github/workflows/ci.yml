@@ -117,6 +117,9 @@ jobs:
       - name: Find Python
         shell: powershell
         run: |
+          # A candidate that fails writes to stderr, which the step's default error preference would turn
+          # into the end of the step; carry on to the next one instead.
+          $ErrorActionPreference = 'Continue'
           $candidates = @()
           $py = Get-Command py -ErrorAction SilentlyContinue
           if ($py) { $candidates += (& $py.Source -3 -c "import sys; print(sys.executable)" 2>$null) }
@@ -323,6 +326,9 @@ jobs:
       - name: Find Python
         shell: powershell
         run: |
+          # A candidate that fails writes to stderr, which the step's default error preference would turn
+          # into the end of the step; carry on to the next one instead.
+          $ErrorActionPreference = 'Continue'
           $candidates = @()
           $py = Get-Command py -ErrorAction SilentlyContinue
           if ($py) { $candidates += (& $py.Source -3 -c "import sys; print(sys.executable)" 2>$null) }
