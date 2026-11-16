@@ -404,7 +404,7 @@ struct Sample {
     bool moving;
 };
 
-// The run as the walker walked it under the defaults before it was bound to a position.
+// The scripted run under the default switches, one sample per tick.
 constexpr std::array<Sample, 200> kScriptedRun{{
     {33, 32, Dir::Right, 6, true}, {34, 32, Dir::Right, 6, true}, {35, 32, Dir::Right, 6, true}, {36, 32, Dir::Right, 6, true},
     {37, 32, Dir::Right, 6, true}, {38, 32, Dir::Right, 6, true}, {39, 32, Dir::Right, 6, true}, {40, 32, Dir::Right, 7, true},

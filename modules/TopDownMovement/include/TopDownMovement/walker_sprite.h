@@ -1,4 +1,4 @@
-// WalkerSprite — the sprite a walker is.
+// WalkerSprite — the sprite for a walker.
 //
 //     LayerKit::SpriteLayer("actors", kActorsZ, {{TopDownMovement::WalkerSprite("hero", walker, hero)}},
 //                         {.scroll = camera});
@@ -21,8 +21,8 @@
 
 namespace TopDownMovement {
 
-// The sprite for `walker` under `config`, keyed `key`. Throws std::logic_error when the frame names no
-// art, and as Walker::frame does.
+// The sprite for `walker` under `config`, keyed `key`. Throws std::logic_error when the frame is
+// palette-only, and as Walker::frame does.
 [[nodiscard]] inline retropp::Sprite WalkerSprite(retropp::ObjectKey key, const Walker& walker,
                                                   const WalkerConfig& config) {
     const retropp::AnimationFrame& frame = walker.frame(config);

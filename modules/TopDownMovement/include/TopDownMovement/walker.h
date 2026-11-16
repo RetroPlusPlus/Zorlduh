@@ -1,6 +1,6 @@
-// A walker: anything that walks a top-down world. It walks a position kept elsewhere, steps against
-// what is solid, faces one of four ways, shows one of four or eight sprite directions, and plays a walk
-// animation for the way its sprite faces.
+// Walker: one walking character in a top-down world. It moves a position the game owns, stops at
+// solids, faces one of four directions, shows one of four or eight sprite directions, and plays a walk
+// animation for the direction its sprite faces.
 //
 //     const TopDownMovement::WalkerConfig wandererConfig{
 //         .speed = 1,
@@ -12,10 +12,10 @@
 //     TopDownMovement::Walker wanderer{wandererAt};                              // bound once
 //     wanderer.walk(wandererConfig, TopDownMovement::Directions{.right = true}, walls);   // once per tick
 //
-// A walker is moved three ways: by a heading (Walker::walk), by the pad (InputWalker, input_walker.h)
-// and along the engine's SpritePath (follow, route.h). The config says what the walker is; the Walker
-// value is how it stands now. One config serves any number of walkers. A walker draws through
-// TopDownMovement/walker_sprite.h.
+// A walker is moved three ways: by a heading (Walker::walk), by input (InputWalker, input_walker.h)
+// and along the engine's SpritePath (follow, route.h). A WalkerConfig describes a kind of walker; a
+// Walker is the state of one. One config serves any number of walkers. WalkerSprite
+// (walker_sprite.h) returns a walker's sprite.
 #pragma once
 
 #include <algorithm>
@@ -50,9 +50,11 @@ struct DirectionalAnimations {
     retropp::Animation downRight;
 };
 
-// What a walker is. Every position in it is in the walker's own pixels, relative to its top-left.
+// Describes a kind of walker. Every position in it is in the walker's own pixels, relative to its
+// top-left.
 struct WalkerConfig {
-    // Pixels moved per tick on each axis the walker heads along.
+    // Pixels moved per tick on each axis the walker heads along. At 0 or less the walker turns and stays
+    // where it is.
     int speed = 1;
 
     // How the walker may move: Ways::Eight moves along both axes at once, Ways::Four along one.
@@ -62,7 +64,7 @@ struct WalkerConfig {
     // diagonals with animations of their own.
     Ways sprites = Ways::Four;
 
-    // What the walker collides with.
+    // The pixels of the walker that collide. An empty shape passes through everything.
     CollisionShape collision{};
 
     // Points in the walker's art, published on its sprite and readable through Walker::anchor. The
@@ -79,9 +81,9 @@ struct WalkerConfig {
     retropp::TimingProfile timing = retropp::AnimationPlayer::defaultTiming;
 };
 
-// Something that walks. A Walker is bound to a position it does not own: it reads and writes that
-// position from then on, and keeps only how it stands — the way it faces, the way its sprite faces,
-// and its place in the walk animation.
+// The state of one walking character. A Walker is bound to a position the game owns: it reads and
+// writes that position, and stores its facing, its sprite's facing and its place in the walk
+// animation.
 class Walker {
 public:
     // A walker bound to `position`, its top-left in world pixels. The position outlives the walker and
@@ -96,7 +98,8 @@ public:
     // copy to the copied position.
     void bind(retropp::Vec2i& position) noexcept { position_ = &position; }
 
-    // Writes `position` without walking there: nothing collides on the way, and the walker stands.
+    // Writes `position` to the bound position and resets the walk animation to frame 0. The walker goes
+    // exactly there, walls included, and the facing is kept.
     void place(retropp::Vec2i position) noexcept {
         *position_ = position;
         strideTicks_ = 0;
@@ -104,18 +107,19 @@ public:
 
     // One tick toward `heading`, against `solids`.
     //
-    // Opposite directions cancel. Under Ways::Eight the walker moves along x, then along y, one pixel at
-    // a time up to `config.speed`, taking each pixel only if its collision shape there covers nothing
-    // `solids` calls solid, so it stops flush against a wall and slides along one when heading into it
-    // diagonally. Under Ways::Four a heading along both axes is brought to one first: the axis the walker
-    // faces along when that is one of the two, otherwise the horizontal one.
+    // Movement. Opposite directions cancel. The walker moves along x, then along y, one pixel at a time
+    // up to `config.speed`. It takes a pixel only where its collision shape is clear of everything
+    // `solids` reports as solid, so it stops against a wall and, heading diagonally into one, moves
+    // along it. Under Ways::Four a heading on both axes is reduced to one before moving: the direction
+    // the walker faces if that is one of the two, otherwise the horizontal one.
     //
-    // It faces along the axis it heads along, whether or not it moves, so a walker heading into a wall
-    // turns to face it. Heading along both axes, it keeps its facing if that is one of the two, and
-    // otherwise faces the horizontal one. Heading nowhere leaves both facings as they were.
+    // Facing. With a heading on one axis the walker faces that direction, whether it moves or is
+    // blocked, so a walker heading into a wall turns to face it. With a heading on both axes it keeps
+    // its facing if that is one of the two directions, and otherwise faces the horizontal one. With an
+    // empty heading both facings are kept.
     //
-    // The walk animation advances while the walker moves, keeping its place across a turn, and returns
-    // to frame 0 when it stands.
+    // Animation. The walk animation advances on a tick the walker moves, keeps its place when the walker
+    // turns, and returns to frame 0 on a tick it stands still.
     template <SolidQuery Q>
     void walk(const WalkerConfig& config, Directions heading, const Q& solids) {
         int dx = (heading.right ? 1 : 0) - (heading.left ? 1 : 0);
@@ -130,15 +134,15 @@ public:
         stepToward(config, dx, dy, dx != 0 ? horizontalOf(dx) : retropp::Dir::None, solids);
     }
 
-    // One tick of being moved by something other than the walker's own step, such as a route: the
-    // walker is put at `to`, nothing colliding, and faces along `travel`, how far it moved this tick.
-    // The walk animation advances while `travel` is not zero and returns to frame 0 when it is; a zero
+    // One tick of being moved by something other than the walker's own step, such as a route: the walker
+    // is put at `to`, walls included, and faces along `travel`, how far it moved this tick. The walk
+    // animation advances while `travel` is non-zero and returns to frame 0 when it is zero; a zero
     // `travel` leaves both facings as they were.
     //
     // The sprite faces the nearest of the eight directions to `travel`: a diagonal when its smaller
     // component is at least 0.4142 of its larger. The walker faces along the axis of the larger
     // component; when the two are equal, it keeps its facing if that is one of the two, and otherwise
-    // faces the horizontal one. `config.movement` is not read: a route goes where it is drawn.
+    // faces the horizontal one. `config.movement` applies to walk alone: a route goes where it is drawn.
     void moveTo(const WalkerConfig& config, retropp::Vec2i to, retropp::Vec2 travel) {
         (void)config;
         *position_ = to;
@@ -163,8 +167,8 @@ public:
         ++strideTicks_;
     }
 
-    // Turns the walker to `facing` without moving it. Both its facing and its sprite's are set; the walk
-    // animation keeps its place. Dir::None changes nothing.
+    // Turns the walker to `facing` in place. Both its facing and its sprite's are set; the walk
+    // animation keeps its place. Dir::None leaves the walker as it is.
     void face(retropp::Dir facing) noexcept {
         if (facing == retropp::Dir::None) {
             return;
@@ -173,7 +177,7 @@ public:
         sprite_ = facingOf(facing);
     }
 
-    // Turns the walker's sprite to `facing` without moving it. A diagonal leaves the walker's own facing
+    // Turns the walker's sprite to `facing` in place. A diagonal leaves the walker's own facing
     // if that is one of its two directions, and otherwise faces it the horizontal one.
     void face(Facing facing) noexcept {
         sprite_ = facing;
@@ -198,16 +202,17 @@ public:
         return config.sprites == Ways::Eight ? sprite_ : facingOf(facing_);
     }
 
-    // Whether the walker moved on its last tick.
+    // Whether the walk animation is running: true after a walk that moved the walker or a moveTo with
+    // a non-zero travel, false after a walk in which it stood still, a moveTo with zero travel, or place.
     [[nodiscard]] bool moving() const noexcept { return strideTicks_ > 0; }
 
-    // The walker's collision shape where it stands, in world pixels.
+    // A copy of the walker's collision shape moved to its position, in world pixels.
     [[nodiscard]] CollisionShape collision(const WalkerConfig& config) const {
         return config.collision.at(*position_);
     }
 
     // The anchor labeled `label` in `config.anchors`, in world pixels. Throws std::out_of_range when the
-    // table has no such anchor.
+    // label is missing from the table.
     [[nodiscard]] retropp::Point anchor(const WalkerConfig& config, std::string_view label) const {
         const auto found = std::find_if(config.anchors.begin(), config.anchors.end(),
                                         [&](const retropp::Anchor& a) { return a.label == label; });
@@ -219,7 +224,7 @@ public:
     }
 
     // The frame of the walk animation for the way the sprite faces, as the walker shows it now. Throws
-    // std::logic_error when that animation has no frames.
+    // std::logic_error when that animation is empty.
     [[nodiscard]] const retropp::AnimationFrame& frame(const WalkerConfig& config) const {
         const retropp::Animation& animation = animationFor(config, spriteFacing(config));
         if (animation.count() == 0) {
@@ -230,8 +235,10 @@ public:
     }
 
 protected:
-    // One tick toward (dx, dy), each -1, 0 or 1. When both are headed and the walker faces neither of
-    // their directions, it faces `diagonal`.
+    // One tick toward (dx, dy), each -1, 0 or 1: moves, turns and animates as walk does. When both are
+    // non-zero and the walker faces a third direction, it faces `diagonal`. It moves on every axis given;
+    // a derived class reduces a two-axis step to one axis under Ways::Four. For a derived class that
+    // decides the walker's direction its own way, as InputWalker does.
     template <SolidQuery Q>
     void stepToward(const WalkerConfig& config, int dx, int dy, retropp::Dir diagonal, const Q& solids) {
         if (dx != 0 || dy != 0) {
@@ -281,7 +288,7 @@ private:
         return moved;
     }
 
-    // The Facing of a step of (dx, dy), each -1, 0 or 1, not both 0.
+    // The Facing of a step of (dx, dy), each -1, 0 or 1, at least one of them non-zero.
     [[nodiscard]] static Facing facingOf(int dx, int dy) noexcept {
         if (dy < 0) {
             return dx < 0 ? Facing::UpLeft : dx > 0 ? Facing::UpRight : Facing::Up;

@@ -1,11 +1,12 @@
-// InputWalker — a walker steered by the pad.
+// InputWalker — a walker moved by the player's input.
 //
 //     retropp::Vec2i heroAt{76, 68};
 //     TopDownMovement::InputWalker hero{heroAt};
 //     hero.walk(heroConfig, TopDownMovement::readDirections(input, steering), walls);   // once per tick
 //
-// It is a Walker that also keeps the one thing only input needs: the order in which directions were
-// pressed. It is walked by input alone; a heading is a plain Walker's.
+// It is a Walker that also records the order in which directions were pressed, and uses it when two
+// are held. Its walk takes a DirectionalInput and hides Walker::walk; to walk by a heading, use a plain
+// Walker.
 #pragma once
 
 #include <array>
@@ -27,15 +28,16 @@ public:
     explicit InputWalker(retropp::Vec2i& position, retropp::Dir facing = retropp::Dir::Down) noexcept
         : Walker(position, facing) {}
 
-    // One tick of walking by the directions `input` holds, against `solids`.
-    //
-    // It moves as Walker::walk does, by the directions held. With directions held on both axes:
+    // One tick of walking by the directions in `input.held`, against `solids`. It moves, turns and
+    // animates as Walker::walk does. `input.pressed` records which direction is newer. With directions
+    // held on both axes:
     //
     //   - under Ways::Eight it moves along both, and keeps its facing if that is one of the two;
-    //     otherwise it faces the one pressed more recently, and the horizontal one when both were
+    //     otherwise it faces the one pressed more recently, or the horizontal one when both were
     //     pressed on the same tick;
-    //   - under Ways::Four it moves, and faces, along the one pressed more recently, and the horizontal
-    //     one when both were pressed on the same tick. Letting go of it moves the walker along the other.
+    //   - under Ways::Four it moves and faces along the one pressed more recently, or the horizontal
+    //     one when both were pressed on the same tick. When that one is released, it moves along the
+    //     other.
     template <SolidQuery Q>
     void walk(const WalkerConfig& config, const DirectionalInput& input, const Q& solids) {
         ++pressClock_;

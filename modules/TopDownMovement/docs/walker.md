@@ -1,23 +1,30 @@
 # Walker reference
 
-`Ways`, `Facing`, `WalkerConfig`, `DirectionalAnimations`, `Walker`, `InputWalker`, the direction types
-and `readDirections`, and `WalkerSprite`. Routes are in [routes.md](routes.md).
+Every type and function in `directions.h`, `walker.h`, `input_walker.h` and `walker_sprite.h`. For
+routes see [routes.md](routes.md). For collision types see [collision.md](collision.md).
 
 ```cpp
-#include "TopDownMovement/directions.h"     // Ways, Facing, Directions, DirectionalInput, DirectionalActions, readDirections
+#include "TopDownMovement/directions.h"     // Ways, Facing, Directions, DirectionalInput, ActionName, DirectionalActions, readDirections
 #include "TopDownMovement/walker.h"         // DirectionalAnimations, WalkerConfig, Walker
 #include "TopDownMovement/input_walker.h"   // InputWalker
 #include "TopDownMovement/walker_sprite.h"  // WalkerSprite
 ```
 
+`input_walker.h` includes `walker.h`, which includes `directions.h` and `collision.h`.
+
 ## Contents
 
 - [`Ways`](#ways)
 - [`Facing`](#facing)
+- [`Directions`](#directions)
+- [`DirectionalInput`](#directionalinput)
+- [`ActionName` and `DirectionalActions`](#actionname-and-directionalactions)
+- [`readDirections`](#readdirections)
+- [`DirectionalAnimations`](#directionalanimations)
 - [`WalkerConfig`](#walkerconfig)
 - [`Walker`](#walker)
 - [`InputWalker`](#inputwalker)
-- [Reading the directions](#reading-the-directions)
+- [Writing your own pathway](#writing-your-own-pathway)
 - [`WalkerSprite`](#walkersprite)
 
 ## `Ways`
@@ -26,8 +33,8 @@ and `readDirections`, and `WalkerSprite`. Routes are in [routes.md](routes.md).
 enum class Ways : std::uint8_t { Four, Eight };
 ```
 
-How many directions: the four cardinal ones, or those and the four diagonals. A `WalkerConfig` has two:
-`movement`, the directions it moves in, and `sprites`, the directions its sprite shows.
+A number of directions: the four cardinal ones, or those plus the four diagonals. `WalkerConfig` has two
+fields of this type, `movement` and `sprites`.
 
 ## `Facing`
 
@@ -35,38 +42,167 @@ How many directions: the four cardinal ones, or those and the four diagonals. A 
 enum class Facing : std::uint8_t { Up, UpRight, Right, DownRight, Down, DownLeft, Left, UpLeft };
 ```
 
-One of eight directions, clockwise from up: the way a walker's sprite faces
-(`Walker::spriteFacing`). A sheet with a row per sprite direction in this order reads its rows as
-`static_cast<std::size_t>(facing)`.
+One of eight directions, clockwise from up. `Walker::spriteFacing` returns it, and `Walker::face` takes
+it.
+
+The values are 0 to 7 in the order listed. A sheet with one row per direction in this order can use the
+value as the row number:
+
+```cpp
+const std::size_t row = static_cast<std::size_t>(TopDownMovement::Facing::DownRight);   // 3
+```
+
+## `Directions`
+
+```cpp
+struct Directions {
+    bool up = false;
+    bool down = false;
+    bool left = false;
+    bool right = false;
+
+    constexpr bool operator==(const Directions&) const noexcept = default;
+};
+```
+
+Four flags. It is used in two places:
+
+- As a **heading** for `Walker::walk`: the directions the walker should move in this tick.
+- Inside `DirectionalInput`: the directions held, and the directions pressed.
+
+```cpp
+const TopDownMovement::Directions upRight{.up = true, .right = true};
+const TopDownMovement::Directions nowhere{};
+```
+
+As a heading, opposite flags cancel. `{.left = true, .right = true}` moves nowhere on x.
+
+## `DirectionalInput`
+
+```cpp
+struct DirectionalInput {
+    Directions held{};
+    Directions pressed{};
+
+    constexpr bool operator==(const DirectionalInput&) const noexcept = default;
+};
+```
+
+One tick of direction input for `InputWalker::walk`.
+
+| Field | Meaning |
+|---|---|
+| `held` | The directions down on this tick. The walker moves by these. |
+| `pressed` | The directions that went down since the previous tick. The walker uses these to know which of two held directions is newer. |
+
+`readDirections` builds one from the engine's input. You can also build one yourself
+([how-to.md](how-to.md#build-a-directionalinput-by-hand)).
+
+## `ActionName` and `DirectionalActions`
+
+```cpp
+struct ActionName {
+    retropp::ActionId id = 0;
+
+    template <retropp::ActionLike A>
+    constexpr ActionName(A action);
+};
+
+struct DirectionalActions {
+    ActionName up;
+    ActionName down;
+    ActionName left;
+    ActionName right;
+};
+```
+
+`DirectionalActions` names the four actions in your game's action enum that mean up, down, left and
+right. `ActionName` converts implicitly from any enumerator or integer the engine accepts as an action,
+so you write your own enumerators:
+
+```cpp
+enum class Action : std::uint8_t { Up, Down, Left, Right, Interact };
+
+const TopDownMovement::DirectionalActions steering{
+    .up = Action::Up, .down = Action::Down, .left = Action::Left, .right = Action::Right};
+```
+
+Build it once and pass it to `readDirections` each tick.
+
+## `readDirections`
+
+```cpp
+DirectionalInput readDirections(const retropp::InputState& input, const DirectionalActions& actions);
+```
+
+Reads the four actions from the tick's input: `held` from `InputState::isHeld`, `pressed` from
+`InputState::justPressed`.
+
+```cpp
+loop.simTick([&](const retropp::InputState& input) {
+    hero.walk(heroConfig, TopDownMovement::readDirections(input, steering), walls);
+});
+```
+
+- **It reads player slot 0.** For another slot, build the `DirectionalInput` from
+  `input.player(n)` ([how-to.md](how-to.md#build-a-directionalinput-by-hand)).
+- **The actions must be bound.** The engine reports an action only when it has a binding in the
+  `ActionMap` you gave the platform. `retropp::presets::directional(up, down, left, right)` binds the
+  arrow keys, WASD and the d-pad (the engine's `docs/guide/input.md`).
+- **Simulation code that takes plain values** can call `readDirections` where it reads input and pass the
+  `DirectionalInput` on. The simulation and its tests then work from plain values.
+
+## `DirectionalAnimations`
+
+```cpp
+struct DirectionalAnimations {
+    retropp::Animation up;
+    retropp::Animation down;
+    retropp::Animation left;
+    retropp::Animation right;
+    retropp::Animation upLeft;
+    retropp::Animation upRight;
+    retropp::Animation downLeft;
+    retropp::Animation downRight;
+};
+```
+
+One walk animation per sprite direction. It is the type of `WalkerConfig::walk`.
+
+| `config.sprites` | Fields read |
+|---|---|
+| `Ways::Four` | `up`, `down`, `left`, `right` |
+| `Ways::Eight` | all eight |
+
+Frame 0 of each animation is the standing pose for that direction. An animation that is read must have
+at least one frame; an empty one makes `Walker::frame` throw.
 
 ## `WalkerConfig`
 
 ```cpp
-struct DirectionalAnimations {
-    retropp::Animation up, down, left, right;
-    retropp::Animation upLeft, upRight, downLeft, downRight;
-};
-
 struct WalkerConfig {
-    int speed = 1;                                   // pixels per tick on each axis headed along
-    Ways movement = Ways::Eight;                     // 8-way or 4-way movement
-    Ways sprites = Ways::Four;                       // 4 or 8 sprite directions
-    CollisionShape collision{};                      // what the walker collides with
-    std::span<const retropp::Anchor> anchors{};      // points in the walker's art
-    DirectionalAnimations walk{};                    // the walk animation for each sprite direction
+    int speed = 1;
+    Ways movement = Ways::Eight;
+    Ways sprites = Ways::Four;
+    CollisionShape collision{};
+    std::span<const retropp::Anchor> anchors{};
+    DirectionalAnimations walk{};
     retropp::TimingProfile timing = retropp::AnimationPlayer::defaultTiming;
 };
 ```
 
-| Field | Meaning |
-|---|---|
-| `speed` | The most pixels the walker moves along each axis it heads along per tick. It stops short when its collision shape would touch something solid. |
-| `movement` | `Ways::Eight` moves along both axes at once; `Ways::Four` brings a heading along both axes to one first ([concepts.md](concepts.md#a-tick-of-walking)). Not read on a route. |
-| `sprites` | `Ways::Four` shows the walker's facing; `Ways::Eight` shows the last of the eight directions it headed in, diagonals with their own animations ([concepts.md](concepts.md#sprite-directions)). |
-| `collision` | The walker's collision shape, in its own pixels relative to its top-left: a box, a `ShapePoints`, or the polygon through anchors ([collision.md](collision.md#collisionshape)). An empty shape collides with nothing. |
-| `anchors` | Points in the walker's art, published on its sprite and readable in world pixels with `Walker::anchor`. The table belongs to the game and must outlive the config. |
-| `walk` | One animation per sprite direction. The diagonals are read only under `sprites = Ways::Eight`. The animation for the sprite's direction plays while the walker moves; its frame 0 shows while it stands. |
-| `timing` | The cadence the animations' durations resolve against. The default is the engine's active cadence, which `EngineConfig::setActive` sets, as long as the config is built after it runs. |
+Describes a kind of walker. Build one per kind of character, after the art is loaded, and pass it to
+every call that takes a config.
+
+| Field | Meaning | Default |
+|---|---|---|
+| `speed` | Pixels moved per tick on each axis the walker heads along. The walker stops short at a wall. | `1` |
+| `movement` | `Ways::Eight` moves on both axes in one tick. `Ways::Four` moves on one ([concepts.md](concepts.md#four-directions-only)). Applies to `walk` only. | `Ways::Eight` |
+| `sprites` | `Ways::Four`: the sprite shows `facing()`. `Ways::Eight`: the sprite shows one of eight directions, each with its own animation ([concepts.md](concepts.md#sprite-directions)). | `Ways::Four` |
+| `collision` | The walker's collision shape, in the walker's own pixels relative to its top-left ([collision.md](collision.md#collisionshape)). | empty |
+| `anchors` | Named points in the walker's art. Read them with `Walker::anchor`; `WalkerSprite` copies the span onto the sprite. | empty |
+| `walk` | The walk animations. | empty |
+| `timing` | The tick rate for converting frame durations to ticks. | the engine's active timing when the config is constructed |
 
 ```cpp
 const TopDownMovement::WalkerConfig knightConfig{
@@ -78,6 +214,17 @@ const TopDownMovement::WalkerConfig knightConfig{
              .upLeft = walkUpLeft, .upRight = walkUpRight, .downLeft = walkDownLeft, .downRight = walkDownRight},
 };
 ```
+
+Watch for:
+
+- **Initializer order.** C++ requires designated initializers in declaration order: `speed`, `movement`,
+  `sprites`, `collision`, `anchors`, `walk`, `timing`.
+- **An empty `collision`.** A walker with an empty collision shape walks through walls.
+- **`speed` of 0 or less.** The walker turns to face its heading and stays where it is.
+- **`timing`.** The default is read when the config is constructed. Construct configs after
+  `retropp::EngineConfig::setActive`, or set `timing` yourself.
+- **`anchors` is a span.** The table it views must outlive the config.
+- **Copying.** A config owns its animations, so copying a config copies them. Pass configs by reference.
 
 ## `Walker`
 
@@ -106,22 +253,224 @@ public:
 };
 ```
 
-| Member | What it does |
+The state of one walking character: the position it is bound to, its facing, its sprite's facing, and
+its place in the walk animation. A `Walker` is always bound to a position: its only
+constructor takes one.
+
+### Constructor
+
+```cpp
+explicit Walker(retropp::Vec2i& position, retropp::Dir facing = retropp::Dir::Down) noexcept;
+```
+
+Binds the walker to `position`, the walker's top-left in world pixels, and sets its starting facing.
+`retropp::Dir::None` is treated as `Down`.
+
+```cpp
+retropp::Vec2i batAt{40, 40};
+TopDownMovement::Walker bat{batAt, retropp::Dir::Left};
+```
+
+`position` must outlive the walker and stay at the same address
+([concepts.md](concepts.md#lifetimes)).
+
+### `bind`
+
+```cpp
+void bind(retropp::Vec2i& position) noexcept;
+```
+
+Binds the walker to a different position. Facing and stride are kept.
+
+Call it on a copied walker. A copy is bound to the same position as the original:
+
+```cpp
+TopDownMovement::Walker ghost = bat;   // ghost is bound to batAt
+retropp::Vec2i ghostAt = batAt;
+ghost.bind(ghostAt);                   // ghost now has its own position
+```
+
+### `place`
+
+```cpp
+void place(retropp::Vec2i position) noexcept;
+```
+
+Writes `position` to the bound position and resets the stride, so the walker shows frame 0. The walker
+goes exactly there, walls included. Facing is kept.
+
+Use it to spawn, respawn, or move a walker to another map.
+
+Call it for a spawn or a teleport only. Each call resets the stride, so calling it every tick holds the
+walk animation on frame 0. To change a walker's position and keep the stride, assign to the position
+itself.
+
+### `walk`
+
+```cpp
+template <SolidQuery Q>
+void walk(const WalkerConfig& config, Directions heading, const Q& solids);
+```
+
+One tick of walking toward `heading`, colliding with `solids`. It moves the walker, sets its facing and
+advances or resets its stride. [concepts.md](concepts.md#a-tick-of-walking) describes the movement and
+[concepts.md](concepts.md#facing) the facing.
+
+```cpp
+bat.walk(batConfig, TopDownMovement::Directions{.left = true}, walls);
+```
+
+- Call it once per tick, including ticks with an empty heading. An empty heading is what makes the
+  walker stand and show frame 0.
+- Calling it twice in one tick moves and animates the walker at double speed.
+- `solids` is read during the call only. You can pass a different one on each call.
+
+### `moveTo`
+
+```cpp
+void moveTo(const WalkerConfig& config, retropp::Vec2i to, retropp::Vec2 travel);
+```
+
+One tick of being moved by something other than `walk`. It writes `to` to the position as given, walls
+included, and uses `travel` — the distance moved this tick, as a float vector — to set the facing and the
+stride.
+
+| `travel` | Facing | Stride |
+|---|---|---|
+| non-zero | set from the direction of `travel` ([routes.md](routes.md#facing-from-travel)) | advances |
+| zero | kept | reset; the walker shows frame 0 |
+
+`follow` calls it for routes. Call it yourself to drive a walker from your own mover
+([how-to.md](how-to.md#move-a-walker-with-your-own-mover)):
+
+```cpp
+ghost.moveTo(ghostConfig, {40, 41}, {0.0f, 0.5f});   // at (40, 41), facing down, walking
+```
+
+`travel` can be smaller than a pixel and `to` can equal the current position. The stride still
+advances, so a slow mover animates.
+
+### `face`
+
+```cpp
+void face(retropp::Dir facing) noexcept;
+void face(Facing facing) noexcept;
+```
+
+Turns the walker in place. The stride is kept.
+
+| Overload | `facing()` becomes | `spriteFacing` becomes |
+|---|---|---|
+| `face(retropp::Dir)` | the direction given | the same direction |
+| `face(Facing)`, cardinal | that direction | that direction |
+| `face(Facing)`, diagonal | kept if it is one of the diagonal's two directions, otherwise the horizontal one | the diagonal |
+
+```cpp
+guard.face(retropp::Dir::Down);
+knight.face(TopDownMovement::Facing::UpLeft);
+```
+
+`face(retropp::Dir::None)` leaves the walker as it is. A walker that is walked turns again on its next
+tick with a heading.
+
+### `position`
+
+```cpp
+retropp::Vec2i position() const noexcept;
+```
+
+The bound position: the walker's top-left in world pixels. It is the same value as the `Vec2i` you
+bound.
+
+### `facing`
+
+```cpp
+retropp::Dir facing() const noexcept;
+```
+
+`Up`, `Down`, `Left` or `Right`. Use it for game logic.
+
+### `spriteFacing`
+
+```cpp
+Facing spriteFacing(const WalkerConfig& config) const noexcept;
+```
+
+The direction the sprite shows.
+
+| `config.sprites` | Returns |
 |---|---|
-| `Walker(position, facing)` | A walker bound to `position`, its top-left in world pixels, which it reads and writes from then on. The position outlives the walker and stays at its address while it is bound. `Dir::None` reads as `Down`. |
-| `bind(position)` | Binds the walker to another position. A copied walker walks the same position as the original until it is bound to its own. |
-| `place(position)` | Writes `position` without walking there: nothing on the way collides, and the walker stands. For spawning, respawning and moving between maps. |
-| `walk(config, heading, solids)` | One tick toward `heading`, as [concepts.md](concepts.md#a-tick-of-walking) describes. Call it once per tick, including ticks it heads nowhere, so the walker stands and its stride resets. |
-| `moveTo(config, to, travel)` | One tick of being moved by something else: the walker is put at `to`, nothing colliding, and faces along `travel`, how far it moved this tick. The stride advances while `travel` is not zero and resets when it is; a zero `travel` leaves both facings. What `follow` calls ([routes.md](routes.md#facing-from-travel)). |
-| `face(Dir)` | Turns the walker and its sprite to that direction without moving it. The stride keeps its place. `Dir::None` changes nothing. |
-| `face(Facing)` | Turns the sprite to that direction. A diagonal leaves the walker's facing if it is one of the diagonal's two directions, and otherwise faces it the horizontal one. |
-| `position()` | The position it is bound to. |
-| `facing()` | `Up`, `Down`, `Left` or `Right`. |
-| `spriteFacing(config)` | The direction its sprite shows under `config`: the facing under `sprites = Ways::Four`, the last of the eight directions it headed in under `Ways::Eight`. |
-| `moving()` | Whether it moved on its last tick. |
-| `collision(config)` | Its collision shape where it stands, in world pixels: `bounds()` for a rectangle around it, `covers(pixel)` for an exact test. |
-| `anchor(config, label)` | The anchor labeled `label`, in world pixels. Throws `std::out_of_range` when the config has no such anchor. |
-| `frame(config)` | The frame of the animation for its sprite's direction it shows now. Throws `std::logic_error` when that animation has no frames — under `sprites = Ways::Eight`, a diagonal left empty included. |
+| `Ways::Four` | `facing()`, as a `Facing` |
+| `Ways::Eight` | the last of the eight directions the walker headed in, was moved in, or was turned to |
+
+### `moving`
+
+```cpp
+bool moving() const noexcept;
+```
+
+Whether the walk animation is running.
+
+| After | `moving()` |
+|---|---|
+| a `walk` that moved the walker on at least one axis | `true` |
+| a `walk` with an empty heading, or blocked on every axis | `false` |
+| a `moveTo` with non-zero `travel` | `true`, including when the position stayed the same |
+| a `moveTo` with zero `travel` | `false` |
+| `place` | `false` |
+
+Use it to detect a blocked walker:
+
+```cpp
+wanderer.walk(wandererConfig, heading, walls);
+if (!wanderer.moving()) {
+    // blocked: pick a new heading
+}
+```
+
+### `collision`
+
+```cpp
+CollisionShape collision(const WalkerConfig& config) const;
+```
+
+The walker's collision shape moved to its position, in world pixels. Use `bounds()` for its bounding
+rectangle and `covers(pixel)` for an exact test.
+
+It returns a copy of the shape, which allocates. For the bounding rectangle alone, offset
+`config.collision.bounds()` by `position()` instead.
+
+### `anchor`
+
+```cpp
+retropp::Point anchor(const WalkerConfig& config, std::string_view label) const;
+```
+
+The anchor named `label` from `config.anchors`, in world pixels: the anchor's position in the art plus
+the walker's position.
+
+```cpp
+const retropp::Point hand = hero.anchor(heroConfig, "hand");
+```
+
+Throws `std::out_of_range` if that label is missing from `config.anchors`.
+
+### `frame`
+
+```cpp
+const retropp::AnimationFrame& frame(const WalkerConfig& config) const;
+```
+
+The frame the walker shows now: the animation for `spriteFacing(config)`, at the walker's place in its
+stride, looping. A standing walker returns frame 0.
+
+The reference points into `config.walk`. It is valid while the config is.
+
+Throws `std::logic_error` if that animation is empty. With `sprites = Ways::Eight` this includes a
+diagonal animation left empty.
+
+`WalkerSprite` calls it. Call it yourself to read the frame's `label` or `tileIndex`. Those are
+plain fields and work in a test that links the engine library alone.
 
 ## `InputWalker`
 
@@ -135,44 +484,78 @@ public:
 };
 ```
 
-A walker steered by the pad. It is a `Walker` that also keeps the order in which directions were pressed,
-and it is walked by input alone: its `walk` takes a `DirectionalInput` and hides `Walker::walk`.
-
-`walk` moves by the directions `input` holds, as a heading walker moves by its heading. With directions
-held on both axes:
-
-- under `Ways::Eight` it moves along both and keeps its facing if that is one of the two; otherwise it
-  faces the one pressed more recently, and the horizontal one when both were pressed on the same tick;
-- under `Ways::Four` it moves, and faces, along the one pressed more recently, and the horizontal one when
-  both were pressed on the same tick. Letting go of it moves the walker along the other.
-
-Everything else — `place`, `moveTo`, `face`, the readers — is `Walker`'s.
-
-## Reading the directions
+A `Walker` steered by a pad or keyboard. It also records the tick each direction was last pressed on.
+Use it for the player.
 
 ```cpp
-struct Directions { bool up, down, left, right; };
-struct DirectionalInput { Directions held; Directions pressed; };
-struct DirectionalActions { ActionName up, down, left, right; };
+retropp::Vec2i heroAt{72, 56};
+TopDownMovement::InputWalker hero{heroAt};
 
-DirectionalInput readDirections(const retropp::InputState& input, const DirectionalActions& actions);
+hero.walk(heroConfig, TopDownMovement::readDirections(input, steering), walls);   // once per tick
 ```
 
-`readDirections` reads which of the four actions `input` holds this tick (`isHeld`) and which were
-pressed since the last (`justPressed`), for player slot 0. `ActionName` takes the game's own
-enumerators, so the actions are written as they are named:
+`walk` moves by `input.held`, as `Walker::walk` moves by a heading. The press order decides the
+two-direction cases:
+
+| `config.movement` | Two axes held |
+|---|---|
+| `Ways::Eight` | Moves on both. Keeps its facing if that is one of the two directions. Otherwise faces the direction pressed more recently, or the horizontal one if both were pressed on the same tick. |
+| `Ways::Four` | Moves and faces along the direction pressed more recently, or the horizontal one if both were pressed on the same tick. When that direction is released, moves along the other. |
+
+- `InputWalker::walk` hides `Walker::walk`. An `InputWalker` takes a `DirectionalInput`; for a
+  `Directions` heading use a plain `Walker`.
+- Every other member is inherited from `Walker`.
+- An `InputWalker` can follow a route ([how-to.md](how-to.md#walk-the-player-along-a-route)).
+- The press order is recorded inside `walk`, so only presses on ticks where `walk` is called count.
+
+## Writing your own pathway
+
+`Walker` has three protected members for a derived class that decides direction its own way, as
+`InputWalker` does.
 
 ```cpp
-const TopDownMovement::DirectionalInput move = TopDownMovement::readDirections(
-    input, {.up = Action::Up, .down = Action::Down, .left = Action::Left, .right = Action::Right});
+protected:
+    template <SolidQuery Q>
+    void stepToward(const WalkerConfig& config, int dx, int dy, retropp::Dir diagonal, const Q& solids);
+
+    static retropp::Dir horizontalOf(int dx) noexcept;   // Right if dx > 0, otherwise Left
+    static retropp::Dir verticalOf(int dy) noexcept;     // Down if dy > 0, otherwise Up
 ```
 
-An `InputWalker` moves by `held` and uses `pressed` to know which direction came last. A `Directions` on
-its own is a heading, for a plain `Walker`. A game whose simulation takes plain values reads the
-directions at its input boundary and passes the `DirectionalInput` on, so its tick and its tests need no
-engine input. The engine binds the actions to keys and buttons with an `ActionMap`;
-`retropp::presets::directional` binds arrows, WASD and the d-pad in one call (the engine's
-`docs/guide/input.md`).
+`stepToward` is one tick of walking toward `(dx, dy)`, where each is -1, 0 or 1. It moves the walker
+against `solids`, sets the sprite's facing, and advances or resets the stride. It sets `facing()` this
+way:
+
+| `dx`, `dy` | `facing()` |
+|---|---|
+| both 0 | kept |
+| one non-zero | that direction |
+| both non-zero | kept if it is one of the two directions, otherwise `diagonal` |
+
+`stepToward` moves on every axis it is given. A derived class that supports `Ways::Four` sets one of
+`dx` and `dy` to 0 before calling it.
+
+A walker steered by an analog stick:
+
+```cpp
+class StickWalker : public TopDownMovement::Walker {
+public:
+    using TopDownMovement::Walker::Walker;
+
+    // One tick of walking by `stick`, each axis in [-1, 1]. An axis past 0.5 heads that way. When both
+    // are, the walker faces the axis pushed further.
+    template <TopDownMovement::SolidQuery Q>
+    void walk(const TopDownMovement::WalkerConfig& config, retropp::Vec2 stick, const Q& solids) {
+        int dx = stick.x > 0.5f ? 1 : stick.x < -0.5f ? -1 : 0;
+        int dy = stick.y > 0.5f ? 1 : stick.y < -0.5f ? -1 : 0;
+        const bool vertical = std::abs(stick.y) > std::abs(stick.x);
+        if (config.movement == TopDownMovement::Ways::Four && dx != 0 && dy != 0) {
+            (vertical ? dx : dy) = 0;
+        }
+        stepToward(config, dx, dy, vertical ? verticalOf(dy) : horizontalOf(dx), solids);
+    }
+};
+```
 
 ## `WalkerSprite`
 
@@ -180,19 +563,29 @@ engine input. The engine binds the actions to keys and buttons with an `ActionMa
 retropp::Sprite WalkerSprite(retropp::ObjectKey key, const Walker& walker, const WalkerConfig& config);
 ```
 
+Returns the sprite for a walker. Call it every frame and add the result to a sprite layer.
+
+```cpp
+sprites = {
+    TopDownMovement::WalkerSprite("hero", hero, heroConfig),
+    TopDownMovement::WalkerSprite("guard", guard, guardConfig),
+};
+```
+
 | Sprite field | Value |
 |---|---|
 | `key` | `key` |
 | `x`, `y` | the walker's position |
-| `z` | the walker's y plus the bottom edge of its collision shape (plus the frame's height, for a walker with no collision shape) |
-| `size`, `atlas`, `tile`, `palette` | the current frame's: the animation for the sprite's direction |
+| `z` | the walker's `y` plus the bottom edge of `config.collision`. With an empty collision shape, `y` plus the frame's height. |
+| `size`, `atlas`, `tile`, `palette` | from `walker.frame(config)` |
 | `anchors` | `config.anchors` |
+| every other field | the engine's default |
 
-Every other field is the engine's default. It takes any walker — an `InputWalker` and a walker on a route
-draw the same way. The sprite resolves the frame's art through the renderer, so a renderer exists before
-it is called, as it does for any `AnimationFrame::tile()`. Throws `std::logic_error` when the frame names
-no art, and as `Walker::frame` does.
+- **It needs a renderer.** The frame's `atlas`, `tile` and `size` are resolved through the renderer that
+  loaded the sheet. It is the only part of the module that needs one.
+- **The key must be unique in the frame and stable for the character.** The engine matches sprites
+  between ticks by key (the engine's `docs/guide/sprites.md`, "Identity — `key`").
+- **`z` sorts walkers on one layer.** A walker lower on the screen has a higher `z` and draws in front.
 
-The key names the walker for the engine, which eases a sprite from one tick to the next by its key:
-a literal for a singleton (`"player"`), an id minted at spawn for anything that comes and goes
-(the engine's `docs/guide/sprites.md`, "Identity — key").
+Throws `std::logic_error` if the frame is a palette-only frame, and when `Walker::frame`
+throws.
