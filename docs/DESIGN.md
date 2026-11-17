@@ -125,7 +125,17 @@ The template's verbs and systems:
   itself: what it wants done comes out as requests — a command with its arguments, or a value that
   should change — and the tick writes them, at one place, in an order the game chose. The module is in
   place with its guide and an example program; the game's own scripts come with its actors.
-- **Actors:** stable ids minted at spawn, per-area spawn tables, one wandering enemy kind.
+- **Actors:** anything spawned into an area is an actor — a person, a creature, a gate, a sign. An actor
+  is declared as a plain value: the slot it is drawn at, the box it collides with, whether it is solid,
+  the values it holds as its own, what it shows, its scripts, what moves it, the actions it performs and
+  the triggers it sets off. Any number are spawned from one value, at any time, into a set of live
+  actors in the game's state, and a game keeps as many sets as it likes. Each tick one call walks every
+  actor of a set, works out what happened between them — acted on, touched, come near, entered, a value
+  becoming true — and steps their scripts. Each actor runs its own copy of its scripts, and one actor
+  affects another only through a value the other reads. Asked, an actor reports where it is and a set
+  reports its sprites; moving the camera and drawing at the world's actor slots stay the game's own
+  calls. The module is in place with an example program, a farmyard; the game's own actors — the player
+  among them, and one wandering enemy — come next.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
 - **HUD:** hearts in half-heart steps; a heart pickup dropped by enemies.
@@ -152,7 +162,12 @@ opens), **cursor** (the arrow on the item a confirm would choose), **script** (a
 runs when the rule applies), **script processor** (the running state of a set of scripts, stepped each
 tick), **value** (of a script: a named, typed piece of the game's state it reads or asks to change),
 **command** (something a script can ask the game to do), **request** (what comes out of a script
-processor when a script asks: a command with its arguments, or a change of a value).
+processor when a script asks: a command with its arguments, or a change of a value), **trigger** (what
+sets a script off: one of the actor module's own — interact, touch, near, enter, becomes — or one the
+game names and binds), **own value** (a value each actor holds its own instance of), **look** (the art
+an actor shows, chosen by its values), **mover** (what moves an actor: a walker of the game's choosing,
+driven by the pad, a value or a function), **followed actor** (the one actor a set marks as followed by
+the game's camera, free to leave its area through an opening).
 
 ## Hard constraints
 
@@ -206,6 +221,12 @@ processor when a script asks: a command with its arguments, or a change of a val
 - Scripts are ScriptKit's, in `modules/ScriptKit/`, on the engine alone: a script reads only the values
   its processor is handed and writes only requests, and the tick is the only thing that writes the
   game's state.
+- Actors are ActorKit's, in `modules/ActorKit/`, on the engine, LayerKit, WorldKit and ScriptKit: it
+  keeps the live actors, walks them, detects what happens between them and runs their scripts, and
+  reports their positions and sprites when asked. It reads the world and the camera and changes neither:
+  the camera and the drawing stay the game's own calls to WorldKit. A mover is the game's own type,
+  taken by its shape, so ActorKit includes no movement module. Actors detect the actors of their own
+  set, and sets exchange through the game's values.
 - Library first: when a system could be general, it is written general and placed where it can be
   lifted out.
 - The layout-area-and-opening world model, the three transitions, the camera rules and the reserved
