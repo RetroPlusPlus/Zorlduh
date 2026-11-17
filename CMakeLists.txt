@@ -42,8 +42,9 @@ add_subdirectory(engine)
 # Modules: systems that include nothing from this project, each with its own
 # CMakeLists.txt. ScriptKit, LayerKit, TopDownMovement, TextKit and CameraKit depend
 # on the engine alone; WorldKit composes LayerKit and CameraKit, WindowKit composes
-# LayerKit and TextKit, and MenuKit composes LayerKit, TextKit and WindowKit. Their
-# example programs are built so the examples their guides walk through always compile.
+# LayerKit and TextKit, MenuKit composes LayerKit, TextKit and WindowKit, and ActorKit
+# composes LayerKit, WorldKit and ScriptKit. Their example programs are built so the
+# examples their guides walk through always compile.
 set(SCRIPTKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/ScriptKit)  # ScriptKit::ScriptKit — Value, Expr, Script, ScriptProcessor, Bindings, Handlers
 set(LAYERKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
@@ -60,6 +61,8 @@ set(CAMERAKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/CameraKit)  # CameraKit::CameraKit — View, Camera, follow
 set(WORLDKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/WorldKit)  # WorldKit::WorldKit — Area, Opening, Layout, Camera, AreaSolids, WorldLayers, Fade
+set(ACTORKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
+add_subdirectory(modules/ActorKit)  # ActorKit::ActorKit — Actor, Actors, movedBy, TriggerMap, tick, Sprites
 
 # Warnings apply to this project's targets only; the engine keeps its own flags.
 if(MSVC)
@@ -90,7 +93,8 @@ target_compile_features(zorlduh-lib PUBLIC cxx_std_20)
 target_compile_options(zorlduh-lib PRIVATE ${_zorlduh_warn})
 target_link_libraries(zorlduh-lib PUBLIC retropp::engine LayerKit::LayerKit TopDownMovement::TopDownMovement
                                           TextKit::TextKit CameraKit::CameraKit WorldKit::WorldKit
-                                          WindowKit::WindowKit MenuKit::MenuKit ScriptKit::ScriptKit)
+                                          WindowKit::WindowKit MenuKit::MenuKit ScriptKit::ScriptKit
+                                          ActorKit::ActorKit)
 
 # ---------------------------------------------------------------------------
 # The game executable.
@@ -161,6 +165,7 @@ zorlduh_add_test(signs)
 zorlduh_add_test(signs_animation)
 zorlduh_add_test(menus)
 zorlduh_add_test(ScriptKit)
+zorlduh_add_test(ActorKit)
 # The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE
