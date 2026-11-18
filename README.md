@@ -53,6 +53,9 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
   game gives with named slots for the things moving in it, openings that scroll, fade or join seamlessly
   to the next area, the camera within an area and across a seam, the world confined to its part of the
   screen ([`modules/WorldKit/`](modules/WorldKit/README.md))
+- [x] **Actor kit** — actors declared as values and spawned at any time, moved by walkers of the game's
+  choosing, with values of their own, triggers and scripts, all run by one call a tick, reporting where
+  they are and their sprites when asked ([`modules/ActorKit/`](modules/ActorKit/README.md))
 - [x] **Assets** — generated placeholder art and the struct that loads it
 - [x] **Player** — walking, collision, facing, animation
 - [x] **Areas** — an overworld of five areas, a dungeon of five rooms and a forest of seven, joined by
@@ -60,7 +63,7 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
   rock of a cave mouth
 - [x] **Signs** — a sign and a rock read with Interact, each in a border of its own
 - [x] **Title screen and pause menu** — START, CONTINUE and OPTIONS; RESUME, OPTIONS, WARP and TITLE
-- [ ] **Actors** — spawning, stable identity, a wandering enemy
+- [ ] **Actors** — the player as an actor, a wandering enemy
 - [ ] **Combat** — the sword, damage, invulnerability, death and restart
 - [ ] **HUD and pickups** — hearts and the heart pickup
 - [ ] **Sound** — a cue for every game event
