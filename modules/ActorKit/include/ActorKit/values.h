@@ -4,7 +4,7 @@
 //
 //     ActorKit::Actor dog{.ownValues = {{Awake, false}}, .scripts = {&wake}};   // each dog its own Awake
 //
-//     // In a script: ActorKit::X, ActorKit::Touched, ActorKit::FollowedX … read like any value.
+//     // In a script: ActorKit::X, ActorKit::Touched, ActorKit::PlayerX … read like any value.
 //
 // A value listed in an actor's `ownValues` is that actor's own: every actor spawned from the value
 // holds an instance of it, starting at the worth listed, and its scripts read and set that instance. Any
@@ -66,19 +66,19 @@ inline const ScriptKit::Value<bool> Touched;
 inline const ScriptKit::Value<int> X;
 inline const ScriptKit::Value<int> Y;
 
-// True when the followed actor (Actors::follow) is in this actor's area.
-inline const ScriptKit::Value<bool> FollowedHere;
+// True when the player (Actors::player) is in this actor's area.
+inline const ScriptKit::Value<bool> PlayerHere;
 
-// The followed actor's position while it is in this actor's area; this actor's own position otherwise.
-inline const ScriptKit::Value<int> FollowedX;
-inline const ScriptKit::Value<int> FollowedY;
+// The player's position while it is in this actor's area; this actor's own position otherwise.
+inline const ScriptKit::Value<int> PlayerX;
+inline const ScriptKit::Value<int> PlayerY;
 
 namespace detail {
 
 // Whether `id` names one of the six values ActorKit fills in.
 [[nodiscard]] inline bool provided(ScriptKit::ValueId id) noexcept {
-    return id == Touched.id() || id == X.id() || id == Y.id() || id == FollowedHere.id() ||
-           id == FollowedX.id() || id == FollowedY.id();
+    return id == Touched.id() || id == X.id() || id == Y.id() || id == PlayerHere.id() ||
+           id == PlayerX.id() || id == PlayerY.id();
 }
 
 // Whether `request` is a `set` of one of the six: such a set is dropped.

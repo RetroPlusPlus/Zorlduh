@@ -33,9 +33,9 @@ using ActorKit::Interact;   // the hero, facing the actor, presses Interact
 using ActorKit::Near;       // the hero comes within a distance
 using ActorKit::Touch;      // the hero walks onto the actor
 
-// The farm's one layout, by its index in the world, and its two areas, by their index in the layout.
+// The farm's one layout, by its index in the world, and its three areas, by their index in the layout.
 enum Layout : std::uint8_t { Farm };
-enum Area : std::uint8_t { Yard, Field };
+enum Area : std::uint8_t { Yard, Field, Pond };
 
 // Where the bell and the dog's kennel stand in the yard, in its pixels.
 inline constexpr int kBellX = 72;
@@ -50,10 +50,24 @@ inline const ScriptKit::Value<bool> BellRung;    // the bell is ringing
 inline const ScriptKit::Command Collect{"collect"};
 inline ScriptKit::Entry collect() { return Collect(); }
 
+// The farm's second command: ripple the asking actor's sprite from a point in the sprite's own art
+// pixels, `x` across and `y` down from its top-left. getting_started.cpp has the handler.
+inline const ScriptKit::Command Ripple{"ripple"};
+inline ScriptKit::Entry ripple(ScriptKit::Expr<int> x, ScriptKit::Expr<int> y) { return Ripple(x, y); }
+
+// The middle of the hero's feet, from its top-left: the middle of its collision box.
+inline constexpr int kFeetX = 8;
+inline constexpr int kFeetY = 13;
+
+// How often the pond looks for a step: the length of one frame of the hero's walk.
+inline constexpr int kStepTicks = 8;
+
 // Values an actor owns: each actor that lists one in its ownValues holds its own instance.
 inline const ScriptKit::Value<bool> Awake;            // the dog's
 inline const ScriptKit::Value<bool> Splashing;        // the puddle's
 inline const ScriptKit::Value<int> Laid;              // each hen's: the eggs it has laid
 inline const ScriptKit::Value<retropp::Dir> Heading;  // the dog's and each hen's: where its walker heads
+inline const ScriptKit::Value<int> SteppedX;          // the pond's: where the hero stood at its last ripple
+inline const ScriptKit::Value<int> SteppedY;
 
 }  // namespace farm

@@ -103,7 +103,7 @@ inline void startScripts(Live& live, std::uint32_t kind, int side, const ScriptK
 //   2. Solidity. Each actor's `solid` is worked out against its values.
 //   3. Walking, while `camera.transitioning()` is false: each actor with a mover, in spawn order, is
 //      walked by its drive against its area's collision map, the boxes of the other solid actors in its
-//      area, and — for every actor but the followed one — everything outside its area's own rectangle.
+//      area, and — for every actor but the player — everything outside its area's own rectangle.
 //   4. Actions. Each action an actor's rows drive this tick, and each asked for with Actors::act, is
 //      performed on the actor it faces: that actor's scripts on ActorKit::Interact start when the action
 //      is `config.interactAction`, and its scripts on any of the game's triggers bound to the action.
@@ -198,11 +198,11 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
         }
         taking.push_back(live.get());
     }
-    Live* followed = ActorsAccess::find(actors, actors.followed());
-    if (followed != nullptr && followed->newlySpawned) {
-        followed = nullptr;
+    Live* player = ActorsAccess::find(actors, actors.player());
+    if (player != nullptr && player->newlySpawned) {
+        player = nullptr;
     }
-    const auto gather = [&](const Live& live) { detail::gatherValues(values, live, followed, config.bindings, state); };
+    const auto gather = [&](const Live& live) { detail::gatherValues(values, live, player, config.bindings, state); };
 
     // 2. Solidity.
     for (Live* live : taking) {
@@ -228,7 +228,7 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
             const Solids solids{WorldKit::AreaSolids{.world = &world, .layout = live->place.layout, .area = live->place.area},
                                 retropp::IntRect{.x = 0, .y = 0, .width = map.width * layout.cellSize,
                                                  .height = map.height * layout.cellSize},
-                                live != followed, others};
+                                live != player, others};
             if (live->actor->mover.kind()->readsValues()) {
                 gather(*live);
             }

@@ -1,13 +1,12 @@
 # ActorKit
 
-Actors for a game on the [Polyrhythm](https://github.com/RetroPlusPlus/Polyrhythm) engine: the people,
-creatures and objects in a [WorldKit](../WorldKit/README.md) world.
+Actors for a top-down game on the [Polyrhythm](https://github.com/RetroPlusPlus/Polyrhythm) engine: the
+people, creatures and objects in a [WorldKit](../WorldKit/README.md) world.
 
 An actor is anything you spawn into an area: a hero, a hen, a gate, a sign. You describe one as a plain
-value — where it is drawn, what it collides with, what it shows, what moves it, and the scripts that run
-when something happens to it — and spawn as many from that value as you like, at any time. Each tick,
-one call walks every actor, works out what happened between them, and steps their scripts. Asked, an
-actor reports where it is, and a set of actors reports its sprites for you to draw.
+value and spawn as many from it as you like, at any time. One call each tick walks every actor, works
+out what happened between them, and steps their scripts. Asked, an actor reports where it is, and a set
+of actors reports its sprites for you to draw.
 
 ```cpp
 #include "ActorKit/actors.h"    // Actor, Actors, movedBy
@@ -59,62 +58,32 @@ state.actors.spawn(lever, {.layout = 0, .area = 0}, {128, 32});
 // Every tick.
 ActorKit::tick(state.actors, config, state.camera, input, state);
 
-// Every frame: the sprites of one slot, for the layer you draw them on.
-const WorldKit::Place here{.layout = state.camera.layout(), .area = state.camera.area()};
-frame.layers.push_back(WorldKit::Actors(state.camera, world, "actors",
-                                        {ActorKit::Sprites(state.actors, config, here, "actors", state)}));
+// Every frame: for each area on screen, the sprites of one slot, on that area's layer.
+for (const WorldKit::Shown& shown : state.camera.shown(world)) {
+    const WorldKit::Place place{.layout = shown.layout, .area = shown.area};
+    frame.layers.push_back(
+        AreaSlot(world, shown, "actors", ActorKit::Sprites(state.actors, config, place, "actors", state)));
+}
 ```
 
-The example borrows these names from your program:
-
-| Name | Type | What it is |
-|---|---|---|
-| `plateUp`, `plateDown`, `leverUp`, `leverDown` | `ActorKit::Look` | Art from your sheets, made with `ActorKit::lookOf(sheet, slot, palette)`. |
-| `heroWalk` | `TopDownMovement::WalkerConfig` | The hero's walker: speed, collision shape, walk animations. |
-| `Action` | your enum | Your input actions. `Action::Interact` is the one the player presses to interact. |
-| `Input` | your struct | What the player does on one tick. `Input::move` is a `TopDownMovement::DirectionalInput`; `Input::interact` is a `bool`, true on the tick Interact is pressed. |
-| `State` | your struct | Your game's state. `State::actors` is an `ActorKit::Actors`, `State::camera` a `WorldKit::Camera`. |
-| `world` | `WorldKit::World` | Your world. |
-| `input`, `state`, `frame` | `Input`, `State`, `retropp::FrameDrawState` | This tick's input, your state, and the frame you are building. |
-
-## What ActorKit does and what your game does
-
-| ActorKit | Your game |
-|---|---|
-| Keeps every live actor: its area, position, own values, mover and running scripts. | Declares the actor values and spawns them. |
-| Walks each actor with a mover, against its area's collision map and the other solid actors. | Reads the player's input into its own `Input` value once a tick. |
-| Detects what happens between actors — acted on, touched, near, entered, a value becoming true — and starts the scripts those set off. | Writes the scripts, names its Interact action, and declares any triggers of its own. |
-| Steps every actor's scripts and writes what they ask for. | Binds its own values and handles its own commands. |
-| Reports an actor's place, position, box and facing, and a slot's sprites. | Moves the camera, with `WorldKit::Camera`, and carries the followed actor where the camera says. |
-| | Draws: hands each slot's sprites to `WorldKit::Actors`, beside any sprites of its own. |
-
-ActorKit reads the WorldKit camera you hand it and leaves it as it is.
+[docs/concepts.md](docs/concepts.md#overview) explains each line and lists the names the example takes
+from your game; `AreaSlot` is your component, in
+[docs/drawing.md](docs/drawing.md#a-layer-for-each-area).
 
 ## Contents
 
-| Type or function | Purpose | Header |
+| Type or function | Purpose | Reference |
 |---|---|---|
-| `Actor` | What an actor is: slot, box, solidity, own values, looks, scripts, mover, actions, the triggers it sets off. | `actor.h` |
-| `Actors`, `Id` | The live actors. `spawn`, `remove`, `follow`, and what an actor reports: `place`, `position`, `box`, `facing`, `key`. | `actors.h` |
-| `movedBy`, `Mover`, `Solids` | What moves an actor: a mover of your type, driven by your input, a value, or a function. | `mover.h` |
-| `Look`, `lookOf`, `LookRule`, `Looks` | What an actor shows, chosen by its values. | `look.h` |
-| `OwnValue`, `Touched`, `X`, `Y`, `FollowedHere`, `FollowedX`, `FollowedY` | An actor's own values, and the six ActorKit fills in for each actor. | `values.h` |
-| `Interact`, `Touch`, `Near`, `Enter`, `Becomes`, `On` | ActorKit's own triggers, ready to use in a script's `on`. | `triggers.h` |
-| `TriggerMap`, `actedOn`, `touched`, `near`, `entered`, `becomes` | Triggers of your own, each bound to a detection. | `triggers.h` |
-| `spawn`, `remove`, `Handlers` | What a script asks of ActorKit, and your handlers for your own commands. | `commands.h` |
-| `Config` | The world, your Interact action, your triggers, your bindings and your handlers. One config serves any number of `Actors` values, or each has its own. | `config.h` |
-| `tick` | One tick of every actor. | `tick.h` |
-| `Sprites` | The sprites of the actors of one area at one slot. | `sprites.h` |
-
-## Several sets of actors
-
-An `Actors` value is one set. You can keep several — one for switches, one for enemies — tick each, and
-send each one's sprites to the layer you choose, combined on one layer or each on its own. ActorKit
-numbers the sets itself, so every sprite key is unique across them.
-
-Actors detect the actors of their own set: touching, coming near and acting on happen within one
-`Actors` value. Sets exchange through your game's values: a script in one set sets a value, and a script
-in another reads it, with `Becomes(value)`, a `when` or a `waitWhile`.
+| `Actor` | What an actor is: slot, box, solidity, own values, looks, scripts, mover, actions, the triggers it sets off. | [docs/actors.md](docs/actors.md#actor) |
+| `Actors`, `Id` | A set of live actors. Spawn and remove them, and ask one where it is. | [docs/actors.md](docs/actors.md#actors) |
+| `Config` | The world, your Interact action, your triggers, your values and your commands. | [docs/actors.md](docs/actors.md#config) |
+| `tick` | One tick of every actor in a set. | [docs/actors.md](docs/actors.md#tick) |
+| `Interact`, `Touch`, `Near`, `Enter`, `Becomes` | ActorKit's own triggers, ready to use in a script's `on`. | [docs/triggers.md](docs/triggers.md#actorkits-own-triggers) |
+| `TriggerMap`, `actedOn`, `touched`, `near`, `entered`, `becomes` | Triggers of your own, each bound to a detection. | [docs/triggers.md](docs/triggers.md#triggers-of-your-own) |
+| `OwnValue`, `Touched`, `X`, `Y`, `PlayerHere`, `PlayerX`, `PlayerY` | An actor's own values, and the six ActorKit fills in for each actor. | [docs/scripts.md](docs/scripts.md#values) |
+| `spawn`, `remove`, `Handlers` | What a script asks of ActorKit, and your handlers for your own commands. | [docs/scripts.md](docs/scripts.md#commands) |
+| `movedBy`, `Mover`, `Solids` | What moves an actor: a mover of your type, driven by your input, a value or a function. | [docs/movers.md](docs/movers.md) |
+| `Look`, `lookOf`, `Looks`, `Sprites` | What an actor shows, and the sprites of a slot. | [docs/drawing.md](docs/drawing.md) |
 
 ## Requirements
 
@@ -136,19 +105,21 @@ target_link_libraries(my-game PRIVATE ActorKit::ActorKit)
 |---|---|---|
 | `ACTORKIT_BUILD_EXAMPLES` | `ON` when this directory is the top-level project, otherwise `OFF` | Builds the example program as the target `ActorKit-example-getting-started`. The example links `TopDownMovement::TopDownMovement`. |
 
-## The example program
+## Documentation
 
-`examples/getting_started.cpp` is a farmyard of two areas. Steer the hero with the arrow keys, WASD or a
-d-pad; X or a pad's A button is Interact.
-
-| Try this | You see |
+| Page | Read it for |
 |---|---|
-| Walk up to the dog | It wakes when you come within 24 pixels. |
-| Press Interact below the bell | The bell rings for a second, and the dog, once awake, trots to it and back. From any other side the bell stays still. |
-| Walk through the puddle | It splashes while you stand in it, under your feet. |
-| Press Interact at the gate | It opens; press again and it shuts. Shut, it stops you. |
-| Walk through the open gate | The screen scrolls into the field. The four hens scatter, then wander, and each lays three eggs, one every four seconds. |
-| Walk onto an egg | It is picked up, and the row along the top grows by one. |
+| **[Getting started](docs/getting-started.md)** | **Start here.** A complete example program, a farmyard, explained step by step. |
+| [Concepts](docs/concepts.md) | How the module works. |
+| [Actors](docs/actors.md) | The actor value, a set of actors, the config and the tick. Reference. |
+| [Triggers](docs/triggers.md) | What starts an actor's scripts. Reference. |
+| [Scripts](docs/scripts.md) | Scripts on an actor, values, commands, sharing a script. Reference. |
+| [Movers](docs/movers.md) | What moves an actor and what drives it. Reference. |
+| [Drawing](docs/drawing.md) | Looks, slots, sprites and their keys. Reference. |
+| [How-to](docs/how-to.md) | Recipes for specific tasks. |
+| [Troubleshooting](docs/troubleshooting.md) | Symptoms, causes and fixes. |
+| [Testing](docs/testing.md) | Testing code that uses the module. |
+| [Guide index](docs/README.md) | Every page, a task index, a name index, and what the module provides and what it leaves to your game. |
 
 ## Layout
 
@@ -160,21 +131,23 @@ modules/ActorKit/
     actors.h                        Actors
     mover.h                         movedBy, Mover, Solids
     look.h                          Look, lookOf, LookRule, Looks
-    values.h                        OwnValue, OwnValues, Touched, X, Y, FollowedHere, FollowedX, FollowedY
+    values.h                        OwnValue, OwnValues, Touched, X, Y, PlayerHere, PlayerX, PlayerY
     triggers.h                      On, Interact, Touch, Near, Enter, Becomes, TriggerMap, actedOn, touched, near, entered, becomes
     commands.h                      spawn, remove, Handler, Handlers
     config.h                        Config, AnyBindings, AnyHandlers
     tick.h                          tick
     sprites.h                       Sprites
   examples/getting_started.cpp      the example program: a farmyard
-  examples/farm.h                   its places, triggers and values
+  examples/farm.h                   its places, values and commands
   examples/scripts/                 its scripts, a file each
+  examples/shaders/                 the pond's ripple shader
   examples/assets/                  its sheets and palette images
+  docs/                             the guide
 ```
 
 | Header | Note |
 |---|---|
-| `sprites.h` | The only header that creates a draw type (`retropp::Sprite`). |
+| `sprites.h` | The only header that creates a draw type (`retropp::Sprite`). The other headers are for simulation code. |
 | `tick.h` | Reads the `WorldKit::Camera` it is handed: its area, and whether a scroll or fade is running. |
 
 ## License

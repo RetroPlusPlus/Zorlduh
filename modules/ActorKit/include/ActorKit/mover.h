@@ -35,7 +35,7 @@ namespace ActorKit {
 
 // What is solid to a walking actor, as ActorKit hands it to the mover's walk: the cells of its area's
 // collision map that WorldKit reports solid, the box of every other solid actor in that area, and — for
-// any actor but the followed one (Actors::follow) — everything outside the area's own rectangle, so such an
+// any actor but the player (Actors::player) — everything outside the area's own rectangle, so such an
 // actor stays inside its area. Valid during the walk it is handed to.
 class Solids {
 public:
@@ -107,7 +107,7 @@ public:
 };
 
 // A heading of one direction, handed to a mover's walk: it converts to any heading type with `up`,
-// `down`, `left` and `right` flags, setting the one flag `direction` names. Dir::None sets none.
+// `down`, `left` and `right` flags, setting the one flag `direction` names. Dir::None leaves all four false.
 struct Heading {
     retropp::Dir direction = retropp::Dir::None;
 
@@ -254,7 +254,7 @@ private:
 //     tick (&Input::move);
 //   - a ScriptKit::Value<retropp::Dir>, the actor's own or the game's: the mover is walked toward that
 //     one direction, handed over as a value that converts to the mover's heading type — any type with
-//     bool `up`, `down`, `left` and `right` — and Dir::None walks it nowhere;
+//     bool `up`, `down`, `left` and `right` — and Dir::None holds it where it is;
 //   - a function of the actor's values, `D(const ScriptKit::Values&)`, for a heading the game works out.
 //
 // The drive by a member is checked against the type of the input handed to tick, and walking with

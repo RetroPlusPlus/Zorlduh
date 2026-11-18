@@ -17,6 +17,9 @@ if(ACTORKIT_BUILD_EXAMPLES)
     # The example reads its sheets and palettes from examples/assets/ in this directory.
     target_compile_definitions(ActorKit-example-getting-started PRIVATE
         ACTORKIT_EXAMPLE_ASSETS="${CMAKE_CURRENT_SOURCE_DIR}/examples/assets")
+    # The engine compiles and embeds every shader the example registers by path (the pond's ripple,
+    # examples/shaders/ripple_ring.frag.hlsl); the paths resolve against this directory.
+    retropp_autocompile_shaders(ActorKit-example-getting-started)
     if(MSVC)
         target_compile_options(ActorKit-example-getting-started PRIVATE /W4)
     else()

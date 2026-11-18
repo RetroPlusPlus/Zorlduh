@@ -4,7 +4,7 @@
 //     ActorKit::Actors actors{engineConfig};                         // in the game's state
 //
 //     const ActorKit::Id player = actors.spawn(hero, {Farm, Yard}, {72, 96});
-//     actors.follow(player);                                         // the actor the game's camera follows
+//     actors.player(player);                                         // the player among them
 //     const ActorKit::Id hen = actors.spawn(henOf(brown), {Farm, Field}, {40, 32});
 //     actors.remove(hen);
 //
@@ -145,7 +145,7 @@ public:
 
     Actors(const Actors& other)
         : config_(other.config_), set_(other.set_), ids_(other.ids_), next_(other.next_),
-          followed_(other.followed_), lastCameraPlace_(other.lastCameraPlace_), prototypes_(other.prototypes_) {
+          player_(other.player_), lastCameraPlace_(other.lastCameraPlace_), prototypes_(other.prototypes_) {
         live_.reserve(other.live_.size());
         for (const std::unique_ptr<detail::Live>& live : other.live_) {
             live_.push_back(std::make_unique<detail::Live>(*live));
@@ -206,8 +206,8 @@ public:
     }
 
     // Removes the actor `id`. Returns true when the actor was live, false otherwise. Inside a tick —
-    // from a handler — it takes effect once that tick's requests are all written. Removing the followed
-    // actor leaves followed() at kNoId.
+    // from a handler — it takes effect once that tick's requests are all written. Removing the player
+    // leaves player() at kNoId.
     bool remove(Id id) {
         detail::Live* live = find(id);
         if (live == nullptr || live->removing) {
@@ -221,19 +221,19 @@ public:
         return true;
     }
 
-    // Records `id` as the followed actor, the one the game's camera follows; kNoId for none. The followed
-    // actor walks out through its area's openings, where every other actor stops at its area's edge, and
-    // the values FollowedHere, FollowedX and FollowedY are filled from it. Moving the camera is the game's
-    // own call to WorldKit, with what followed(), box and place report.
-    void follow(Id id) {
+    // Records `id` as the player; kNoId clears it. The player walks out through its area's openings, where
+    // every other actor stops at its area's edge, and the values PlayerHere, PlayerX and PlayerY are filled
+    // from it. Moving the camera is the game's own call to WorldKit, with what player(), box and place
+    // report.
+    void player(Id id) {
         if (id != kNoId) {
             (void)require(id);
         }
-        followed_ = id;
+        player_ = id;
     }
 
-    // The followed actor; kNoId for none.
-    [[nodiscard]] Id followed() const noexcept { return followed_; }
+    // The player, or kNoId.
+    [[nodiscard]] Id player() const noexcept { return player_; }
 
     // Whether an actor `id` is live.
     [[nodiscard]] bool has(Id id) const noexcept { return find(id) != nullptr; }
@@ -297,7 +297,8 @@ public:
         return live.own.get(value);
     }
 
-    // Sets the actor's own `value` to `worth`, as a script's `set` would. Throws as get does.
+    // Sets the actor's own `value` to `worth`, at once; a script's `set` of it is written on the tick after
+    // the script asks. Throws as get does.
     template <ScriptKit::ValueType T>
     void set(Id id, ScriptKit::Value<T> value, T worth) {
         detail::Live& live = require(id);
@@ -410,8 +411,8 @@ private:
                                    [id](const std::unique_ptr<detail::Live>& live) { return live->id == id; }),
                     live_.end());
         ids_.erase(std::remove(ids_.begin(), ids_.end(), id), ids_.end());
-        if (followed_ == id) {
-            followed_ = kNoId;
+        if (player_ == id) {
+            player_ = kNoId;
         }
     }
 
@@ -420,7 +421,7 @@ private:
     std::vector<std::unique_ptr<detail::Live>> live_;   // in spawn order; each at one address for its life
     std::vector<Id> ids_;
     Id next_ = 1;
-    Id followed_ = kNoId;
+    Id player_ = kNoId;
     std::optional<WorldKit::Place> lastCameraPlace_;    // the camera's place on the last tick
     bool deferring_ = false;                            // removals wait for the requests to be written
     std::vector<Prototype> prototypes_;

@@ -1,13 +1,15 @@
 // Sprites — what the actors of one place show at one slot, reported as sprites for the game to draw.
 //
-//     const WorldKit::Place here{.layout = state.camera.layout(), .area = state.camera.area()};
-//     frame.layers = WorldKit::WorldLayers(state.camera, world);
-//     frame.layers.push_back(WorldKit::Actors(state.camera, world, "actors",
-//                                             {ActorKit::Sprites(state.actors, config.actors, here, "actors", state)}));
+//     for (const WorldKit::Shown& shown : state.camera.shown(world)) {
+//         const WorldKit::Place place{.layout = shown.layout, .area = shown.area};
+//         frame.layers.push_back(
+//             AreaSlot(world, shown, "actors", ActorKit::Sprites(state.actors, config, place, "actors", state)));
+//     }
 //
-// The layers are the game's. It asks for the sprites of a slot and hands them to whatever draws that
-// slot — WorldKit::Actors here — beside any sprites of its own. This is the only ActorKit header that
-// builds a draw type.
+// The layers are the game's. It asks for the sprites of a slot in each area on screen and hands them to
+// whatever draws that slot, beside any sprites of its own. AreaSlot here is the game's own component: one
+// layer for one area's slot, at the slot's depth and that area's scroll. This is the only ActorKit header
+// that builds a draw type.
 #pragma once
 
 #include <memory>
@@ -41,12 +43,14 @@ namespace ActorKit {
 // sort by their feet.
 //
 // Throws std::out_of_range, as tick does, for an actor reading an unbound value, and std::logic_error
-// when the config's bindings are written for another type than State.
+// when the config's bindings are written for another type than State. Whatever a mover's frame throws
+// passes through: a TopDownMovement walker throws std::logic_error when the walk animation for its
+// direction is empty.
 template <class State>
 [[nodiscard]] LayerKit::Sprites Sprites(const Actors& actors, const Config& config, WorldKit::Place place,
                                         std::string_view slot, const State& state) {
     using detail::Live;
-    const Live* followed = detail::ActorsAccess::find(actors, actors.followed());
+    const Live* player = detail::ActorsAccess::find(actors, actors.player());
     LayerKit::Sprites sprites;
     ScriptKit::Values values;
     for (const std::unique_ptr<Live>& live : detail::ActorsAccess::live(actors)) {
@@ -55,7 +59,7 @@ template <class State>
         }
         std::optional<Look> shown;
         if (!live->actor->look.empty()) {
-            detail::gatherValues(values, *live, followed, config.bindings, state);
+            detail::gatherValues(values, *live, player, config.bindings, state);
             for (const LookRule& rule : live->actor->look.rules()) {
                 if (ScriptKit::evaluate(rule.when, values)) {
                     shown = rule.look;

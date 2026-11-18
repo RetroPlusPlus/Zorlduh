@@ -140,11 +140,11 @@ struct Config {
 namespace detail {
 
 // Fills `values` with everything the actor `live` reads: the game's values through `bindings`, its own,
-// and ActorKit's six, worked out against `followed`, the followed actor or null. Throws
+// and ActorKit's six, worked out against `player`, the player or null. Throws
 // std::out_of_range naming the actor and the value for an unbound value: one outside the actor's own,
 // ActorKit's six and the game's bindings.
 template <class State>
-void gatherValues(ScriptKit::Values& values, const Live& live, const Live* followed, const AnyBindings& bindings,
+void gatherValues(ScriptKit::Values& values, const Live& live, const Live* player, const AnyBindings& bindings,
                   const State& state) {
     const auto unbound = [&](ScriptKit::ValueId id) {
         return std::out_of_range("ActorKit: actor " + std::to_string(live.id) + " reads the value with id " +
@@ -172,13 +172,13 @@ void gatherValues(ScriptKit::Values& values, const Live& live, const Live* follo
     for (const OwnValue& value : live.actor->ownValues) {
         values.setRaw(value.id(), live.own.raw(value.id()));
     }
-    const bool here = followed != nullptr && followed->place == live.place;
+    const bool here = player != nullptr && player->place == live.place;
     values.set(Touched, live.touched);
     values.set(X, live.position.x);
     values.set(Y, live.position.y);
-    values.set(FollowedHere, here);
-    values.set(FollowedX, here ? followed->position.x : live.position.x);
-    values.set(FollowedY, here ? followed->position.y : live.position.y);
+    values.set(PlayerHere, here);
+    values.set(PlayerX, here ? player->position.x : live.position.x);
+    values.set(PlayerY, here ? player->position.y : live.position.y);
 }
 
 }  // namespace detail

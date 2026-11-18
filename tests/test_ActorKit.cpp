@@ -1,11 +1,11 @@
 // The ActorKit module: spawning and removing actors, ids, an Actors value copied whole; own values, the
 // game's values and ActorKit's six; scripts by address and by value, and a script function; the trigger
 // map and every detection; starting scripts; solidity by a value; walking by each drive, against the map,
-// other actors and an area's edge; the followed actor carried through a scroll, a fade and a seam by the
+// other actors and an area's edge; the player carried through a scroll, a fade and a seam by the
 // game's own camera calls; the order of a tick; spawn and remove from a script; handlers; act; looks; and
 // the sprites the actors report, drawn through WorldKit beside a sprite of the game's own. The world is
 // built in code and the actors are moved by a mover of the test's own and by TopDownMovement's walkers.
-// Everything but the last test runs with no window or GPU; the last resolves a mover's frame through a
+// Every test but the last runs headless; the last resolves a mover's frame through a
 // renderer on a real GPU device.
 
 #include <gtest/gtest.h>
@@ -299,7 +299,7 @@ const ScriptKit::Value<int> Mine;
 const ScriptKit::Value<bool> Up;
 const ScriptKit::Value<Dir> Heading;
 
-// A value no binding names and no actor owns.
+// A value outside every binding and every actor's own values.
 const ScriptKit::Value<bool> Stray;
 
 const ScriptKit::Command Shout{"shout"};
@@ -345,7 +345,7 @@ ActorKit::TriggerMap triggers() {
     };
 }
 
-// The message `run` throws, or empty when it throws nothing.
+// The message `run` throws, or empty when it returns.
 std::string thrown(const std::function<void()>& run) {
     try {
         run();
@@ -358,7 +358,7 @@ std::string thrown(const std::function<void()>& run) {
 bool mentions(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
 
 // One world, one state, one config; each test spawns what it needs. The fixture is the game: its tick
-// runs the actors, then makes the game's own camera calls for the followed actor.
+// runs the actors, then makes the game's own camera calls for the player.
 class Farm : public ::testing::Test {
 protected:
     Maps maps;
@@ -368,18 +368,18 @@ protected:
 
     void SetUp() override { WorldKit::validate(world); }
 
-    // One tick of the game: ActorKit's tick, then, while the followed actor is in the camera's area, the
-    // camera following its box and the actor carried where the camera says. Returns what the camera said.
+    // One tick of the game: ActorKit's tick, then, while the player is in the camera's area, the camera
+    // following its box and the player carried where the camera says. Returns what the camera said.
     WorldKit::Step tick(const Input& input = {}) {
         ActorKit::tick(state.actors, config, state.camera, input, state);
-        const Id followed = state.actors.followed();
-        if (followed == ActorKit::kNoId ||
-            state.actors.place(followed) != Place{.layout = state.camera.layout(), .area = state.camera.area()}) {
+        const Id player = state.actors.player();
+        if (player == ActorKit::kNoId ||
+            state.actors.place(player) != Place{.layout = state.camera.layout(), .area = state.camera.area()}) {
             return {};
         }
-        const WorldKit::Step step = state.camera.follow(world, state.actors.box(followed));
-        const Vec2i at = state.actors.position(followed);
-        state.actors.moveTo(followed, step.entered.value_or(state.actors.place(followed)),
+        const WorldKit::Step step = state.camera.follow(world, state.actors.box(player));
+        const Vec2i at = state.actors.position(player);
+        state.actors.moveTo(player, step.entered.value_or(state.actors.place(player)),
                             {.x = at.x + step.move.x, .y = at.y + step.move.y});
         return step;
     }
@@ -414,7 +414,7 @@ Actor slider(SliderConfig config = {}) {
     return {.slot = "actors", .solid = true, .mover = ActorKit::movedBy<Slider>(config, &Input::way)};
 }
 
-// An actor with no mover and an 8×8 box.
+// An actor with an empty mover and an 8×8 box.
 Actor block(ActorKit::Scripts scripts = {}) { return {.slot = "actors", .box = {.x = 0, .y = 0, .width = 8, .height = 8}, .scripts = scripts}; }
 
 // ── Spawning, ids and the live actors ──────────────────────────────────────────────────────────────
@@ -509,25 +509,25 @@ TEST_F(Farm, TheGamesValuesAreOneInstanceThatEveryActorsScriptsReadAndWrite) {
 
 const ScriptKit::Script seeX{.name = "see x", .on = Enter, .body = {loop({set(SeenX, ActorKit::X), wait(1)})}};
 const ScriptKit::Script seeY{.name = "see y", .on = Enter, .body = {loop({set(SeenY, ActorKit::Y), wait(1)})}};
-const ScriptKit::Script seeFX{.name = "see fx", .on = Enter, .body = {loop({set(SeenFX, ActorKit::FollowedX), wait(1)})}};
-const ScriptKit::Script seeFY{.name = "see fy", .on = Enter, .body = {loop({set(SeenFY, ActorKit::FollowedY), wait(1)})}};
+const ScriptKit::Script seeFX{.name = "see fx", .on = Enter, .body = {loop({set(SeenFX, ActorKit::PlayerX), wait(1)})}};
+const ScriptKit::Script seeFY{.name = "see fy", .on = Enter, .body = {loop({set(SeenFY, ActorKit::PlayerY), wait(1)})}};
 const ScriptKit::Script seeHere{.name = "see here", .on = Enter,
-                                .body = {loop({set(SeenHere, ActorKit::FollowedHere), wait(1)})}};
+                                .body = {loop({set(SeenHere, ActorKit::PlayerHere), wait(1)})}};
 const ScriptKit::Script seeTouched{.name = "see touched", .on = Enter,
                                    .body = {loop({set(SeenTouched, ActorKit::Touched), wait(1)})}};
 
-TEST_F(Farm, ActorKitFillsInTouchedXYAndTheFollowedActorsPlaceAndPositionForEachActor) {
+TEST_F(Farm, ActorKitFillsInTouchedXYAndThePlayersPlaceAndPositionForEachActor) {
     const Id watcher = state.actors.spawn(block({&seeX, &seeY, &seeFX, &seeFY, &seeHere, &seeTouched}), kA, {40, 48});
     const Id hero = state.actors.spawn(Actor{.slot = "actors", .box = {.x = 0, .y = 0, .width = 8, .height = 8},
                                              .setsOff = {On::Touch}},
                                        kB, {100, 60});
     tick();   // the camera's area: the watcher's scripts start
-    state.actors.follow(hero);
+    state.actors.player(hero);
     ticks(3);
     EXPECT_EQ(state.seenX, 40);
     EXPECT_EQ(state.seenY, 48);
     EXPECT_FALSE(state.seenHere);
-    EXPECT_EQ(state.seenFX, 40);   // the followed actor is elsewhere: the watcher's own position
+    EXPECT_EQ(state.seenFX, 40);   // the player is elsewhere: the watcher's own position
     EXPECT_EQ(state.seenFY, 48);
     EXPECT_FALSE(state.seenTouched);
 
@@ -576,7 +576,7 @@ TEST_F(Farm, AScriptFunctionCalledWithTwoValuesActsOnEach) {
                                        kA, {40, 48});
     state.actors.spawn(block({raise(Flag)}), kA, {40, 40});   // above the hero
     state.actors.spawn(block({raise(Lit)}), kA, {48, 48});    // to its right
-    tick(Input{.way = {.up = true}, .interact = true});        // faces up, blocked by nothing: steps to 47
+    tick(Input{.way = {.up = true}, .interact = true});        // faces up, the way clear: steps to 47
     tick();
     EXPECT_TRUE(state.flag);
     EXPECT_FALSE(state.lit);
@@ -662,8 +662,8 @@ TEST_F(Farm, TheGamesTriggersAndActorKitsStandSideBySideAndInteractIsBoundOnlyOn
     ticks(3);
     EXPECT_TRUE(state.flag);   // ownTouch
 
-    // The fixture's config names no interact action, so ActorKit::Interact starts nothing under it; named
-    // another action, the same; named the one the hero performs, it starts.
+    // The fixture's config leaves the interact action empty, so ActorKit::Interact stays quiet under it;
+    // named another action, the same; named the one the hero performs, it starts.
     state.actors.spawn(Actor{.slot = "actors", .mover = ActorKit::movedBy<Slider>(SliderConfig{}, &Input::way),
                              .actions = {{Action::Interact, &Input::interact}}},
                        kA, {40, 48});
@@ -830,7 +830,7 @@ protected:
     void SetUp() override {
         Farm::SetUp();
         hero = state.actors.spawn(slider(SliderConfig{.speed = 2}), kA, {120, 60});
-        state.actors.follow(hero);
+        state.actors.player(hero);
         state.camera.place(world, state.actors.box(hero));
         tick();
     }
@@ -860,7 +860,7 @@ TEST_F(Entered, ASeamIntoAnAreaSetsOffItsActorsAndASpawnIntoTheCamerasAreaDoesOn
     ticks(2);
     EXPECT_EQ(state.count, 1);
     state.actors.spawn(block({&countEnter}), kC, {40, 60});
-    state.actors.spawn(block({&countEnter}), kA, {40, 60});   // another area: nothing
+    state.actors.spawn(block({&countEnter}), kA, {40, 60});   // another area: stays quiet
     ticks(3);
     EXPECT_EQ(state.count, 2);
 }
@@ -891,7 +891,7 @@ const ScriptKit::Script onlyIf{.name = "only if", .on = Enter, .when = Flag, .bo
 
 TEST_F(Farm, ATriggerStartsEveryMatchingScriptOfTheActorLeavesARunningOneAndChecksWhen) {
     const Id a = state.actors.spawn(block({&holdOn, &alsoOn, &onlyIf}), kA, {40, 40});
-    const Id b = state.actors.spawn(block({&holdOn}), kB, {40, 40});   // not in the camera's area
+    const Id b = state.actors.spawn(block({&holdOn}), kB, {40, 40});   // in an area other than the camera's
     ticks(2);
     EXPECT_EQ(state.count, 1);
     EXPECT_TRUE(state.lit);
@@ -951,7 +951,7 @@ TEST_F(Farm, AMoverIsWalkedByAnInputMemberADirValueOrAFunctionOfTheActorsValues)
     EXPECT_EQ(state.actors.position(walker), (Vec2i{64, 19}));
 }
 
-TEST_F(Farm, AWalkerStopsAtTheMapAndOtherSolidActorsNeverAtItselfAndAnUnfollowedOneAtItsAreasEdge) {
+TEST_F(Farm, AWalkerStopsAtTheMapAndOtherSolidActorsNeverAtItselfAndAnyButThePlayerAtItsAreasEdge) {
     const Id hero = state.actors.spawn(slider(SliderConfig{.speed = 4}), kA, {16, 16});
     ticks(5, Input{.way = {.up = true}});
     EXPECT_EQ(state.actors.position(hero), (Vec2i{16, 8}));   // the wall is row 0
@@ -959,16 +959,16 @@ TEST_F(Farm, AWalkerStopsAtTheMapAndOtherSolidActorsNeverAtItselfAndAnUnfollowed
     ticks(10, Input{.way = {.right = true}});
     EXPECT_EQ(state.actors.position(hero), (Vec2i{32, 8}));
 
-    // Unfollowed, it stops at the open door's edge.
+    // Any actor but the player stops at the open door's edge.
     state.actors.moveTo(hero, kA, {140, 60});
     ticks(20, Input{.way = {.right = true}});
     EXPECT_EQ(state.actors.position(hero), (Vec2i{152, 60}));
     EXPECT_EQ(state.camera.area(), 0);
 }
 
-// ── The followed actor ─────────────────────────────────────────────────────────────────────────────
+// ── The player ─────────────────────────────────────────────────────────────────────────────────────
 
-TEST_F(Entered, TheFollowedActorScrollsIntoTheNextAreaAndNothingWalksWhileTheScrollRuns) {
+TEST_F(Entered, ThePlayerScrollsIntoTheNextAreaAndNothingWalksWhileTheScrollRuns) {
     const Id other = state.actors.spawn(slider(), kA, {40, 100});
     std::optional<Place> entered;
     bool scrolled = false;
@@ -990,7 +990,7 @@ TEST_F(Entered, TheFollowedActorScrollsIntoTheNextAreaAndNothingWalksWhileTheScr
     EXPECT_EQ(state.actors.place(other), kA);
 }
 
-TEST_F(Entered, TheFollowedActorFadesIntoAnotherLayoutAndCrossesASeam) {
+TEST_F(Entered, ThePlayerFadesIntoAnotherLayoutAndCrossesASeam) {
     state.actors.moveTo(hero, kA, {100, 44});
     tick();
     std::optional<Place> entered;
@@ -1014,11 +1014,11 @@ TEST_F(Entered, TheFollowedActorFadesIntoAnotherLayoutAndCrossesASeam) {
     EXPECT_GT(state.actors.position(hero).y, 100);   // the bottom of area 2, in its own pixels
 }
 
-TEST_F(Farm, FollowRecordsTheFollowedActorAndTheCameraStaysWhereTheGamePutIt) {
+TEST_F(Farm, PlayerRecordsThePlayerAndTheCameraStaysWhereTheGamePutIt) {
     const Id hero = state.actors.spawn(slider(), kC, {80, 60});
-    EXPECT_EQ(state.actors.followed(), ActorKit::kNoId);
-    state.actors.follow(hero);
-    EXPECT_EQ(state.actors.followed(), hero);
+    EXPECT_EQ(state.actors.player(), ActorKit::kNoId);
+    state.actors.player(hero);
+    EXPECT_EQ(state.actors.player(), hero);
     const Vec2i cameraAt = state.camera.position();
     for (int n = 0; n < 5; ++n) {
         ActorKit::tick(state.actors, config, state.camera, Input{.way = {.right = true}}, state);
@@ -1030,9 +1030,9 @@ TEST_F(Farm, FollowRecordsTheFollowedActorAndTheCameraStaysWhereTheGamePutIt) {
     state.actors.moveTo(hero, kD, {40, 32});
     EXPECT_EQ(state.actors.place(hero), kD);
     EXPECT_EQ(state.camera.layout(), 0);
-    EXPECT_THROW(state.actors.follow(99), std::out_of_range);
+    EXPECT_THROW(state.actors.player(99), std::out_of_range);
     state.actors.remove(hero);
-    EXPECT_EQ(state.actors.followed(), ActorKit::kNoId);
+    EXPECT_EQ(state.actors.player(), ActorKit::kNoId);
 }
 
 // ── The order of a tick ────────────────────────────────────────────────────────────────────────────
@@ -1139,7 +1139,7 @@ TEST_F(Farm, AStateOfAnotherTypeThanTheBindingsOrTheHandlersWereWrittenForThrows
     ActorKit::tick(askers, handlersOnly, state.camera, Input{}, state);   // the script asks
     EXPECT_THROW(ActorKit::tick(askers, handlersOnly, state.camera, Input{}, other), std::logic_error);
 
-    // A config with neither takes a state of any type.
+    // A config of a world alone takes a state of any type.
     ActorKit::Actors plain{kConfig};
     plain.spawn(block(), kA, {16, 16});
     const ActorKit::Config bare{.world = &world};
@@ -1285,7 +1285,7 @@ TEST_F(Farm, AFreshActorThatMovedTakesAThrowawayKeyAndItsOwnAgainWhenFreshIsNoLo
     EXPECT_NE(second, own);
     EXPECT_NE(second, first);
 
-    // And a third time: the first one again, which the tick before did not use.
+    // And a third time: the first one again, free since the tick before took the second.
     tick();
     state.actors.moveTo(hero, kB, {44, 40});
     state.actors.fresh(hero);
@@ -1296,7 +1296,7 @@ TEST_F(Farm, AFreshActorThatMovedTakesAThrowawayKeyAndItsOwnAgainWhenFreshIsNoLo
     state.actors.fresh(hero);
     EXPECT_EQ(state.actors.key(hero), first);
 
-    // No longer reported: its own key again, moving or not.
+    // Reported on an earlier tick only: its own key again, moving or not.
     tick();
     state.actors.moveTo(hero, kB, {80, 40});
     EXPECT_EQ(state.actors.key(hero), own);
