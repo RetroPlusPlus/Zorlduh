@@ -166,8 +166,8 @@ processor when a script asks: a command with its arguments, or a change of a val
 sets a script off: one of the actor module's own — interact, touch, near, enter, becomes — or one the
 game names and binds), **own value** (a value each actor holds its own instance of), **look** (the art
 an actor shows, chosen by its values), **mover** (what moves an actor: a walker of the game's choosing,
-driven by the pad, a value or a function), **followed actor** (the one actor a set marks as followed by
-the game's camera, free to leave its area through an opening).
+driven by the pad, a value or a function), **player** (the one actor a set marks as the one the game's
+camera follows, free to leave its area through an opening).
 
 ## Hard constraints
 
