@@ -540,6 +540,23 @@ TEST_F(Farm, ActorKitFillsInTouchedXYAndThePlayersPlaceAndPositionForEachActor) 
     (void)watcher;
 }
 
+// The six are constants before any constructor at namespace scope runs, so the scripts above read them
+// whatever order the toolchain builds this file's constants and the header's in.
+constinit const ScriptKit::Value<int> kEarlyX = ActorKit::X;
+
+TEST(ActorKitValues, TheSixAreCompileTimeConstantsWithIdsOfTheirOwnAboveEveryMintedId) {
+    static_assert(ActorKit::Touched.id() == 0x40000000);
+    static_assert(ActorKit::X.id() == 0x40000001);
+    static_assert(ActorKit::Y.id() == 0x40000002);
+    static_assert(ActorKit::PlayerHere.id() == 0x40000003);
+    static_assert(ActorKit::PlayerX.id() == 0x40000004);
+    static_assert(ActorKit::PlayerY.id() == 0x40000005);
+    EXPECT_EQ(kEarlyX.id(), ActorKit::X.id());
+
+    const ScriptKit::Value<int> minted;
+    EXPECT_LT(minted.id(), ActorKit::Touched.id());
+}
+
 TEST_F(Farm, AValueThatIsNeitherOwnActorKitsNorBoundThrowsOnTheActorsFirstTickNamingTheActorAndTheValue) {
     const Id stray = state.actors.spawn(Actor{.solid = Stray}, kA, {16, 16});
     const std::string message = thrown([&] { tick(); });

@@ -29,7 +29,9 @@ concept ValueType = std::same_as<T, bool> || std::same_as<T, int> || std::is_enu
 
 namespace detail {
 
-// The next unused id. Ids are handed out in the order values are constructed.
+// The next unused id. Ids are handed out in the order values are constructed, from 1 up. A module that
+// declares values of its own as compile-time constants gives them ids from 0x40000000 up, through
+// ValueAccess::named.
 [[nodiscard]] inline ValueId mintValueId() noexcept {
     static ValueId next = 0;
     return ++next;
@@ -68,21 +70,24 @@ class Value {
 public:
     Value() noexcept : id_(detail::mintValueId()) {}
 
-    [[nodiscard]] ValueId id() const noexcept { return id_; }
+    [[nodiscard]] constexpr ValueId id() const noexcept { return id_; }
 
 private:
     friend struct detail::ValueAccess;
-    explicit Value(ValueId id) noexcept : id_(id) {}
+    constexpr explicit Value(ValueId id) noexcept : id_(id) {}
 
     ValueId id_;
 };
 
 namespace detail {
 
-// Makes the Value<T> an id already names, minting nothing.
+// Makes the Value<T> of the id given, leaving the minted ids as they are. It is a constant expression, so a value made
+// with it is ready before any constructor at namespace scope runs:
+//
+//     inline constexpr ScriptKit::Value<int> Depth = ScriptKit::detail::ValueAccess::named<int>(0x40000000);
 struct ValueAccess {
     template <class T>
-    [[nodiscard]] static Value<T> named(ValueId id) noexcept {
+    [[nodiscard]] static constexpr Value<T> named(ValueId id) noexcept {
         return Value<T>(id);
     }
 };

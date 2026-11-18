@@ -334,16 +334,17 @@ write braces:
 ## The six values
 
 ```cpp
-inline const ScriptKit::Value<bool> Touched;
-inline const ScriptKit::Value<int> X;
-inline const ScriptKit::Value<int> Y;
-inline const ScriptKit::Value<bool> PlayerHere;
-inline const ScriptKit::Value<int> PlayerX;
-inline const ScriptKit::Value<int> PlayerY;
+inline constexpr ScriptKit::Value<bool> Touched = ScriptKit::detail::ValueAccess::named<bool>(0x40000000);
+inline constexpr ScriptKit::Value<int> X = ScriptKit::detail::ValueAccess::named<int>(0x40000001);
+inline constexpr ScriptKit::Value<int> Y = ScriptKit::detail::ValueAccess::named<int>(0x40000002);
+inline constexpr ScriptKit::Value<bool> PlayerHere = ScriptKit::detail::ValueAccess::named<bool>(0x40000003);
+inline constexpr ScriptKit::Value<int> PlayerX = ScriptKit::detail::ValueAccess::named<int>(0x40000004);
+inline constexpr ScriptKit::Value<int> PlayerY = ScriptKit::detail::ValueAccess::named<int>(0x40000005);
 ```
 
 Values ActorKit fills in for each actor. A script reads them like any value, and each actor's scripts
-read that actor's own worths.
+read that actor's own worths. The six are compile-time constants with fixed ids, so a script constant in
+any file of your game can read them, whatever order your constants are built in.
 
 | Value | Worth, for the actor whose script reads it |
 |---|---|

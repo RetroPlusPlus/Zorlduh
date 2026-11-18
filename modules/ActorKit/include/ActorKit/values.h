@@ -58,20 +58,23 @@ private:
 // An actor's own values, in the order listed.
 using OwnValues = std::vector<OwnValue>;
 
+// The six values below are compile-time constants with ids of their own, 0x40000000 to 0x40000005, so a
+// script constant anywhere in the game can read them, in any file, whatever order its constants are built in.
+
 // True on a tick an actor whose `setsOff` lists a trigger bound to ActorKit::touched() overlaps this
 // actor's box, in the same area.
-inline const ScriptKit::Value<bool> Touched;
+inline constexpr ScriptKit::Value<bool> Touched = ScriptKit::detail::ValueAccess::named<bool>(0x40000000);
 
 // The actor's position: the top-left of its art, in its area's pixels.
-inline const ScriptKit::Value<int> X;
-inline const ScriptKit::Value<int> Y;
+inline constexpr ScriptKit::Value<int> X = ScriptKit::detail::ValueAccess::named<int>(0x40000001);
+inline constexpr ScriptKit::Value<int> Y = ScriptKit::detail::ValueAccess::named<int>(0x40000002);
 
 // True when the player (Actors::player) is in this actor's area.
-inline const ScriptKit::Value<bool> PlayerHere;
+inline constexpr ScriptKit::Value<bool> PlayerHere = ScriptKit::detail::ValueAccess::named<bool>(0x40000003);
 
 // The player's position while it is in this actor's area; this actor's own position otherwise.
-inline const ScriptKit::Value<int> PlayerX;
-inline const ScriptKit::Value<int> PlayerY;
+inline constexpr ScriptKit::Value<int> PlayerX = ScriptKit::detail::ValueAccess::named<int>(0x40000004);
+inline constexpr ScriptKit::Value<int> PlayerY = ScriptKit::detail::ValueAccess::named<int>(0x40000005);
 
 namespace detail {
 
