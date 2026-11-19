@@ -55,7 +55,8 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
   screen ([`modules/WorldKit/`](modules/WorldKit/README.md))
 - [x] **Actor kit** — actors declared as values and spawned at any time, moved by walkers of the game's
   choosing, with values of their own, triggers and scripts, all run by one call a tick, reporting where
-  they are and their sprites when asked ([`modules/ActorKit/`](modules/ActorKit/README.md))
+  they are and their sprites when asked; a part of WorldKit
+  ([`modules/WorldKit/`](modules/WorldKit/README.md#actors))
 - [x] **Assets** — generated placeholder art and the struct that loads it
 - [x] **Player** — walking, collision, facing, animation
 - [x] **Areas** — an overworld of five areas, a dungeon of five rooms and a forest of seven, joined by
