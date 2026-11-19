@@ -54,6 +54,12 @@ how, the sprites of what moves, and whatever fills the rest of the screen.
 | [camera.md](camera.md) | `Camera`, `Step`, `Shown`, `AreaSolids` | `camera.h`, `solids.h` |
 | [drawing.md](drawing.md) | `WorldLayers`, `Actors`, `Fade`, `TopZ`, `AreaLayerKey`, `ActorsKey`, `ViewStencil` | `world_layers.h` |
 
+### Actors
+
+| Page | Covers |
+|---|---|
+| [actors/README.md](actors/README.md) | The actors' guide: ActorKit's pages, a task index, a name index, and what it provides and what it leaves to your game; its example, the farmyard, is built as `WorldKit-example-farm` |
+
 ## Coverage
 
 | Surface | Status | Page |

@@ -41,10 +41,11 @@ add_subdirectory(engine)
 
 # Modules: systems that include nothing from this project, each with its own
 # CMakeLists.txt. ScriptKit, LayerKit, TopDownMovement, TextKit and CameraKit depend
-# on the engine alone; WorldKit composes LayerKit and CameraKit, WindowKit composes
-# LayerKit and TextKit, MenuKit composes LayerKit, TextKit and WindowKit, and ActorKit
-# composes LayerKit, WorldKit and ScriptKit. Their example programs are built so the
-# examples their guides walk through always compile.
+# on the engine alone; WorldKit composes LayerKit and CameraKit, and its actors,
+# ActorKit, add ScriptKit; WindowKit composes LayerKit and TextKit, and MenuKit composes
+# LayerKit, TextKit and WindowKit. ScriptKit and TopDownMovement are added before
+# WorldKit, which builds its actors and its farm example on them. Their example programs
+# are built so the examples their guides walk through always compile.
 set(SCRIPTKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/ScriptKit)  # ScriptKit::ScriptKit — Value, Expr, Script, ScriptProcessor, Bindings, Handlers
 set(LAYERKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
@@ -60,9 +61,9 @@ add_subdirectory(modules/MenuKit)  # MenuKit::MenuKit — MenuConfig, Item, Menu
 set(CAMERAKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/CameraKit)  # CameraKit::CameraKit — View, Camera, follow
 set(WORLDKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
-add_subdirectory(modules/WorldKit)  # WorldKit::WorldKit — Area, Opening, Layout, Camera, AreaSolids, WorldLayers, Fade
-set(ACTORKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
-add_subdirectory(modules/ActorKit)  # ActorKit::ActorKit — Actor, Actors, movedBy, TriggerMap, tick, Sprites
+# WorldKit::WorldKit — Area, Opening, Layout, Camera, AreaSolids, WorldLayers, Fade;
+# ActorKit::ActorKit — Actor, Actors, movedBy, TriggerMap, tick, Sprites
+add_subdirectory(modules/WorldKit)
 
 # Warnings apply to this project's targets only; the engine keeps its own flags.
 if(MSVC)

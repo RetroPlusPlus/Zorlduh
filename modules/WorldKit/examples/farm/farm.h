@@ -26,7 +26,7 @@ using ScriptKit::wait;
 using namespace std::chrono_literals;
 
 // The farm's scripts start on ActorKit's own triggers. Interact is the hero pressing the program's
-// Interact action, which getting_started.cpp names to the trigger map.
+// Interact action, which farm.cpp names to the trigger map.
 using ActorKit::Becomes;    // a value goes from false to true
 using ActorKit::Enter;      // the camera comes into the actor's area
 using ActorKit::Interact;   // the hero, facing the actor, presses Interact
@@ -46,12 +46,12 @@ inline const ScriptKit::Value<bool> GateOpen;    // the gate to the field stands
 inline const ScriptKit::Value<bool> BellRung;    // the bell is ringing
 
 // The farm's one command: count an egg as picked up. A command is done once for every script that asks,
-// so three eggs picked up on one tick count as three; getting_started.cpp has the handler.
+// so three eggs picked up on one tick count as three; farm.cpp has the handler.
 inline const ScriptKit::Command Collect{"collect"};
 inline ScriptKit::Entry collect() { return Collect(); }
 
 // The farm's second command: ripple the asking actor's sprite from a point in the sprite's own art
-// pixels, `x` across and `y` down from its top-left. getting_started.cpp has the handler.
+// pixels, `x` across and `y` down from its top-left. farm.cpp has the handler.
 inline const ScriptKit::Command Ripple{"ripple"};
 inline ScriptKit::Entry ripple(ScriptKit::Expr<int> x, ScriptKit::Expr<int> y) { return Ripple(x, y); }
 

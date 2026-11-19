@@ -1,4 +1,4 @@
-// A complete program built on the ActorKit module: a farmyard of three areas — a yard one screen big, a
+// A complete program built on ActorKit, the WorldKit module's actors: a farmyard of three areas — a yard one screen big, a
 // field larger than the screen through a gate in the yard's east fence, and a pond one screen big through
 // a gap in its south fence — and the actors in them.
 //
@@ -141,7 +141,7 @@ struct Maps {
 
 // The bytes of a file under this example's assets/ directory.
 std::vector<std::uint8_t> readAsset(const std::string& name) {
-    std::ifstream in(std::string(ACTORKIT_EXAMPLE_ASSETS) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(WORLDKIT_FARM_ASSETS) + "/" + name, std::ios::binary);
     if (!in) {
         throw std::runtime_error("cannot open assets/" + name);
     }
@@ -305,7 +305,7 @@ struct State {
     std::vector<Rippling> ripples;
 };
 
-// How a ripple looks, in the sprite's art pixels (examples/shaders/ripple_ring.frag.hlsl draws it): a band
+// How a ripple looks, in the sprite's art pixels (shaders/ripple_ring.frag.hlsl draws it): a band
 // of rings 6 pixels apart, reaching 5 pixels either side of a front that starts 2 pixels from where the foot
 // came down and travels outward a pixel a tick. A crest pushes the art up to 1.5 pixels and lightens it
 // by a quarter; both fade out over 60 ticks. Up to kRipplesAtOnce run on one sprite — the shader's
@@ -511,7 +511,7 @@ int main() {
     const Art art = loadArt(renderer);
     // The pond's ripple: a shader of the example's own, compiled and embedded by the build from its path.
     const retropp::PostProcessStageId rippleShader =
-        renderer.registerPostProcessStage("examples/shaders/ripple_ring.frag.hlsl");
+        renderer.registerPostProcessStage("examples/farm/shaders/ripple_ring.frag.hlsl");
     const Maps maps;
     const WorldKit::World world = FarmWorld(maps, art);
     WorldKit::validate(world);

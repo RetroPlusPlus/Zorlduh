@@ -15,7 +15,7 @@ here is what compiles.
 ## Contents
 
 - [1. Build it](#1-build-it)
-- [2. Four maps](#2-four-maps)
+- [2. Five maps](#2-five-maps)
 - [3. The world: a layout of areas and their openings](#3-the-world-a-layout-of-areas-and-their-openings)
 - [4. The marker moves against what is solid](#4-the-marker-moves-against-what-is-solid)
 - [5. The camera follows it through the openings](#5-the-camera-follows-it-through-the-openings)
