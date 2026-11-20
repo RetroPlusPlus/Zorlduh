@@ -1,9 +1,9 @@
 # ActorKit guide
 
-Documentation for the ActorKit module: actors for a top-down game on the Polyrhythm engine, in a
-WorldKit world, with their scripts written in ScriptKit.
+Documentation for ActorKit, the WorldKit module's actors: actors for a top-down game on the Polyrhythm
+engine, in a WorldKit world, with their scripts written in ScriptKit.
 
-New to the module? Read [getting-started.md](getting-started.md), then [concepts.md](concepts.md).
+New to ActorKit? Read [getting-started.md](getting-started.md), then [concepts.md](concepts.md).
 
 ## Pages
 

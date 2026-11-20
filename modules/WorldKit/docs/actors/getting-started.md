@@ -14,10 +14,12 @@ field and a pond — with a hero and the actors it meets.
 | The eggs | where the hens lay them | are picked up when the hero walks onto them |
 | The pond | south of the yard | ripples out from the hero's feet with every step the hero takes in it |
 
-The source is [`examples/getting_started.cpp`](../examples/getting_started.cpp), with the farm's names
-in [`examples/farm.h`](../examples/farm.h), its scripts in [`examples/scripts/`](../examples/scripts/),
-the pond's shader in [`examples/shaders/`](../examples/shaders/) and its art in
-[`examples/assets/`](../examples/assets/). The code on this page is taken from those files.
+The source is [`examples/farm/farm.cpp`](../../examples/farm/farm.cpp), with the farm's names in
+[`examples/farm/farm.h`](../../examples/farm/farm.h), its scripts in
+[`examples/farm/scripts/`](../../examples/farm/scripts/), the pond's shader in
+[`examples/farm/shaders/`](../../examples/farm/shaders/) and its art in
+[`examples/farm/assets/`](../../examples/farm/assets/). The code on this page is taken from those
+files.
 
 ## Contents
 
@@ -38,10 +40,11 @@ the pond's shader in [`examples/shaders/`](../examples/shaders/) and its art in
 
 ## 1. Build it
 
-The module needs the engine as the CMake target `retropp::engine`, and the modules it is built on:
-LayerKit, CameraKit, WorldKit and ScriptKit. The example also links TopDownMovement, whose walkers move
-its actors. The engine's `docs/guide/build-and-consume.md` covers building the engine. Add the modules
-and turn the example on:
+ActorKit is the target `ActorKit::ActorKit` of the WorldKit module. It needs the engine as the CMake
+target `retropp::engine`, and the modules WorldKit is built on: LayerKit, CameraKit and ScriptKit. The
+example also links TopDownMovement, whose walkers move its actors. The engine's
+`docs/guide/build-and-consume.md` covers building the engine. Add ScriptKit and TopDownMovement before
+WorldKit, and turn the examples on:
 
 ```cmake
 add_subdirectory(engine)
@@ -49,19 +52,18 @@ add_subdirectory(modules/ScriptKit)
 add_subdirectory(modules/LayerKit)
 add_subdirectory(modules/TopDownMovement)
 add_subdirectory(modules/CameraKit)
+set(WORLDKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
 add_subdirectory(modules/WorldKit)
-set(ACTORKIT_BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
-add_subdirectory(modules/ActorKit)
 ```
 
 ```sh
 cmake -S . -B build
-cmake --build build --target ActorKit-example-getting-started
+cmake --build build --target WorldKit-example-farm
 ```
 
-The executable is written to `build/modules/ActorKit/`. Close the window to quit.
+The executable is written to `build/modules/WorldKit/`. Close the window to quit.
 
-The module's `CMakeLists.txt` calls the engine's `retropp_autocompile_shaders` for the example, which
+WorldKit's `CMakeLists.txt` calls the engine's `retropp_autocompile_shaders` for the example, which
 compiles the pond's shader into the executable ([13. The pond's ripples](#13-the-ponds-ripples)).
 
 ## 2. Run it
@@ -87,7 +89,7 @@ the top, a puddle at the bottom-left, a gate in the east fence, a gap in the sou
 
 ## 3. The art
 
-`examples/assets/` holds three sheets and fourteen palette images.
+`examples/farm/assets/` holds three sheets and fourteen palette images.
 
 | File | Size | Contents |
 |---|---|---|
@@ -100,7 +102,7 @@ The sheets are indexed PNGs: each pixel is a palette index, and a palette image 
 The four hens share the hen's frames and differ in palette. The pond is drawn through the puddle's
 palette.
 
-The program reads the files from the directory named by `ACTORKIT_EXAMPLE_ASSETS`, which the module's
+The program reads the files from the directory named by `WORLDKIT_FARM_ASSETS`, which WorldKit's
 `CMakeLists.txt` defines, and loads them with the engine's `loadAtlasFromMemory`:
 
 ```cpp
@@ -181,12 +183,12 @@ inline const ScriptKit::Value<bool> GateOpen;    // the gate to the field stands
 inline const ScriptKit::Value<bool> BellRung;    // the bell is ringing
 
 // The farm's one command: count an egg as picked up. A command is done once for every script that asks,
-// so three eggs picked up on one tick count as three; getting_started.cpp has the handler.
+// so three eggs picked up on one tick count as three; farm.cpp has the handler.
 inline const ScriptKit::Command Collect{"collect"};
 inline ScriptKit::Entry collect() { return Collect(); }
 
 // The farm's second command: ripple the asking actor's sprite from a point in the sprite's own art
-// pixels, `x` across and `y` down from its top-left. getting_started.cpp has the handler.
+// pixels, `x` across and `y` down from its top-left. farm.cpp has the handler.
 inline const ScriptKit::Command Ripple{"ripple"};
 inline ScriptKit::Entry ripple(ScriptKit::Expr<int> x, ScriptKit::Expr<int> y) { return Ripple(x, y); }
 ```
@@ -222,7 +224,7 @@ using ActorKit::Touch;      // the hero walks onto the actor
 
 ## 6. The scripts
 
-Each script is a file in `examples/scripts/`.
+Each script is a file in `examples/farm/scripts/`.
 
 | Script | On | What it does |
 |---|---|---|
@@ -631,12 +633,12 @@ A ripple goes from the pond's script to the screen in four steps.
 | 3. The tick ages it. | `AdvanceRipples`, at the top of each tick | Each ripple ages a tick, and one 60 ticks old is dropped. |
 | 4. The frame draws it. | `Underfoot`, each frame | The ripples running on the pond go onto the pond's sprite as one effect, which the ripple shader draws. |
 
-The shader is the example's own, `examples/shaders/ripple_ring.frag.hlsl`. The program registers it by
-its path, and the build compiles it into the executable:
+The shader is the example's own, `examples/farm/shaders/ripple_ring.frag.hlsl`. The program registers
+it by its path, and the build compiles it into the executable:
 
 ```cpp
 const retropp::PostProcessStageId rippleShader =
-    renderer.registerPostProcessStage("examples/shaders/ripple_ring.frag.hlsl");
+    renderer.registerPostProcessStage("examples/farm/shaders/ripple_ring.frag.hlsl");
 ```
 
 `Underfoot` puts every ripple running on an actor into one effect on its sprite:

@@ -134,8 +134,9 @@ The template's verbs and systems:
   becoming true — and steps their scripts. Each actor runs its own copy of its scripts, and one actor
   affects another only through a value the other reads. Asked, an actor reports where it is and a set
   reports its sprites; moving the camera and drawing at the world's actor slots stay the game's own
-  calls. The module is in place with an example program, a farmyard; the game's own actors — the player
-  among them, and one wandering enemy — come next.
+  calls. Actors are a part of the WorldKit module, in place with an example program of their own, a
+  farmyard, beside the world's; the game's own actors — the player among them, and one wandering enemy —
+  come next.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
 - **HUD:** hearts in half-heart steps; a heart pickup dropped by enemies.
@@ -208,7 +209,9 @@ camera follows, free to leave its area through an opening).
   switches on a walker's config: 8-way or 4-way movement, and 4 or 8 sprite directions; 8-way movement
   with 4 sprite directions is the default.
 - The world is WorldKit's, in `modules/WorldKit/`, and the camera CameraKit's, in `modules/CameraKit/`.
-  WorldKit composes LayerKit and CameraKit; no module depends on a movement module — movement plugs
+  WorldKit composes LayerKit and CameraKit, and its actors add ScriptKit; a game links the world alone
+  (`WorldKit::WorldKit`) or the world and its actors (`ActorKit::ActorKit`). No module depends on a
+  movement module — movement plugs
   into the world through the engine's types (a solid query, a box, a move), so another kind of movement
   fits the same world.
 - Text is TextKit's, in `modules/TextKit/`, on the engine alone. Windows and messages are WindowKit's, in
@@ -221,7 +224,8 @@ camera follows, free to leave its area through an opening).
 - Scripts are ScriptKit's, in `modules/ScriptKit/`, on the engine alone: a script reads only the values
   its processor is handed and writes only requests, and the tick is the only thing that writes the
   game's state.
-- Actors are ActorKit's, in `modules/ActorKit/`, on the engine, LayerKit, WorldKit and ScriptKit: it
+- Actors are ActorKit's, a part of the WorldKit module in `modules/WorldKit/` with headers of its own
+  (`include/ActorKit/`), on the engine, LayerKit, the world and ScriptKit: it
   keeps the live actors, walks them, detects what happens between them and runs their scripts, and
   reports their positions and sprites when asked. It reads the world and the camera and changes neither:
   the camera and the drawing stay the game's own calls to WorldKit. A mover is the game's own type,
