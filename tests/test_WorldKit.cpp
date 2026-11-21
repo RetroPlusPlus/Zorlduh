@@ -119,8 +119,10 @@ struct Maps {
 WorldKit::World worldOver(const Maps& maps) {
     return WorldKit::World{.layouts = {
         WorldKit::Layout{
+            .name = "a",
             .areas = {
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a0, .art = art()},
+                WorldKit::Area{.name = "a0",
+                               .layers = {{.name = "ground", .tiles = &maps.a0, .art = art()},
                                           {.name = "canopy", .tiles = &maps.a0Canopy, .art = art(), .z = 7}},
                                .actorSlots = {{.name = "actors", .z = 5}},
                                .collision = &maps.a0,
@@ -130,7 +132,8 @@ WorldKit::World worldOver(const Maps& maps) {
                                              .transition = Transition::Scroll, .leadsTo = {.area = 2, .opening = "north"}},
                                             {.name = "stairs", .at = {.x = 12, .y = 4, .width = 2, .height = 1},
                                              .transition = Transition::Fade, .leadsTo = {.area = 3, .opening = "stairs"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a1, .art = art()}},
+                WorldKit::Area{.name = "a1",
+                               .layers = {{.name = "ground", .tiles = &maps.a1, .art = art()}},
                                .actorSlots = {{.name = "actors", .z = 3}},
                                .collision = &maps.a1,
                                .openings = {{.name = "west", .side = Side::West, .span = {6, 9},
@@ -138,7 +141,8 @@ WorldKit::World worldOver(const Maps& maps) {
                                             {.name = "well", .at = {.x = 30, .y = 2, .width = 2, .height = 1},
                                              .transition = Transition::Fade,
                                              .leadsTo = {.layout = 1, .area = 0, .opening = "well"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a2, .art = art()}}, .collision = &maps.a2,
+                WorldKit::Area{.name = "a2",
+                               .layers = {{.name = "ground", .tiles = &maps.a2, .art = art()}}, .collision = &maps.a2,
                                .openings = {{.name = "north", .side = Side::North, .span = {2, 5},
                                              .transition = Transition::Scroll, .leadsTo = {.area = 0, .opening = "south"}},
                                             {.name = "east", .side = Side::East, .span = {3, 6}},
@@ -148,7 +152,8 @@ WorldKit::World worldOver(const Maps& maps) {
                                             {.name = "west", .side = Side::West, .span = {3, 6},
                                              .transition = Transition::Seamless,
                                              .leadsTo = {.layout = 1, .area = 1, .opening = "east"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a3, .art = art()}}, .collision = &maps.a3,
+                WorldKit::Area{.name = "a3",
+                               .layers = {{.name = "ground", .tiles = &maps.a3, .art = art()}}, .collision = &maps.a3,
                                .openings = {{.name = "stairs", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
                                              .transition = Transition::Fade, .leadsTo = {.area = 0, .opening = "stairs"}},
                                             {.name = "ledge", .side = Side::North, .span = {4, 5}}}},
@@ -158,8 +163,10 @@ WorldKit::World worldOver(const Maps& maps) {
             .view = kView,
         },
         WorldKit::Layout{
+            .name = "b",
             .areas = {
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.b0, .art = art()}}, .collision = &maps.b0,
+                WorldKit::Area{.name = "b0",
+                               .layers = {{.name = "ground", .tiles = &maps.b0, .art = art()}}, .collision = &maps.b0,
                                .openings = {{.name = "north", .side = Side::North, .span = {2, 5},
                                              .transition = Transition::Scroll,
                                              .leadsTo = {.layout = 0, .area = 2, .opening = "south", .offset = {.x = 1, .y = 0}}},
@@ -169,7 +176,8 @@ WorldKit::World worldOver(const Maps& maps) {
                                             {.name = "east", .side = Side::East, .span = {0, 15},
                                              .transition = Transition::Seamless,
                                              .leadsTo = {.area = 1, .opening = "west", .offset = {.x = 0, .y = 2}}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.b1, .art = art()}}, .collision = &maps.b1,
+                WorldKit::Area{.name = "b1",
+                               .layers = {{.name = "ground", .tiles = &maps.b1, .art = art()}}, .collision = &maps.b1,
                                .openings = {{.name = "west", .side = Side::West, .span = {0, 15},
                                              .transition = Transition::Seamless,
                                              .leadsTo = {.area = 0, .opening = "east", .offset = {.x = 0, .y = -2}}},
@@ -198,16 +206,20 @@ struct Chain {
 WorldKit::World chainOver(const Chain& maps, std::uint32_t seamDepth = 0) {
     return WorldKit::World{.layouts = {
         WorldKit::Layout{
+            .name = "c",
             .areas = {
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c0, .art = art()}}, .collision = &maps.c0,
+                WorldKit::Area{.name = "c0",
+                               .layers = {{.name = "ground", .tiles = &maps.c0, .art = art()}}, .collision = &maps.c0,
                                .openings = {{.name = "north", .side = Side::North, .span = {12, 21},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 1, .opening = "south"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c1, .art = art()}}, .collision = &maps.c1,
+                WorldKit::Area{.name = "c1",
+                               .layers = {{.name = "ground", .tiles = &maps.c1, .art = art()}}, .collision = &maps.c1,
                                .openings = {{.name = "south", .side = Side::South, .span = {1, 10},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 0, .opening = "north"}},
                                             {.name = "east", .side = Side::East, .span = {1, 8},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 2, .opening = "west"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c2, .art = art()}}, .collision = &maps.c2,
+                WorldKit::Area{.name = "c2",
+                               .layers = {{.name = "ground", .tiles = &maps.c2, .art = art()}}, .collision = &maps.c2,
                                .openings = {{.name = "west", .side = Side::West, .span = {1, 8},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 1, .opening = "east"}}}},
             },
@@ -245,14 +257,50 @@ TEST(Validate, AcceptsTheWorldOfTwoLayouts) {
     EXPECT_NO_THROW(WorldKit::validate(worldOver(maps)));
 }
 
+TEST(Validate, RejectsALayoutOrAnAreaWithNoNameOrANameUsedTwice) {
+    const Maps maps;
+    WorldKit::World world = worldOver(maps);
+    world.layouts[1].name = "";
+    EXPECT_EQ(rejection(world), "WorldKit: layout 1 has no name");
+    world.layouts[1].name = "a";
+    EXPECT_EQ(rejection(world), "WorldKit: layout 1 'a' is named twice");
+    world = worldOver(maps);
+    world.layouts[0].areas[2].name = "";
+    EXPECT_EQ(rejection(world), "WorldKit: layout 0 'a' area 2 has no name");
+    world.layouts[0].areas[2].name = "a1";
+    EXPECT_EQ(rejection(world), "WorldKit: layout 0 'a' area 2 'a1' is named twice");
+    world = worldOver(maps);
+    world.layouts[1].areas[0].name = "a0";   // names are per layout: layout 1 may name an area as layout 0 does
+    EXPECT_EQ(rejection(world), "");
+}
+
+TEST(PlaceOf, FindsAPlaceByTheNamesOfItsLayoutAndAreaAndThrowsNamingWhatIsMissing) {
+    const Maps maps;
+    const WorldKit::World world = worldOver(maps);
+    EXPECT_EQ(WorldKit::placeOf(world, "a", "a2"), (Place{.layout = 0, .area = 2}));
+    EXPECT_EQ(WorldKit::placeOf(world, "b", "b1"), (Place{.layout = 1, .area = 1}));
+    try {
+        (void)WorldKit::placeOf(world, "b", "a0");
+        ADD_FAILURE() << "an area the layout lacks throws";
+    } catch (const std::out_of_range& e) {
+        EXPECT_EQ(std::string{e.what()}, "WorldKit: layout 1 'b' has no area 'a0'");
+    }
+    try {
+        (void)WorldKit::placeOf(world, "z", "a0");
+        ADD_FAILURE() << "a layout the world lacks throws";
+    } catch (const std::out_of_range& e) {
+        EXPECT_EQ(std::string{e.what()}, "WorldKit: the world has no layout 'z'");
+    }
+}
+
 TEST(Validate, RejectsAnAreaWithNoCollisionMapOrNoLayers) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
     world.layouts[0].areas[1].collision = nullptr;
-    EXPECT_NE(rejection(world).find("layout 0 area 1 has no collision map"), std::string::npos);
+    EXPECT_NE(rejection(world).find("layout 0 'a' area 1 'a1' has no collision map"), std::string::npos);
     world = worldOver(maps);
     world.layouts[0].areas[1].layers.clear();
-    EXPECT_NE(rejection(world).find("layout 0 area 1 has no layers"), std::string::npos);
+    EXPECT_NE(rejection(world).find("layout 0 'a' area 1 'a1' has no layers"), std::string::npos);
     world.layouts[0].areas[1].actorSlots.clear();   // an area needs no actor slot
     world.layouts[0].areas[1].layers = {{.name = "ground", .tiles = &maps.a1, .art = art()}};
     EXPECT_NO_THROW(WorldKit::validate(world));
@@ -262,27 +310,29 @@ TEST(Validate, RejectsALayerOrSlotWithNoNameOrANameUsedTwice) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
     world.layouts[0].areas[0].layers[1].name = "";
-    EXPECT_NE(rejection(world).find("layout 0 area 0 has a layer with no name"), std::string::npos);
+    EXPECT_NE(rejection(world).find("layout 0 'a' area 0 'a0' has a layer with no name"), std::string::npos);
     world.layouts[0].areas[0].layers[1].name = "ground";
-    EXPECT_NE(rejection(world).find("area 0 layer 'ground' is named twice"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 0 'a0' layer 'ground' is named twice"), std::string::npos);
     world = worldOver(maps);
     world.layouts[0].areas[0].actorSlots[0].name = "";
-    EXPECT_NE(rejection(world).find("layout 0 area 0 has an actor slot with no name"), std::string::npos);
+    EXPECT_NE(rejection(world).find("layout 0 'a' area 0 'a0' has an actor slot with no name"), std::string::npos);
     world.layouts[0].areas[0].actorSlots[0].name = "canopy";   // a slot and a map layer share names
-    EXPECT_NE(rejection(world).find("area 0 layer 'canopy' is named twice"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 0 'a0' layer 'canopy' is named twice"), std::string::npos);
 }
 
-TEST(Validate, RejectsALayerWithNoMapOrAMapOfAnotherSize) {
+TEST(Validate, AcceptsAReservedLayerAndRejectsAMapLayerMissingItsMapOrOfAnotherSize) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
-    world.layouts[0].areas[0].layers[1].tiles = nullptr;
-    EXPECT_NE(rejection(world).find("area 0 layer 'canopy' has no map"), std::string::npos);
+    world.layouts[0].areas[0].layers[1].tiles = nullptr;   // art and no map: a map layer missing its map
+    EXPECT_EQ(rejection(world), "WorldKit: layout 0 'a' area 0 'a0' layer 'canopy' has art but no map");
+    world.layouts[0].areas[0].layers[1] = WorldKit::ReservedLayer{.name = "canopy", .z = 7};   // neither: a reservation
+    EXPECT_EQ(rejection(world), "");
     world.layouts[0].areas[0].layers[1].tiles = &maps.a1;
-    EXPECT_NE(rejection(world).find("area 0 layer 'canopy''s map differs in size from the collision map"),
+    EXPECT_NE(rejection(world).find("area 0 'a0' layer 'canopy''s map differs in size from the collision map"),
               std::string::npos);
     world = worldOver(maps);
     world.layouts[0].areas[1].collision = &maps.a0;
-    EXPECT_NE(rejection(world).find("area 1 layer 'ground''s map differs in size from the collision map"),
+    EXPECT_NE(rejection(world).find("area 1 'a1' layer 'ground''s map differs in size from the collision map"),
               std::string::npos);
 }
 
@@ -290,13 +340,13 @@ TEST(Validate, RejectsTwoLayersOrSlotsAtOneDepth) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
     world.layouts[0].areas[0].layers[1].z = 0;
-    EXPECT_NE(rejection(world).find("area 0 layer 'canopy' is at the same depth as layer 'ground'"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 0 'a0' layer 'canopy' is at the same depth as layer 'ground'"), std::string::npos);
     world = worldOver(maps);
     world.layouts[0].areas[0].actorSlots[0].z = 7;
-    EXPECT_NE(rejection(world).find("area 0 layer 'actors' is at the same depth as layer 'canopy'"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 0 'a0' layer 'actors' is at the same depth as layer 'canopy'"), std::string::npos);
     world = worldOver(maps);
     world.layouts[0].areas[0].actorSlots.push_back({.name = "flyers", .z = 5});
-    EXPECT_NE(rejection(world).find("area 0 layer 'flyers' is at the same depth as layer 'actors'"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 0 'a0' layer 'flyers' is at the same depth as layer 'actors'"), std::string::npos);
     world.layouts[0].areas[0].actorSlots[1].z = 9;   // a second slot above the canopy
     EXPECT_NO_THROW(WorldKit::validate(world));
     world = worldOver(maps);
@@ -308,7 +358,7 @@ TEST(Validate, RejectsAnOpeningWithNoNameOrANameUsedTwice) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
     world.layouts[0].areas[0].openings[1].name = "";
-    EXPECT_NE(rejection(world).find("area 0 has an opening with no name"), std::string::npos);
+    EXPECT_NE(rejection(world).find("area 0 'a0' has an opening with no name"), std::string::npos);
     world.layouts[0].areas[0].openings[1].name = "east";
     EXPECT_NE(rejection(world).find("opening 'east' is named twice"), std::string::npos);
 }
@@ -416,7 +466,7 @@ TEST(Validate, RejectsASeamlessJoinWhoseFarEndDoesNotMatchIt) {
     WorldKit::World world = worldOver(maps);
     WorldKit::Opening& back = world.layouts[1].areas[1].openings[0];   // layout 1 area 1 'west'
     back.side = Side::North;
-    EXPECT_NE(rejection(world).find("layout 1 area 0 opening 'east' joins seamlessly, so it and 'west' must be in facing walls"),
+    EXPECT_NE(rejection(world).find("layout 1 'b' area 0 'b0' opening 'east' joins seamlessly, so it and 'west' must be in facing walls"),
               std::string::npos);
     back.side = Side::West;
     back.span = {0, 14};
@@ -437,7 +487,7 @@ TEST(Validate, RejectsASeamlessJoinWhoseFarEndDoesNotMatchIt) {
     EXPECT_EQ(rejection(world), "");
     // Across layouts, the two must share a cell size.
     world.layouts[1].cellSize = 16;
-    EXPECT_NE(rejection(world).find("layout 0 area 2 opening 'west' joins seamlessly into layout 1, whose cell size differs"),
+    EXPECT_NE(rejection(world).find("layout 0 'a' area 2 'a2' opening 'west' joins seamlessly into layout 1, whose cell size differs"),
               std::string::npos);
 }
 
@@ -1141,7 +1191,7 @@ TEST(WorldLayers, KeysEachLayerByLayoutAreaAndNameAndListsASeamlessNeighborsLaye
     EXPECT_EQ(std::string_view{layers[0].key}, "area:1:0:ground");
     EXPECT_EQ(std::string_view{layers[1].key}, "area:1:1:ground");
     EXPECT_EQ(std::string_view{layers[2].key}, "area:1:1:canopy");
-    EXPECT_EQ(layers[2].z, 3);
+    EXPECT_EQ(layers[2].z, 3 * 2 + 1);   // declared 3, in the second of two areas on screen
     for (const std::size_t i : {1u, 2u}) {
         EXPECT_EQ(layers[i].scroll, (retropp::LayerScroll{.x = -85, .y = -32})) << i;
         EXPECT_EQ(std::get<retropp::TileContent>(layers[i].content).widthInTiles, 24) << i;
@@ -1151,11 +1201,11 @@ TEST(WorldLayers, KeysEachLayerByLayoutAreaAndNameAndListsASeamlessNeighborsLaye
 TEST(TopZ, IsTheHighestDepthOfAnyLayerOrSlotInAnyLayout) {
     const Maps maps;
     WorldKit::World world = worldOver(maps);
-    EXPECT_EQ(WorldKit::TopZ(world), 7);   // area 0's canopy
+    EXPECT_EQ(WorldKit::TopZ(world), 7 * 6 + 5);   // area 0's canopy at 7, drawn at most at 7 × N + N − 1, N = 6 areas
     world.layouts[1].areas[1].layers[0].z = 12;
-    EXPECT_EQ(WorldKit::TopZ(world), 12);
+    EXPECT_EQ(WorldKit::TopZ(world), 12 * 6 + 5);
     world.layouts[0].areas[3].actorSlots.push_back({.name = "flyers", .z = 20});
-    EXPECT_EQ(WorldKit::TopZ(world), 20);
+    EXPECT_EQ(WorldKit::TopZ(world), 20 * 6 + 5);
 }
 
 // ── Actor slots ──────────────────────────────────────────────────────────────────────────────
@@ -1169,7 +1219,7 @@ TEST(ActorZ, IsTheDepthOfTheNamedSlotInThatArea) {
         (void)WorldKit::ActorZ(world, {.layout = 0, .area = 2}, "actors");
         ADD_FAILURE() << "an area with no such slot throws";
     } catch (const std::out_of_range& e) {
-        EXPECT_NE(std::string{e.what()}.find("layout 0 area 2 has no actor slot 'actors'"), std::string::npos);
+        EXPECT_NE(std::string{e.what()}.find("layout 0 'a' area 2 'a2' has no actor slot 'actors'"), std::string::npos);
     }
     EXPECT_THROW((void)WorldKit::ActorZ(world, {.layout = 0, .area = 0}, "flyers"), std::out_of_range);
 }

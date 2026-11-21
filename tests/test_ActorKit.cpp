@@ -152,8 +152,10 @@ WorldKit::World worldOver(const Maps& maps) {
     const std::vector<WorldKit::ActorSlot> actorsOnly{{.name = "actors", .z = 5}};
     return WorldKit::World{.layouts = {
         WorldKit::Layout{
+            .name = "above",
             .areas = {
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.a, .art = art()}},
+                WorldKit::Area{.name = "a",
+                               .layers = {{.name = "ground", .tiles = &maps.a, .art = art()}},
                                .actorSlots = {{.name = "actors", .z = 5}, {.name = "underfoot", .z = 2}},
                                .collision = &maps.a,
                                .openings = {{.name = "east", .side = Side::East, .span = {6, 9},
@@ -161,14 +163,16 @@ WorldKit::World worldOver(const Maps& maps) {
                                             {.name = "stairs", .at = {.x = 12, .y = 4, .width = 2, .height = 1},
                                              .transition = Transition::Fade,
                                              .leadsTo = {.layout = 1, .area = 0, .opening = "stairs"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.b, .art = art()}},
+                WorldKit::Area{.name = "b",
+                               .layers = {{.name = "ground", .tiles = &maps.b, .art = art()}},
                                .actorSlots = actorsOnly,
                                .collision = &maps.b,
                                .openings = {{.name = "west", .side = Side::West, .span = {6, 9},
                                              .transition = Transition::Scroll, .leadsTo = {.area = 0, .opening = "east"}},
                                             {.name = "north", .side = Side::North, .span = {1, 18},
                                              .transition = Transition::Seamless, .leadsTo = {.area = 2, .opening = "south"}}}},
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.c, .art = art()}},
+                WorldKit::Area{.name = "c",
+                               .layers = {{.name = "ground", .tiles = &maps.c, .art = art()}},
                                .actorSlots = actorsOnly,
                                .collision = &maps.c,
                                .openings = {{.name = "south", .side = Side::South, .span = {1, 18},
@@ -179,8 +183,10 @@ WorldKit::World worldOver(const Maps& maps) {
             .view = kView,
         },
         WorldKit::Layout{
+            .name = "below",
             .areas = {
-                WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.d, .art = art()}},
+                WorldKit::Area{.name = "d",
+                               .layers = {{.name = "ground", .tiles = &maps.d, .art = art()}},
                                .actorSlots = actorsOnly,
                                .collision = &maps.d,
                                .openings = {{.name = "stairs", .at = {.x = 5, .y = 4, .width = 2, .height = 1},

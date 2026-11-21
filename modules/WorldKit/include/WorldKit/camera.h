@@ -18,9 +18,11 @@
 #pragma once
 
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -41,12 +43,154 @@ struct Step {
     std::optional<Place> entered{};
 };
 
-// An area on screen, and the scroll that places a layer of its pixels.
+// An area on screen: which area, the scroll that places a layer of its pixels, its place in the list of
+// areas on screen (the current area's is 0) and how many areas that list holds. Camera::shown fills in
+// all five; a Shown written by hand with the last two left at their defaults is an area alone on screen.
 struct Shown {
     int layout = 0;
     int area = 0;
     retropp::LayerScroll scroll{};
+    int position = 0;
+    int count = 1;
 };
+
+namespace detail {
+
+// The depth a layer declared at depth `z` is drawn at in the area `shown`: `z × count + position`. With
+// one area on screen it is `z`. With more, every lower declared depth is drawn under every higher one
+// across all the areas on screen, and two areas' layers at one declared depth take the order of the
+// list, the current area's first, so every layer of a frame has a depth of its own. Worked out in 64 bits; for
+// a world validate accepts, the result is in range.
+[[nodiscard]] inline std::int32_t spread(const Shown& shown, std::int32_t z) noexcept {
+    return static_cast<std::int32_t>(std::int64_t{z} * shown.count + shown.position);
+}
+
+// ── Where a box goes through an opening: the camera's for the box it follows, and through() for any
+// other box. One implementation of each rule, so the two always agree.
+
+[[nodiscard]] inline retropp::Vec2i center(retropp::IntRect box) noexcept {
+    return retropp::Vec2i{.x = box.x + box.width / 2, .y = box.y + box.height / 2};
+}
+
+// The spot opening of area `area` of `here` whose cells hold `point`, if any.
+[[nodiscard]] inline std::optional<int> spotHolding(const Layout& here, int area, retropp::Vec2i point) noexcept {
+    const Area& inside = here.areas[static_cast<std::size_t>(area)];
+    for (std::size_t i = 0; i < inside.openings.size(); ++i) {
+        if (isSpot(inside.openings[i]) && contains(spotPixels(here, inside.openings[i]), point)) {
+            return static_cast<int>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+// Whether `point` is past the wall `opening` of area `area` of `here` is in, within its span.
+[[nodiscard]] inline bool outThrough(const Layout& here, int area, const Opening& opening, retropp::Vec2i point) noexcept {
+    const retropp::IntRect rect = bounds(here, area);
+    const bool past = (opening.side == Side::East && point.x >= rect.width) ||
+                      (opening.side == Side::West && point.x < 0) ||
+                      (opening.side == Side::South && point.y >= rect.height) ||
+                      (opening.side == Side::North && point.y < 0);
+    const int along = runsAcross(opening.side) ? point.x : point.y;
+    return past && holds(opening.span, cellOf(along, here.cellSize));
+}
+
+// Where a box the size of `box` lands coming in through opening `entrance` of area `area` of `there`:
+// centered on a spot, or one cell in from a wall's gap, centered along it.
+[[nodiscard]] inline retropp::IntRect arrival(const Layout& there, int area, int entrance, retropp::IntRect box) noexcept {
+    const Area& next = there.areas[static_cast<std::size_t>(area)];
+    const Opening& into = next.openings[static_cast<std::size_t>(entrance)];
+    const int cell = there.cellSize;
+    if (isSpot(into)) {
+        const retropp::IntRect spot = spotPixels(there, into);
+        return retropp::IntRect{.x = spot.x + (spot.width - box.width) / 2,
+                                .y = spot.y + (spot.height - box.height) / 2,
+                                .width = box.width,
+                                .height = box.height};
+    }
+    const retropp::IntRect rect = bounds(there, area);
+    const int along = (into.span.first + into.span.last + 1) * cell / 2;
+    retropp::IntRect at{.x = 0, .y = 0, .width = box.width, .height = box.height};
+    switch (into.side) {
+        case Side::West: at.x = cell; at.y = along - box.height / 2; break;
+        case Side::East: at.x = rect.width - cell - box.width; at.y = along - box.height / 2; break;
+        case Side::North: at.y = cell; at.x = along - box.width / 2; break;
+        case Side::South: at.y = rect.height - cell - box.height; at.x = along - box.width / 2; break;
+        case Side::None:
+        default: break;
+    }
+    return at;
+}
+
+// Where a box other than the one the camera follows goes through an opening of the area at `from`, in one tick:
+// `box` is where the box is now and `was` where it was on the tick before, both in that area's pixels.
+// It takes the first opening that leads somewhere, in the order the area lists them, that the box has
+// gone through: for a wall's gap, its center has come past the wall within the span (it was on this
+// side of it on the tick before); for a spot, its center has come into the spot from outside it. Then:
+//
+//   Seamless   move: into the next area's pixels                                       entered: next place
+//   Scroll     move: the leaving layout's `carry` outward, then into the next area's pixels    "
+//   Fade       move: onto the entrance, as arrival() places a box                              "
+//
+// The scroll's move is where the camera leaves a box it follows when its scroll ends; the seam's and
+// the fade's are the moves the camera hands such a box. A box still inside its area gets an empty
+// Step. For a validated world.
+[[nodiscard]] inline Step through(const World& world, Place from, retropp::IntRect was, retropp::IntRect box) {
+    const Layout& here = world.layouts[static_cast<std::size_t>(from.layout)];
+    const Area& area = here.areas[static_cast<std::size_t>(from.area)];
+    const retropp::Vec2i now = center(box);
+    const retropp::Vec2i before = center(was);
+    const std::optional<int> nowInside = spotHolding(here, from.area, now);
+    const std::optional<int> wasInside = spotHolding(here, from.area, before);
+    for (std::size_t i = 0; i < area.openings.size(); ++i) {
+        const Opening& opening = area.openings[i];
+        if (opening.leadsTo.area == kNoArea) {
+            continue;
+        }
+        const bool gone = isEdge(opening)
+                              ? outThrough(here, from.area, opening, now) && !outThrough(here, from.area, opening, before)
+                              : nowInside == static_cast<int>(i) && wasInside != nowInside;
+        if (!gone) {
+            continue;
+        }
+        const Link next = link(world, from.layout, from.area, opening);
+        switch (opening.transition) {
+            case Transition::Seamless:
+                return Step{.move = {.x = -next.origin.x, .y = -next.origin.y}, .entered = next.to};
+            case Transition::Scroll: {
+                const retropp::Vec2i out = outward(opening.side);
+                return Step{.move = {.x = out.x * here.carry - next.origin.x, .y = out.y * here.carry - next.origin.y},
+                            .entered = next.to};
+            }
+            case Transition::Fade:
+            default: {
+                const Layout& there = world.layouts[static_cast<std::size_t>(next.to.layout)];
+                const retropp::IntRect landing = arrival(there, next.to.area, next.entrance, box);
+                return Step{.move = {.x = landing.x - box.x, .y = landing.y - box.y}, .entered = next.to};
+            }
+        }
+    }
+    return Step{};
+}
+
+}  // namespace detail
+
+// The depth the actor slot named `slot` is drawn at in the area `shown`, an entry of Camera::shown: its
+// declared depth while the area is alone on screen, and among the areas on screen otherwise. A game
+// building a layer for an area's actors calls it with the Shown it is drawing. Throws
+// std::out_of_range, naming the layout, the area and the slot, when `slot` is missing from the area's slots.
+template <std::same_as<Shown> AreaOnScreen>
+[[nodiscard]] std::int32_t ActorZ(const World& world, const AreaOnScreen& shown, std::string_view slot) {
+    return detail::spread(shown, ActorZ(world, Place{.layout = shown.layout, .area = shown.area}, slot));
+}
+
+// The depth the layer named `name` is drawn at in the area `shown`, an entry of Camera::shown: its
+// declared depth while the area is alone on screen, and among the areas on screen otherwise. A game
+// building its own layer at a reserved layer calls it with the Shown it is drawing. Throws
+// std::out_of_range, naming the layout, the area and the layer, when `name` is missing from the area's layers.
+template <std::same_as<Shown> AreaOnScreen>
+[[nodiscard]] std::int32_t LayerZ(const World& world, const AreaOnScreen& shown, std::string_view name) {
+    return detail::spread(shown, LayerZ(world, Place{.layout = shown.layout, .area = shown.area}, name));
+}
 
 class Camera {
 public:
@@ -76,9 +220,9 @@ public:
     // followed at the start or after a jump. A transition in progress is dropped.
     void place(const World& world, retropp::IntRect box) {
         transition_ = std::monostate{};
-        camera_.place(lawPlace(world, center(box)));
-        focus_ = center(box);
-        inside_ = spotHolding(world.layouts[static_cast<std::size_t>(layout_)], center(box));
+        camera_.place(lawPlace(world, detail::center(box)));
+        focus_ = detail::center(box);
+        inside_ = detail::spotHolding(world.layouts[static_cast<std::size_t>(layout_)], area_, detail::center(box));
     }
 
     // One tick. While nothing is running, the camera follows `box` by the law on each axis along which
@@ -107,7 +251,7 @@ public:
         }
 
         const Layout& here = world.layouts[static_cast<std::size_t>(layout_)];
-        const retropp::Vec2i focus = center(box);
+        const retropp::Vec2i focus = detail::center(box);
         const retropp::IntRect bounds = lawBounds(world);
         const retropp::Vec2i want = here.camera(bounds, here.view.size, focus);
         if (!focus_) {
@@ -127,14 +271,14 @@ public:
         focus_ = focus;
 
         const Area& area = here.areas[static_cast<std::size_t>(area_)];
-        const std::optional<int> nowInside = spotHolding(here, focus);
+        const std::optional<int> nowInside = detail::spotHolding(here, area_, focus);
         for (std::size_t i = 0; i < area.openings.size(); ++i) {
             const Opening& opening = area.openings[i];
             if (opening.leadsTo.area == kNoArea) {
                 continue;
             }
             const bool through = detail::isEdge(opening)
-                                     ? outThrough(here, opening, focus)
+                                     ? detail::outThrough(here, area_, opening, focus)
                                      : nowInside == static_cast<int>(i) && inside_ != nowInside;
             if (through) {
                 return start(world, opening, box);
@@ -157,7 +301,8 @@ public:
     // layout's `seamDepth` allows — whose attached rectangle is in view, each once; and during a scroll
     // the next area, lined up with the opening being gone through. An area out of view is still passed
     // through, so an area beyond it that is in view is found. Each area is placed by the first chain of
-    // seams that reaches it, the shortest.
+    // seams that reaches it, the shortest. Each entry carries its place in this list and the list's
+    // length, which set the depths its layers are drawn at (detail::spread).
     [[nodiscard]] std::vector<Shown> shown(const World& world) const {
         const Layout& here = world.layouts[static_cast<std::size_t>(layout_)];
         const retropp::LayerScroll mine = scroll(world);
@@ -207,6 +352,10 @@ public:
         if (const auto* scroll = std::get_if<Scrolling>(&transition_)) {
             add(scroll->to, scroll->origin);
         }
+        for (std::size_t i = 0; i < result.size(); ++i) {
+            result[i].position = static_cast<int>(i);
+            result[i].count = static_cast<int>(result.size());
+        }
         return result;
     }
 
@@ -243,10 +392,6 @@ private:
         std::uint32_t elapsed = 0;
         bool switched = false;
     };
-
-    [[nodiscard]] static retropp::Vec2i center(retropp::IntRect box) noexcept {
-        return retropp::Vec2i{.x = box.x + box.width / 2, .y = box.y + box.height / 2};
-    }
 
     // The rectangle area `to` occupies in the current area's pixels, its top-left at `origin`.
     [[nodiscard]] static retropp::IntRect attached(const World& world, Place to, retropp::Vec2i origin) noexcept {
@@ -291,40 +436,17 @@ private:
         return at + (step > 0 ? std::min(gap, step) : std::max(gap, step));
     }
 
-    // The spot opening of the current area whose cells hold `point`, if any.
-    [[nodiscard]] std::optional<int> spotHolding(const Layout& here, retropp::Vec2i point) const noexcept {
-        const Area& area = here.areas[static_cast<std::size_t>(area_)];
-        for (std::size_t i = 0; i < area.openings.size(); ++i) {
-            if (detail::isSpot(area.openings[i]) &&
-                detail::contains(detail::spotPixels(here, area.openings[i]), point)) {
-                return static_cast<int>(i);
-            }
-        }
-        return std::nullopt;
-    }
-
-    // Whether `point` is past the wall `opening` is in, within its span.
-    [[nodiscard]] bool outThrough(const Layout& here, const Opening& opening, retropp::Vec2i point) const noexcept {
-        const retropp::IntRect area = detail::bounds(here, area_);
-        const bool past = (opening.side == Side::East && point.x >= area.width) ||
-                          (opening.side == Side::West && point.x < 0) ||
-                          (opening.side == Side::South && point.y >= area.height) ||
-                          (opening.side == Side::North && point.y < 0);
-        const int along = detail::runsAcross(opening.side) ? point.x : point.y;
-        return past && detail::holds(opening.span, detail::cellOf(along, here.cellSize));
-    }
-
     // Goes out through `exit`: starts its scroll or fade, or makes the seamless switch at once.
     [[nodiscard]] Step start(const World& world, const Opening& exit, retropp::IntRect box) {
         const detail::Link link = detail::link(world, layout_, area_, exit);
         if (exit.transition == Transition::Fade) {
             transition_ = Fading{.to = link.to, .entrance = link.entrance};
-            inside_ = spotHolding(world.layouts[static_cast<std::size_t>(layout_)], center(box));
+            inside_ = detail::spotHolding(world.layouts[static_cast<std::size_t>(layout_)], area_, detail::center(box));
             return Step{};
         }
         if (exit.transition == Transition::Seamless) {
             rebase(link.to, link.origin);
-            focus_ = retropp::Vec2i{.x = center(box).x - link.origin.x, .y = center(box).y - link.origin.y};
+            focus_ = retropp::Vec2i{.x = detail::center(box).x - link.origin.x, .y = detail::center(box).y - link.origin.y};
             return Step{.move = {.x = -link.origin.x, .y = -link.origin.y}, .entered = link.to};
         }
 
@@ -348,7 +470,7 @@ private:
         }
         camera_.pan(to, here.scrollTicks);
         transition_ = Scrolling{.to = link.to, .side = exit.side, .origin = link.origin};
-        inside_ = spotHolding(here, center(box));
+        inside_ = detail::spotHolding(here, area_, detail::center(box));
         return Step{};
     }
 
@@ -378,7 +500,7 @@ private:
             step.entered = scroll.to;
             rebase(scroll.to, scroll.origin);
             // Following goes on from here: the box is where this move puts it.
-            focus_ = retropp::Vec2i{.x = center(box).x + step.move.x, .y = center(box).y + step.move.y};
+            focus_ = retropp::Vec2i{.x = detail::center(box).x + step.move.x, .y = detail::center(box).y + step.move.y};
         }
         return step;
     }
@@ -390,47 +512,19 @@ private:
             fade.switched = true;
             fade.elapsed = 0;
             const Layout& there = world.layouts[static_cast<std::size_t>(fade.to.layout)];
-            const retropp::IntRect target = arrival(there, fade.to.area, fade.entrance, box);
+            const retropp::IntRect target = detail::arrival(there, fade.to.area, fade.entrance, box);
             step.move = {.x = target.x - box.x, .y = target.y - box.y};
             step.entered = fade.to;
             layout_ = fade.to.layout;
             area_ = fade.to.area;
-            camera_.place(lawPlace(world, center(target)));
-            focus_ = center(target);
-            inside_ = spotHolding(there, center(target));
+            camera_.place(lawPlace(world, detail::center(target)));
+            focus_ = detail::center(target);
+            inside_ = detail::spotHolding(there, area_, detail::center(target));
         }
         if (fade.switched && fade.elapsed >= world.layouts[static_cast<std::size_t>(layout_)].fadeTicks) {
             transition_ = std::monostate{};
         }
         return step;
-    }
-
-    // Where a box the size of `box` lands coming in through opening `entrance` of `area` in `there`:
-    // centered on a spot, or just inside a wall's gap, centered along it.
-    [[nodiscard]] static retropp::IntRect arrival(const Layout& there, int area, int entrance,
-                                                  retropp::IntRect box) noexcept {
-        const Area& next = there.areas[static_cast<std::size_t>(area)];
-        const Opening& into = next.openings[static_cast<std::size_t>(entrance)];
-        const int cell = there.cellSize;
-        if (detail::isSpot(into)) {
-            const retropp::IntRect spot = detail::spotPixels(there, into);
-            return retropp::IntRect{.x = spot.x + (spot.width - box.width) / 2,
-                                    .y = spot.y + (spot.height - box.height) / 2,
-                                    .width = box.width,
-                                    .height = box.height};
-        }
-        const retropp::IntRect bounds = detail::bounds(there, area);
-        const int along = (into.span.first + into.span.last + 1) * cell / 2;
-        retropp::IntRect at{.x = 0, .y = 0, .width = box.width, .height = box.height};
-        switch (into.side) {
-            case Side::West: at.x = cell; at.y = along - box.height / 2; break;
-            case Side::East: at.x = bounds.width - cell - box.width; at.y = along - box.height / 2; break;
-            case Side::North: at.y = cell; at.x = along - box.width / 2; break;
-            case Side::South: at.y = bounds.height - cell - box.height; at.x = along - box.width / 2; break;
-            case Side::None:
-            default: break;
-        }
-        return at;
     }
 
     int layout_ = 0;

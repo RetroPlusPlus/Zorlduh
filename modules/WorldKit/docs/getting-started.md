@@ -3,7 +3,8 @@
 This page builds a complete program on the module: four areas — a hall with a door in its east wall
 that scrolls into a wider hall; stairs in that hall that fade down to a cellar with stairs back up; and
 a garden joined seamlessly along the wider hall's north wall, so it is simply there beyond the wall and
-walking into it changes nothing on screen, with trees whose canopy the marker passes under — and a
+walking into it changes nothing on screen, with trees whose canopy the marker passes under and leaves
+falling from them — and a
 marker you steer with the arrow keys, WASD or a d-pad. The marker's own movement is a few lines in the
 program; WorldKit tells it what is solid, takes it through each opening and draws whatever is on
 screen, the marker included, at the depth each area gives it.
@@ -46,7 +47,9 @@ carried through; it is wider than the screen, so the screen follows the marker a
 its edges. Its north wall is open along its whole length, and the green garden is there beyond it: walk
 up into it and nothing jumps — the garden was already on screen, and the marker simply carries on.
 Along the garden's north side two stands of trees hang over the grass; walk under them and the leaves
-cover the marker, the grass showing through the gaps between them.
+cover the marker, the grass showing through the gaps between them. Single leaves drift down the garden
+all the time, over the marker and under the trees, and keep falling while the wide hall is on screen
+beside it.
 Step onto the striped stairs in the wide hall and the screen fades out, then in on a small purple
 cellar, the marker standing on its stairs. Step off and back on to fade up again. Close the window to
 quit.
@@ -78,10 +81,11 @@ the corners. The maps know nothing of each other. How they join is said once, be
 The fifth map is drawn over the garden: the garden's size, `Canopy` in two rectangles of cells and
 `Nothing` everywhere else. It is drawn through a sheet of its own, uploaded with index 0 as its
 transparent index, whose `Nothing` slot is every pixel 0 and whose leaves have gaps of 0, so the
-garden shows through wherever there are no leaves:
+garden shows through wherever there are no leaves. Its third slot is one falling leaf
+([6. Drawing it](#6-drawing-it)):
 
 ```cpp
-.overhead = renderer.uploadAtlas(overhead.data(), 16, 8, retropp::TransparentIndices::of({0})).atlasId,
+.overhead = renderer.uploadAtlas(overhead.data(), 24, 8, retropp::TransparentIndices::of({0})).atlasId,
 ```
 
 ## 3. The world: a layout of areas and their openings
@@ -90,9 +94,11 @@ garden shows through wherever there are no leaves:
 enum Layout : std::uint8_t { Castle };
 enum Area : std::uint8_t { Hall, WideHall, Cellar, Garden };
 
-// Every area's depths: the ground, the marker over it, and the canopy over the marker.
+// Every area's depths: the ground, the marker over it, the garden's falling leaves over the marker, and
+// the canopy over the leaves.
 constexpr std::int32_t kGroundZ = 0;
 constexpr std::int32_t kActorsZ = 5;
+constexpr std::int32_t kLeavesZ = 7;
 constexpr std::int32_t kCanopyZ = 10;
 
 WorldKit::MapLayer Ground(const retropp::IndexGrid& map, const Art& art, retropp::PaletteId palette) {
@@ -103,13 +109,14 @@ const std::vector<WorldKit::ActorSlot> kActorSlots{{.name = "actors", .z = kActo
 
 WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
     return WorldKit::Layout{
+        .name = "castle",
         .areas = {
-            WorldKit::Area{.layers = {Ground(maps.hall, art, art.hall)}, .actorSlots = kActorSlots,
+            WorldKit::Area{.name = "hall", .layers = {Ground(maps.hall, art, art.hall)}, .actorSlots = kActorSlots,
                            .collision = &maps.hall,
                            .openings = {{.name = "east door", .side = Side::East, .span = {7, 10},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::WideHall, .opening = "west door"}}}},
-            WorldKit::Area{.layers = {Ground(maps.wideHall, art, art.hall)}, .actorSlots = kActorSlots,
+            WorldKit::Area{.name = "wide hall", .layers = {Ground(maps.wideHall, art, art.hall)}, .actorSlots = kActorSlots,
                            .collision = &maps.wideHall,
                            .openings = {{.name = "west door", .side = Side::West, .span = {7, 10},
                                          .transition = Transition::Scroll,
@@ -120,12 +127,14 @@ WorldKit::Layout CastleLayout(const Maps& maps, const Art& art) {
                                         {.name = "north edge", .side = Side::North, .span = {1, 28},
                                          .transition = Transition::Seamless,
                                          .leadsTo = {.area = Area::Garden, .opening = "south edge"}}}},
-            WorldKit::Area{.layers = {Ground(maps.cellar, art, art.cellar)}, .actorSlots = kActorSlots,
+            WorldKit::Area{.name = "cellar", .layers = {Ground(maps.cellar, art, art.cellar)}, .actorSlots = kActorSlots,
                            .collision = &maps.cellar,
                            .openings = {{.name = "stairs up", .at = {.x = 5, .y = 4, .width = 2, .height = 1},
                                          .transition = Transition::Fade,
                                          .leadsTo = {.area = Area::WideHall, .opening = "stairs down"}}}},
-            WorldKit::Area{.layers = {Ground(maps.garden, art, art.garden),
+            WorldKit::Area{.name = "garden",
+                           .layers = {Ground(maps.garden, art, art.garden),
+                                      WorldKit::ReservedLayer{.name = "leaves", .z = kLeavesZ},
                                       {.name = "canopy", .tiles = &maps.gardenCanopy, .art = OverheadArt(art),
                                        .z = kCanopyZ}},
                            .actorSlots = kActorSlots,
@@ -144,13 +153,16 @@ const WorldKit::World world{.layouts = {CastleLayout(maps, art)}};
 WorldKit::validate(world);
 ```
 
-An **area** is its map layers, its actor slots, its collision map and its openings. A **map layer** is a
+An **area** is its name, its map layers, its actor slots, its collision map and its openings. A **map layer** is a
 tile map, the art it is drawn through (a `retropp::TileCatalog`: which tile and palette each map value
 is) and the depth it is drawn at; every area here has a `"ground"` layer, and the garden a `"canopy"`
-over it. An **actor slot** is a named depth for the things that move in the area: `"actors"`, between
+over it. A **reserved layer** is a depth the area holds, under a name, for a layer the program builds
+itself: the garden's `"leaves"`, between the marker and the canopy. An **actor slot** is a named depth for the things that move in the area: `"actors"`, between
 the ground and the canopy. A **layout** is a list of areas with the settings they share; the program
 has one, and a game with an overworld and a dungeon has two. The **world** is the list of layouts.
-Layouts and areas are named by the program's enums, whose values are their indices in the lists.
+Every layout and area has a name, unique among its neighbors, which `WorldKit::placeOf` finds it by
+and every check's message names it by. In code the program names them by its enums, whose values are
+their indices in the lists.
 
 An **opening** is a way out. `"east door"` is an *edge* opening: a gap in the east wall, cells 7–10 of
 it (`.span`). `"stairs down"` is a *spot* opening: a rectangle of cells inside the area (`.at`). Each
@@ -228,6 +240,26 @@ view, so a part of the screen kept for something else is never drawn over. `Acto
 a sprite layer at the current area's `"actors"` slot, scrolled for things placed in the current area's
 pixels and confined the same way: over the garden's grass at depth 0, under its canopy at depth 10.
 `Fade` is the color fill over the whole screen while a fade runs, and nothing otherwise.
+
+The falling leaves are a layer the program builds itself, at the depth the garden reserves for them:
+
+```cpp
+for (const WorldKit::Shown& shown : camera.shown(world)) {
+    if (shown.layout == Layout::Castle && shown.area == Area::Garden) {
+        frame.layers.push_back(LayerKit::SpriteLayer("garden:leaves", WorldKit::LayerZ(world, shown, "leaves"),
+                                                     {Leaves(ticks, maps.garden, art)},
+                                                     {.scroll = shown.scroll, .regions = WorldKit::ViewStencil(kView)}));
+    }
+}
+```
+
+`camera.shown(world)` lists the garden whenever it is on screen: as the current area, or beside the wide
+hall across the seam. `WorldKit::LayerZ(world, shown, "leaves")` is the depth the reserved layer is
+drawn at for the garden on screen: 7, as declared, while the garden is alone, and spread among the
+areas on screen otherwise, so the leaves stay over every marker and under every canopy
+([drawing.md](drawing.md#how-the-layers-stack)). The layer takes the garden's scroll and the view's
+stencil, as `WorldLayers` gives the garden's own layers. `Leaves` is the program's component: eight
+leaf sprites, in the garden's pixels, placed by `ticks`, the count of ticks the simulation keeps.
 
 ## 7. Where to go next
 

@@ -152,7 +152,8 @@ struct Maps {
 `openings` opened in the fence and `kennel` built inside. The yard:
 
 ```cpp
-WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.yard, .art = Ground(art, art.grass), .z = kGroundZ}},
+WorldKit::Area{.name = "yard",
+               .layers = {{.name = "ground", .tiles = &maps.yard, .art = Ground(art, art.grass), .z = kGroundZ}},
                .actorSlots = {{.name = "underfoot", .z = kUnderfootZ}, {.name = "actors", .z = kActorsZ}},
                .collision = &maps.yard,
                .openings = {{.name = "gate", .side = Side::East, .span = {7, 8},
@@ -168,6 +169,9 @@ WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.yard, .art = Ground(
 | the yard | 20×16 cells of 8 pixels: one screen | a gate in the east fence to the field, a gap in the south fence to the pond |
 | the field | 40×24: larger than the screen | a gate in the west fence back to the yard |
 | the pond | 20×16: one screen | a gap in the north fence back to the yard |
+
+The layout is named `"farm"` and its areas `"yard"`, `"field"` and `"pond"`; every message WorldKit
+throws about the world names them.
 
 Every area has the actor slots `"underfoot"` at depth 5 and `"actors"` at depth 10, over the ground at
 depth 0. The slot names are what the actors put in `slot`, and the depths are where each slot's sprites
@@ -580,7 +584,7 @@ for (const WorldKit::Shown& shown : state.camera.shown(world)) {
     frame.layers.push_back(
         AreaSlot(world, shown, "actors", ActorKit::Sprites(state.actors, config, place, "actors", state)));
 }
-frame.layers.push_back(LayerKit::SpriteLayer("hud:eggs", kHudZ, {EggRow(state.eggs, art)}));
+frame.layers.push_back(LayerKit::SpriteLayer("hud:eggs", hudZ, {EggRow(state.eggs, art)}));
 frame.regions = WorldKit::Fade(state.camera, world);
 renderer.renderFrame(frame);
 ```
@@ -595,11 +599,10 @@ layer of their own:
 ```cpp
 retropp::DrawLayer AreaSlot(const WorldKit::World& world, const WorldKit::Shown& shown, std::string_view slot,
                             LayerKit::Sprites sprites) {
-    const WorldKit::Place place{.layout = shown.layout, .area = shown.area};
     const std::string key =
         "farm:" + std::to_string(shown.layout) + ":" + std::to_string(shown.area) + ":" + std::string(slot);
     const CameraKit::View& view = world.layouts[static_cast<std::size_t>(shown.layout)].view;
-    return LayerKit::SpriteLayer(key, WorldKit::ActorZ(world, place, slot), {std::move(sprites)},
+    return LayerKit::SpriteLayer(key, WorldKit::ActorZ(world, shown, slot), {std::move(sprites)},
                                  {.scroll = shown.scroll, .regions = WorldKit::ViewStencil(view)});
 }
 ```
@@ -607,7 +610,7 @@ retropp::DrawLayer AreaSlot(const WorldKit::World& world, const WorldKit::Shown&
 | Part | Why |
 |---|---|
 | a key naming the area and the slot | each area keeps its own layer, so a layer's scroll moves only with the camera |
-| `WorldKit::ActorZ(world, place, slot)` | the slot's depth in that area, among its map layers |
+| `WorldKit::ActorZ(world, shown, slot)` | the depth the slot is drawn at for that area: its declared depth while the area is alone on screen, spread among the areas on screen otherwise |
 | `.scroll = shown.scroll` | the area's own scroll, so an area scrolling in brings its actors with it |
 | `WorldKit::ViewStencil(view)` | keeps the layer inside the part of the screen the world is drawn in |
 
@@ -618,6 +621,9 @@ sprite ([13. The pond's ripples](#13-the-ponds-ripples)).
 
 Each sprite's `z` is the bottom of its actor's box, so the hero is drawn in front of the bell when it
 stands below it and behind the bell when it stands above.
+
+`hudZ` is `WorldKit::TopZ(world) + 1`, read once after the world is built: a depth above every layer
+of the world, whatever is on screen.
 
 `EggRow` is the program's own component: one sprite along the top of the screen for each egg in
 `state.eggs`.

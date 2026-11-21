@@ -73,8 +73,12 @@ The template's verbs and systems:
   and under the layers above. Every depth is the game's, from one depth table, and the world is handed
   them; the player and everything else that walks the world are drawn at the `"actors"` slot, and an
   area may have more slots (things that fly over a canopy, things that swim under a surface). A layer
-  that covers part of an area draws nothing elsewhere, through its sheet's transparent index; whatever
-  is drawn over the whole world — effects, the HUD — takes a depth above the world's highest.
+  that covers part of an area draws nothing elsewhere, through its sheet's transparent index. An area
+  can also reserve a depth, under a name, for a layer the game builds itself. An area alone on screen is
+  drawn at the depths the game gives; with more areas on screen, across a seam or during a scroll, the
+  depths are spread so every lower one stays under every higher one and each layer has a depth of its
+  own. Whatever is drawn over the whole world — effects, the HUD — takes a depth above the highest any
+  layer of the world is drawn at.
 - **The camera moves only with the player.** Within an area it centers on the player and stops at the
   area's edges, reaching across a seam into the area beyond. It moves only when the player moves,
   toward where it should be and never past it, never against the player, never on its own. A scroll
@@ -148,7 +152,8 @@ Terms used consistently: **area** (one map with its own art and openings; a room
 **layout** (a set of areas sharing a cell size, a view and transition settings; the overworld, a
 dungeon), **opening** (a way out of an area, in a wall or at a spot, leading to an opening in another),
 **seam** (a seamless join: two openings whose areas meet as one map), **seam depth** (how many seams
-away an area in view is drawn), **layer** (of an area: one of its tile maps, drawn at its own depth),
+away an area in view is drawn), **layer** (of an area: one of its tile maps, drawn at its own depth), **reserved layer** (a depth an area holds, under a name,
+for a layer the game builds itself),
 **actor slot** (a named depth in an area where the things moving in it are drawn), **play area** (the
 screen below the HUD strip), **camera** (the position in the current area shown at the play area's top-left),
 **actor** (anything spawned in an area), **cell** (one 8×8 tile position), **font** (a glyph sheet and

@@ -4,8 +4,8 @@ What a world is made of, and the check that it holds together. The types are in
 `include/WorldKit/area.h`.
 
 ```cpp
-#include "WorldKit/area.h"   // Side, Transition, Span, Destination, Opening, CellValue, MapLayer, ActorSlot, Area,
-                             // CameraLaw, Layout, World, Place, validate, ActorZ
+#include "WorldKit/area.h"   // Side, Transition, Span, Destination, Opening, CellValue, MapLayer, ReservedLayer,
+                             // ActorSlot, Area, CameraLaw, Layout, World, Place, validate, ActorZ, LayerZ, placeOf
 ```
 
 ## Contents
@@ -14,6 +14,7 @@ What a world is made of, and the check that it holds together. The types are in
 - [`Destination`](#destination)
 - [`Opening`](#opening)
 - [`MapLayer`](#maplayer)
+- [`ReservedLayer`](#reservedlayer)
 - [`ActorSlot`](#actorslot)
 - [`Area`](#area)
 - [`CameraLaw`](#cameralaw)
@@ -21,6 +22,8 @@ What a world is made of, and the check that it holds together. The types are in
 - [`World`, `Place`](#world-place)
 - [`validate`](#validate)
 - [`ActorZ`](#actorz)
+- [`LayerZ`](#layerz)
+- [`placeOf`](#placeof)
 
 ## `Side`, `Transition`, `Span`
 
@@ -97,10 +100,11 @@ struct MapLayer {
 };
 ```
 
-One tile map of an area, drawn on a layer of its own at its own depth. The ground is a layer like any
-other; a path under the player's feet, a canopy over the player's head and the inside of a cave mouth
-are more of them. `art` is an engine `TileCatalog`, so two areas drawn from the same map values can
-look different, and one layer can draw from several sheets.
+One tile map of an area, drawn on a layer of its own at the depth the game declares. The ground is a
+layer like any other; a path under the player's feet, a canopy over the player's head and the inside of
+a cave mouth are more of them. `art` is an engine `TileCatalog`, so two areas drawn from the same map
+values can look different, and one layer can draw from several sheets. A layer whose `tiles` is null is
+a [reserved layer](#reservedlayer): a depth for a layer the game builds itself.
 
 Every layer's map is the size of the area. A layer that covers only part of the area draws nothing in
 its other cells: their catalog entries name a slot whose every pixel is in the sheet's
@@ -113,6 +117,46 @@ leaves.
 {.name = "canopy", .tiles = &maps.gladeCanopy, .art = OverlayArt(assets), .z = depths.overhead},
 ```
 
+## `ReservedLayer`
+
+```cpp
+struct ReservedLayer {
+    std::string name;
+    std::int32_t z = 0;
+
+    operator MapLayer() const;   // this name and depth, `tiles` null
+};
+```
+
+A depth an area holds, under a name, for a layer your game builds itself: rain over the actors, a
+shadow under them, an effect between two map layers. Write it among the area's `layers`; it becomes a
+`MapLayer` whose `tiles` is null, and `WorldLayers` skips it. Each frame, your game builds a layer of any kind
+LayerKit builds, for each area on screen that has it, at the depth
+[`LayerZ`](camera.md#actorz-layerz-by-shown) gives for that area.
+
+```cpp
+.layers = {{.name = "ground", .tiles = &maps.yard, .art = groundArt, .z = kGroundZ},
+           WorldKit::ReservedLayer{.name = "rain", .z = kRainZ},              // over the actors, under the canopy
+           {.name = "canopy", .tiles = &maps.yardCanopy, .art = canopyArt, .z = kCanopyZ}},
+.actorSlots = {{.name = "actors", .z = kActorsZ}},                           // kActorsZ < kRainZ < kCanopyZ
+```
+
+[how-to.md](how-to.md#draw-a-layer-of-your-own-among-the-worlds) has the frame side whole.
+
+| A reserved layer | What it does |
+|---|---|
+| its `name` | is a layer name of its area: unique among the area's layers and slots, and what `LayerZ` finds it by |
+| its `z` | orders it among the area's layers and slots, and is checked by `validate` as theirs are |
+| in `WorldLayers` | is skipped: your game builds the layer |
+| in `TopZ` | counts like any layer |
+| its `art` | stays empty: `validate` rejects a layer with art and a null `tiles` as a map layer missing its map |
+
+Watch for:
+
+- **Build the layer for every area on screen that reserves it,** with that area's `Shown`, as you build
+  an actor layer. A layer built only for the current area is missing from a neighbor across a seam.
+- **Give each area's layer a key of its own,** such as the area's numbers in it, so each keeps its scroll.
+
 ## `ActorSlot`
 
 ```cpp
@@ -124,7 +168,8 @@ struct ActorSlot {
 
 A named depth in an area for the things that move in it: the player, the people and creatures in it.
 A slot holds nothing and WorldKit draws nothing at it; a game draws its sprites there through
-[`Actors`](drawing.md#actors), or reads the depth through [`ActorZ`](#actorz), and they land among the
+[`Actors`](drawing.md#actors), or on a layer of its own at the depth
+[`ActorZ`](camera.md#actorz-layerz-by-shown) gives for an area on screen, and they land among the
 area's map layers — over every map layer below the slot's depth and under every one above it. An area
 has as many slots as it needs, or none: an `"actors"` slot over the ground and under a canopy, a
 `"flyers"` slot above the canopy, a `"swimmers"` slot under a water surface.
@@ -133,18 +178,21 @@ has as many slots as it needs, or none: an `"actors"` slot over the ground and u
 
 ```cpp
 struct Area {
-    std::vector<MapLayer> layers;                    // at least one
+    std::string name;                                // unique within its layout
+    std::vector<MapLayer> layers;                    // at least one, map layers and reserved layers
     std::vector<ActorSlot> actorSlots;               // any number
     const retropp::IndexGrid* collision = nullptr;   // the area's size; one value is open
     std::vector<Opening> openings;
 };
 ```
 
-The layers and slots are in no required order; each one's `z` places it. The maps are the game's and
-must outlive the world. Every depth is the game's: it hands them in when it builds the world, from the
-one table it keeps its depths in, so that the sprite layers it draws and the layers above the world
-(see [`TopZ`](drawing.md#topz)) are placed against the same numbers. Collision, the openings and the
-camera read the collision map alone; the layers are only drawn.
+The name is how [`placeOf`](#placeof) finds the area and how every message names it. The layers and
+slots are in any order; each one's `z` places it. The maps are the game's and must outlive the
+world. Every depth is the game's: it hands them in when it builds the world, from the one table it
+keeps its depths in. An area alone on screen is drawn at exactly those depths; with more areas on
+screen, WorldKit spreads them so every lower depth stays under every higher one
+([drawing.md](drawing.md#how-the-layers-stack)). Collision, the openings and the camera read the
+collision map alone; the layers are only drawn.
 
 ## `CameraLaw`
 
@@ -162,6 +210,7 @@ the game's own state. How the camera gets to the law's place is the module's: se
 
 ```cpp
 struct Layout {
+    std::string name;                        // unique within the world
     std::vector<Area> areas;                 // indices are area ids
     int cellSize = 8;                        // the side of one map cell, in pixels
     CellValue open{};                        // the one collision-map value that is not solid
@@ -201,7 +250,8 @@ struct Place {
 ```
 
 The world is its layouts; every camera call takes it. A place is a layout and an area in it, the pair
-the module hands back when a game needs both (the place entered, the areas shown).
+the module hands back when a game needs both (the place entered, the areas shown). A game names a
+place by its enums, or by the names of its layout and area through [`placeOf`](#placeof).
 
 ## `validate`
 
@@ -211,19 +261,25 @@ void validate(const World& world);
 
 Checks the world and throws `std::invalid_argument` for the first problem it finds. A game calls it
 once after building the world, so a wrong link is found at startup and not when a player reaches it.
-Each message names the layout and area by index and, where there is one, the opening by name:
+Each message names the layout and the area by index and by name, and the layer, slot or opening by
+name: `WorldKit: layout 0 'overworld' area 1 'lake' opening 'east door' …`.
 
 | Rejected | Message ends |
 |---|---|
+| a layout whose name is empty | `layout N has no name` |
+| two layouts with one name | `is named twice` |
+| an area whose name is empty | `area N has no name` |
+| two areas of one layout with one name | `is named twice` |
 | a cell size of zero or less | `'s cell size must be positive` |
 | an area with no collision map | `has no collision map` |
-| an area with no map layers | `has no layers` |
-| a map layer with no name | `has a layer with no name` |
+| an area with no layers | `has no layers` |
+| a layer whose name is empty | `has a layer with no name` |
 | an actor slot with no name | `has an actor slot with no name` |
-| two map layers or slots in one area with one name | `layer '…' is named twice` |
-| a map layer with no map | `layer '…' has no map` |
-| a map layer whose map is not the collision map's size | `layer '…''s map differs in size from the collision map` |
-| two map layers or slots in one area at one depth | `layer '…' is at the same depth as layer '…'` |
+| two layers or slots in one area with one name | `layer '…' is named twice` |
+| a layer that sets `art` and leaves `tiles` null: a map layer missing its map | `layer '…' has art but no map` |
+| a layer whose map is not the collision map's size | `layer '…''s map differs in size from the collision map` |
+| two layers or slots in one area at one depth | `layer '…' is at the same depth as layer '…'` |
+| a layer or slot at a depth `z` for which `z × N` or `z × N + N − 1` leaves `std::int32_t`, N the number of areas in the world | `layer '…' is at a depth out of range for a world of N areas` |
 | an opening with no name | `has an opening with no name` |
 | two openings in one area with one name | `is named twice` |
 | an opening neither in a wall nor at a spot, or both | `must be in one wall or at one spot` |
@@ -242,9 +298,10 @@ Each message names the layout and area by index and, where there is one, the ope
 | a seam whose far end does not lead back to it | `joins seamlessly into '…', which does not lead back to it` |
 | a seam whose far end's offset is not the opposite of its own | `joins seamlessly into '…', whose offset is not the negation of its own` |
 
-Not checked: that the map's cells agree with the openings (a doorway cell at each span, open in the
-collision map), that a scroll or a fade leads back, or that two areas joined by a seam give a slot the
-same depth. A game that wants any of these tests its own data for it.
+The depth rule keeps every depth in the engine's range whatever is on screen: with N areas in the
+world, a layer declared at `z` is drawn between `z × N` and `z × N + N − 1`. Left to your game's own
+tests: that the map's cells agree with the openings (a doorway cell at each span, open in the collision
+map), and that a scroll or a fade leads back.
 
 ## `ActorZ`
 
@@ -252,7 +309,58 @@ same depth. A game that wants any of these tests its own data for it.
 std::int32_t ActorZ(const World& world, Place place, std::string_view slot);
 ```
 
-The depth of the actor slot named `slot` in the area at `place`. Throws `std::out_of_range`, naming the
-layout, the area and the slot, when the area has no slot by that name. [`Actors`](drawing.md#actors)
-reads it for the current area; a game reads it for anything else it places at a slot, such as a
-neighbor's inhabitants across a seam ([how-to.md](how-to.md#put-things-in-an-area)).
+The depth the area at `place` declares for its actor slot named `slot`: the depth the slot is drawn at
+while that area is alone on screen.
+
+```cpp
+const std::int32_t declared = WorldKit::ActorZ(world, {.layout = Layout::Overworld, .area = Area::Lake}, "actors");
+```
+
+Call it to read back what the world declares. For the depth to build a layer at, call the form that
+takes the area's `Shown` ([camera.md](camera.md#actorz-layerz-by-shown)): it equals this one while the
+area is alone on screen and is spread among the areas on screen otherwise.
+
+Throws `std::out_of_range`, naming the layout, the area and the slot, when `slot` is missing from the
+area's slots.
+
+## `LayerZ`
+
+```cpp
+std::int32_t LayerZ(const World& world, Place place, std::string_view name);
+```
+
+The depth the area at `place` declares for its layer named `name`, a [reserved layer](#reservedlayer)
+or a map layer: the depth the layer is drawn at while that area is alone on screen.
+
+```cpp
+const std::int32_t rain = WorldKit::LayerZ(world, {.layout = Layout::Overworld, .area = Area::Meadow}, "rain");
+```
+
+As with `ActorZ`, the form that takes the area's `Shown` ([camera.md](camera.md#actorz-layerz-by-shown))
+is the depth to build a layer at.
+
+Throws `std::out_of_range`, naming the layout, the area and the layer, when `name` is missing from the
+area's layers.
+
+## `placeOf`
+
+```cpp
+Place placeOf(const World& world, std::string_view layout, std::string_view area);
+```
+
+The place of the area named `area` in the layout named `layout`. Call it where a game names its places
+in text: a table of warps, a save file, a debug console.
+
+```cpp
+const WorldKit::Place treasury = WorldKit::placeOf(world, "dungeon-one", "treasury");
+WorldKit::Camera camera{treasury.layout, treasury.area};
+```
+
+| Called with | Returns or throws |
+|---|---|
+| a layout and an area of it, by name | their place |
+| a layout the world has, and an area it lacks | `std::out_of_range`: `WorldKit: layout N '…' has no area '…'` |
+| a layout the world lacks | `std::out_of_range`: `WorldKit: the world has no layout '…'` |
+
+It walks the world's layouts and areas in order. A game that looks the same place up every tick looks
+it up once and keeps the `Place`.

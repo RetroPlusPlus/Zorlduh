@@ -56,7 +56,9 @@ retropp::IndexGrid room(int width, int height) {
 ```cpp
 const retropp::IndexGrid map = room(20, 16);   // 160 by 128 pixels, with cells of 8
 const WorldKit::World world{.layouts = {WorldKit::Layout{
-    .areas = {WorldKit::Area{.layers = {{.name = "ground", .tiles = &map}},
+    .name = "test",
+    .areas = {WorldKit::Area{.name = "room",
+                             .layers = {{.name = "ground", .tiles = &map}},
                              .actorSlots = {{.name = "actors", .z = 5}},
                              .collision = &map}},
     .cellSize = 8,

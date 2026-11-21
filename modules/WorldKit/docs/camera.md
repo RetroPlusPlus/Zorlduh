@@ -4,7 +4,7 @@ The camera, what it hands back each tick, and the solid query. The types are in
 `include/WorldKit/camera.h` and `include/WorldKit/solids.h`.
 
 ```cpp
-#include "WorldKit/camera.h"   // Step, Shown, Camera
+#include "WorldKit/camera.h"   // Step, Shown, ActorZ and LayerZ by Shown, Camera
 #include "WorldKit/solids.h"   // AreaSolids
 ```
 
@@ -13,6 +13,7 @@ The camera, what it hands back each tick, and the solid query. The types are in
 - [`Camera`](#camera)
 - [`Step`](#step)
 - [`Shown`](#shown)
+- [`ActorZ`, `LayerZ` by `Shown`](#actorz-layerz-by-shown)
 - [`AreaSolids`](#areasolids)
 
 ## `Camera`
@@ -98,13 +99,54 @@ struct Shown {
     int layout = 0;
     int area = 0;
     retropp::LayerScroll scroll{};   // what a layer of this area's pixels takes
+    int position = 0;                // its place in the list `shown` returns; the current area's is 0
+    int count = 1;                   // how many areas that list holds
 };
 ```
 
 The current area's scroll is `camera.scroll(world)`; another area's is that less the offset the area
 sits at, through the chain of seams that reaches it. `WorldLayers` builds that area's layers with it,
 and a game draws the things of each area on a layer that takes the same scroll
-([how-to.md](how-to.md#put-things-in-an-area)).
+([how-to.md](how-to.md#put-things-in-an-area)). `position` and `count` set the depths the area's layers
+are drawn at ([drawing.md](drawing.md#how-the-layers-stack)); `Camera::shown` fills them in, and a
+`Shown` written by hand with both left at their defaults is an area alone on screen.
+
+## `ActorZ`, `LayerZ` by `Shown`
+
+```cpp
+template <std::same_as<Shown> AreaOnScreen>
+std::int32_t ActorZ(const World& world, const AreaOnScreen& shown, std::string_view slot);
+
+template <std::same_as<Shown> AreaOnScreen>
+std::int32_t LayerZ(const World& world, const AreaOnScreen& shown, std::string_view name);
+```
+
+The depth an actor slot, or a layer of the area such as a [reserved layer](areas.md#reservedlayer), is
+drawn at in the area `shown`, one entry of `camera.shown(world)`. Call them when you build a layer of
+your own for an area on screen, with the `Shown` you are building it for.
+
+```cpp
+for (const WorldKit::Shown& shown : camera.shown(world)) {
+    frame.layers.push_back(LayerKit::SpriteLayer("rain:" + std::to_string(shown.layout) + ":" + std::to_string(shown.area),
+                                                 WorldKit::LayerZ(world, shown, "rain"), {Rain(state)},
+                                                 {.scroll = shown.scroll, .regions = WorldKit::ViewStencil(view)}));
+}
+```
+
+| On screen | A layer declared at depth `d` is drawn at |
+|---|---|
+| its area alone | `d` |
+| its area at `position` k of `count` S areas | `d × S + k` |
+
+Watch for:
+
+- **The template parameter is exactly `Shown`.** A braced place, `{.layout = 0, .area = 1}`, picks the
+  forms in [areas.md](areas.md#actorz), which return the declared depth.
+- **The depth changes as neighbors come into and leave view.** Build the layer each frame from the
+  `Shown` of that frame.
+
+Throw `std::out_of_range`, naming the layout, the area and the slot or layer, when the name is missing
+from the area's slots or layers.
 
 ## `AreaSolids`
 

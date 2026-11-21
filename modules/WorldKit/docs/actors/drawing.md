@@ -125,23 +125,24 @@ Draw each area's actors on a layer of their own: one layer for each area on scre
 by the area, at that slot's depth, with that area's scroll. `AreaSlot` is that layer:
 
 ```cpp
-// The layer of `sprites`, the actors of the area `shown` at its slot `slot`: at that slot's depth, with that
-// area's scroll, kept inside the view. Each area has a layer of its own, keyed by the area, so a layer's
-// scroll moves only with the camera, and an area scrolling in brings its actors with it.
+// The layer of `sprites`, the actors of the area `shown` at its slot `slot`: at the depth that slot is drawn
+// at for that area, with that area's scroll, kept inside the view. Each area has a layer of its own, keyed by
+// the area, so a layer's scroll moves only with the camera, and an area scrolling in brings its actors with it.
 retropp::DrawLayer AreaSlot(const WorldKit::World& world, const WorldKit::Shown& shown, std::string_view slot,
                             LayerKit::Sprites sprites) {
-    const WorldKit::Place place{.layout = shown.layout, .area = shown.area};
     const std::string key =
         "farm:" + std::to_string(shown.layout) + ":" + std::to_string(shown.area) + ":" + std::string(slot);
     const CameraKit::View& view = world.layouts[static_cast<std::size_t>(shown.layout)].view;
-    return LayerKit::SpriteLayer(key, WorldKit::ActorZ(world, place, slot), {std::move(sprites)},
+    return LayerKit::SpriteLayer(key, WorldKit::ActorZ(world, shown, slot), {std::move(sprites)},
                                  {.scroll = shown.scroll, .regions = WorldKit::ViewStencil(view)});
 }
 ```
 
 The frame calls it for every area `state.camera.shown(world)` lists, as the overview does.
 `WorldKit::Camera::shown`, `WorldKit::ActorZ` and `WorldKit::ViewStencil` are WorldKit's (its
-`docs/how-to.md`, "Put things in an area"), and `LayerKit::SpriteLayer` is LayerKit's. The `"farm:"`
+`docs/how-to.md`, "Put things in an area"), and `LayerKit::SpriteLayer` is LayerKit's.
+`WorldKit::ActorZ(world, shown, slot)` is the depth the slot is drawn at for the area `shown`: with two
+areas on screen, every area's `"underfoot"` stays under every area's `"actors"`. The `"farm:"`
 prefix is the example's: use one of your own.
 
 `shown` lists the camera's area, every area joined to it by a seam that is in view, and during a scroll

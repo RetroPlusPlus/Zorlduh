@@ -10,6 +10,7 @@ Recipes for the questions a game asks once it has more than one area.
 - [Draw areas with different art](#draw-areas-with-different-art)
 - [Draw a layer over the player](#draw-a-layer-over-the-player)
 - [Draw things at more than one depth](#draw-things-at-more-than-one-depth)
+- [Draw a layer of your own among the world's](#draw-a-layer-of-your-own-among-the-worlds)
 - [Use a camera law of your own](#use-a-camera-law-of-your-own)
 - [Plug in a movement module](#plug-in-a-movement-module)
 - [Change the fade's look and the scroll's pace](#change-the-fades-look-and-the-scrolls-pace)
@@ -125,6 +126,41 @@ Each slot is its own sprite layer with its own key. An area without a slot by th
 throw, so either give every area the slots the game draws at or draw a slot only where the current area
 has it. A thing that moves between the two — a bird landing — is drawn by one component one frame and
 the other the next.
+
+## Draw a layer of your own among the world's
+
+Rain that falls over the actors and under a canopy, a shadow between the ground and a path, an effect
+of any kind LayerKit builds: reserve its depth in the world once, under a name, and build the layer at
+that name each frame.
+
+```cpp
+// In the world, once: rain over the actors and under the canopy.
+.layers = {{.name = "ground", .tiles = &maps.yard, .art = groundArt, .z = kGroundZ},
+           WorldKit::ReservedLayer{.name = "rain", .z = kRainZ},
+           {.name = "canopy", .tiles = &maps.yardCanopy, .art = canopyArt, .z = kCanopyZ}},
+.actorSlots = {{.name = "actors", .z = kActorsZ}},   // kActorsZ < kRainZ < kCanopyZ
+
+// Each frame, after the world's layers: the rain of every area on screen.
+const CameraKit::View& view = world.layouts[static_cast<std::size_t>(camera.layout())].view;
+for (const WorldKit::Shown& shown : camera.shown(world)) {
+    const std::string key = "rain:" + std::to_string(shown.layout) + ":" + std::to_string(shown.area);
+    frame.layers.push_back(LayerKit::SpriteLayer(key, WorldKit::LayerZ(world, shown, "rain"), {Rain(state)},
+                                                 {.scroll = shown.scroll, .regions = WorldKit::ViewStencil(view)}));
+}
+```
+
+`Rain` is your component for the drops, placed in the area's pixels. `LayerZ(world, shown, "rain")` is
+the depth the reserved layer is drawn at for that area: the declared `kRainZ` while the area is alone
+on screen, and spread among the areas on screen otherwise, so the rain stays over every area's actors
+and under every area's canopy ([drawing.md](drawing.md#how-the-layers-stack)).
+
+Watch for:
+
+- **Every area you draw it for reserves it.** `LayerZ` throws `std::out_of_range` for an area missing
+  that layer; reserve it in every area, or build the layer only for the areas that have it.
+- **The key names the area,** so each area's layer keeps its own scroll as the camera moves.
+- **Any layer kind fits.** A `TileLayer`, `RasterLayer` or `ImageLayer` takes the same depth, scroll and
+  regions.
 
 ## Use a camera law of your own
 
@@ -243,8 +279,8 @@ moment. What the things make solid or passable is the game's own solid query wra
 `camera.solids(world)` ([Shut a door](#shut-a-door)).
 
 Across a seam the next area is on screen before the thing followed crosses, so its things are too. Draw
-the things of every area `shown` lists, each area's on a layer at that area's slot depth that takes that
-area's scroll, not the current area's alone:
+the things of every area `shown` lists, each area's on a layer at the depth `ActorZ` gives for that
+area's slot, taking that area's scroll:
 
 ```cpp
 // The game's things, by area; each position is in that area's pixels.
@@ -258,7 +294,7 @@ for (const WorldKit::Shown& area : camera.shown(world)) {
         continue;
     }
     const std::string key = "things:" + std::to_string(area.layout) + ":" + std::to_string(area.area);
-    const std::int32_t z = WorldKit::ActorZ(world, {.layout = area.layout, .area = area.area}, "actors");
+    const std::int32_t z = WorldKit::ActorZ(world, area, "actors");   // the slot's depth for this area on screen
     frame.layers.push_back(LayerKit::SpriteLayer(key, z, {Things(found->second)},
                                                  {.scroll = area.scroll, .regions = WorldKit::ViewStencil(view)}));
 }
