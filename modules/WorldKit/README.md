@@ -71,7 +71,7 @@ example of the whole use and explains each line.
 | Type or function | Purpose | Reference |
 |---|---|---|
 | `Actor` | What an actor is: slot, box, solidity, own values, looks, scripts, mover, actions, the triggers it sets off. | [docs/actors/actors.md](docs/actors/actors.md#actor) |
-| `Actors`, `Id` | A set of live actors. Spawn and remove them, and ask one where it is. | [docs/actors/actors.md](docs/actors/actors.md#actors) |
+| `Actors`, `Id`, `Confinement` | A set of live actors. Spawn and remove them, ask one where it is, set what its walk is held inside, and freeze and wake it. | [docs/actors/actors.md](docs/actors/actors.md#actors) |
 | `Config` | The world, your Interact action, your triggers, your values and your commands. | [docs/actors/actors.md](docs/actors/actors.md#config) |
 | `tick` | One tick of every actor in a set. | [docs/actors/actors.md](docs/actors/actors.md#tick) |
 | `Interact`, `Touch`, `Near`, `Enter`, `Becomes` | ActorKit's own triggers, ready to use in a script's `on`. | [docs/actors/triggers.md](docs/actors/triggers.md#actorkits-own-triggers) |
@@ -135,7 +135,7 @@ modules/WorldKit/
     world_layers.h                  AreaLayerKey, ActorsKey, TopZ, ViewStencil, WorldLayers, Actors, Fade
   include/ActorKit/
     actor.h                         Actor, Id, Side, ScriptRef, Scripts, ActionRow, Actions
-    actors.h                        Actors
+    actors.h                        Confinement, Actors
     mover.h                         movedBy, Mover, Solids
     look.h                          Look, lookOf, LookRule, Looks
     values.h                        OwnValue, OwnValues, Touched, X, Y, PlayerHere, PlayerX, PlayerY

@@ -19,6 +19,7 @@ exceptions.
 - [An actor walks through things](#an-actor-walks-through-things)
 - [An actor is held in place](#an-actor-is-held-in-place)
 - [An actor stops at a doorway](#an-actor-stops-at-a-doorway)
+- [An actor stands beyond its area's edge](#an-actor-stands-beyond-its-areas-edge)
 - [The hero walks off the screen](#the-hero-walks-off-the-screen)
 - [Actors in two sets ignore each other](#actors-in-two-sets-ignore-each-other)
 - [Compile errors](#compile-errors)
@@ -35,6 +36,7 @@ exceptions.
 | Its `on` is `ActorKit::Enter` and the actor is in another area than the camera. | It starts when the camera comes into the actor's area. An actor your code moves into the camera's area with `moveTo` keeps its `Enter` scripts off. |
 | Its `on` is `ActorKit::Becomes(value)` and the value was already true on the actor's first tick. | The trigger happens when the value goes from false to true. Start it false. |
 | The script is still running from an earlier trigger. | See [A script answers its trigger once](#a-script-answers-its-trigger-once). |
+| The actor is frozen: `state.actors.frozen(id)` is true. | A frozen actor's triggers hold as they are. Wake it with `state.actors.wake(id)` ([actors.md](actors.md#freeze-wake-and-frozen)). |
 
 To see whether a script is running, ask the actor's processor:
 `state.actors.processor(id).running(script)`.
@@ -52,6 +54,8 @@ To see whether a script is running, ask the actor's processor:
 | The target's `box` is empty. | Give it a box. |
 | The script's `from` names another side. | `ActorKit::Below` means the acting actor stands below the target and faces up. |
 | The two actors are in different `Actors` values. | Put them in one set ([concepts.md](concepts.md#several-sets)). |
+| The target is frozen. | An action aimed at a frozen actor goes to the next awake actor whose box holds the point. Wake the target with `state.actors.wake(id)`. |
+| The acting actor is frozen. | Its actions wait for its first tick awake. Wake it with `state.actors.wake(id)`. |
 
 ## Touch goes unanswered
 
@@ -143,6 +147,7 @@ every layer of the frame.
 | Its drive function returns an empty heading. With the player in another area, `PlayerX` and `PlayerY` equal the actor's own position. | This is correct behavior for a heading toward the player. |
 | The camera is in a scroll or a fade. Walking waits until it ends. | Keep calling `camera.follow` every tick so the transition finishes. |
 | `tick` is skipped for the actor's set. | Call `tick` once per tick for each `Actors` value. |
+| It is frozen: `state.actors.frozen(id)` is true. | A frozen actor stands. Wake it with `state.actors.wake(id)` ([actors.md](actors.md#freeze-wake-and-frozen)). |
 | It is held by something solid. | See [An actor is held in place](#an-actor-is-held-in-place). |
 | The mover itself stands. | For a `TopDownMovement` walker see that module's `docs/troubleshooting.md`, "The walker stands still". |
 
@@ -168,12 +173,28 @@ A walker whose box overlaps something solid stays where it is.
 
 ## An actor stops at a doorway
 
-Every actor but the player stays inside its area, at an open doorway included.
+Every actor but the player has its walk held inside its [confinement](actors.md#confinement), and the
+default, `Area`, holds it inside its area, at an open doorway included.
 
-| To | Do |
+| Cause | Fix |
 |---|---|
-| let the player's actor through | Call `state.actors.player(id)` for it ([how-to.md](how-to.md#follow-the-player-with-the-camera)). |
-| take another actor through | Move it from your code when it reaches the edge ([how-to.md](how-to.md#send-an-actor-to-another-area)). |
+| Its confinement is `Area`, the default. | Set `state.actors.confinement(id, ActorKit::Confinement::Layout)`, or `None` for a doorway into another layout. |
+| Its confinement is `Layout`, and the doorway leads to another layout. | Set `ActorKit::Confinement::None`. |
+| The doorway's opening leads nowhere: its `leadsTo.area` is `WorldKit::kNoArea`. | Every actor stops there. Give the opening a `leadsTo` in your world. |
+| It is the player's actor and stops anyway. | Call `state.actors.player(id)` for it ([how-to.md](how-to.md#follow-the-player-with-the-camera)). |
+
+To take an actor through while its walk stays in its area, move it from your code when it reaches the edge
+([how-to.md](how-to.md#send-an-actor-to-another-area)).
+
+## An actor stands beyond its area's edge
+
+Its confinement let it walk out through an opening. ActorKit keeps it in its area, in that area's
+pixels, beyond the edge.
+
+| Cause | Fix |
+|---|---|
+| Your code leaves it in its area once it has walked out. | Move it into the next area with `moveTo` when its box has passed the edge, and call `fresh` on that tick ([how-to.md](how-to.md#send-an-actor-to-another-area)). |
+| It was meant to stay in its area. | Set its confinement back to `ActorKit::Confinement::Area`. |
 
 ## The hero walks off the screen
 
@@ -214,12 +235,12 @@ Touch, near, Interact and solidity work within one `Actors` value.
 | `Actors::spawn` | `std::invalid_argument` | A value is listed twice in `ownValues`. |
 | `Actors::spawn` | `std::invalid_argument` | A script in `scripts` is a null pointer. |
 | `Actors::spawn` | `std::logic_error` | ScriptKit refuses the actor's scripts: two of one name, a script naming one outside the list, a script that calls itself, or an interrupt ring. |
-| `Actors::place`, `position`, `box`, `facing`, `touching`, `moveTo`, `key`, `fresh`, `get`, `set`, `act`, `processor`, and `player(id)` with an id other than `kNoId` | `std::out_of_range` | The id's actor was removed, or the set has yet to hand the id out. The message names the id. |
+| `Actors::place`, `position`, `box`, `facing`, `touching`, `moveTo`, `key`, `fresh`, `get`, `set`, `act`, `processor`, `confinement`, `freeze`, `wake`, `frozen`, and `player(id)` with an id other than `kNoId` | `std::out_of_range` | The id's actor was removed, or the set has yet to hand the id out. The message names the id. |
 | `Actors::get`, `Actors::set` | `std::out_of_range` | The value is outside the actor's `ownValues`. |
 | `TriggerMap` constructor | `std::invalid_argument` | A trigger is bound twice. |
 | `lookOf` | `std::out_of_range` | The slot is past the sheet's last. |
 | `tick` | `std::invalid_argument` | `config.world` is null. |
-| `tick` | `std::out_of_range` | An actor is in a layout or area outside the world. |
+| `tick` | `std::out_of_range` | An awake actor is in a layout or area outside the world. A frozen actor's place goes unchecked until it wakes. |
 | `tick`, `Sprites` | `std::out_of_range` | An actor reads a value outside its own, ActorKit's six and your bindings. It is thrown on the first tick or frame that reads it. The message names the actor and the value's id. |
 | `tick` | `std::out_of_range` | A script sets a value of your game's and the config's bindings are empty or lack it. |
 | `tick` | `std::out_of_range` | A script asks for a command and the config's handlers are empty or lack it. The message names the command. |

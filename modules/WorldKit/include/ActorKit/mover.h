@@ -34,9 +34,13 @@
 namespace ActorKit {
 
 // What is solid to a walking actor, as ActorKit hands it to the mover's walk: the cells of its area's
-// collision map that WorldKit reports solid, the box of every other solid actor in that area, and — for
-// any actor but the player (Actors::player) — everything outside the area's own rectangle, so such an
-// actor stays inside its area. Valid during the walk it is handed to.
+// collision map that WorldKit reports solid; every rectangle in `others`; and, while `confined` is true,
+// everything outside `bounds`, the area's own rectangle. Valid during the walk it is handed to.
+//
+// tick fills `others` with the box of every other solid actor in the area, and for an actor whose
+// confinement is Confinement::Layout, the strip beyond each edge opening that leads to another layout,
+// as wide as the opening's span. It sets `confined` for an actor whose confinement is
+// Confinement::Area, the player (Actors::player) excepted.
 class Solids {
 public:
     Solids(WorldKit::AreaSolids area, retropp::IntRect bounds, bool confined,

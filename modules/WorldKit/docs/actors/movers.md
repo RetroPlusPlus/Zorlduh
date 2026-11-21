@@ -141,13 +141,25 @@ Each tick, the mover's `walk` is handed a [`Solids`](#solids) to test its steps 
 | What is solid | For which actors |
 |---|---|
 | The solid cells of the area's collision map: every cell but the layout's `open` value. | every actor |
-| The box of every other actor that is solid this tick, in the same area and the same set. | every actor |
-| Everything outside the area's own rectangle. | every actor but the player |
+| Beyond the area's edge, everything but the way out through an edge opening that leads somewhere, as WorldKit's `AreaSolids` has it. | every actor |
+| The box of every other actor that is solid this tick, in the same area and the same set, frozen ones included. | every actor |
+| Everything outside the area's own rectangle. | every actor but the player whose [confinement](actors.md#confinement) is `Area`, the default |
+| Beyond each edge opening that leads to another layout, as wide as the opening. | every actor but the player whose confinement is `Layout` |
 
-The player walks out through its area's openings, as WorldKit's `AreaSolids` lets it, and your
-camera code carries it into the next area
-([how-to.md](how-to.md#follow-the-player-with-the-camera)). Every other actor stays inside its area, at
-an open doorway included.
+The player walks out through its area's openings, whatever its confinement, and your camera code
+carries it into the next area ([how-to.md](how-to.md#follow-the-player-with-the-camera)). Every other
+actor's walk is held inside what its confinement names:
+
+| A walker other than the player reaches | `Area` (the default) | `Layout` | `None` |
+|---|---|---|---|
+| A doorway in the area's edge, into an area of its own layout | It stops at the edge. | It walks out. | It walks out. |
+| A doorway in the area's edge, into another layout | It stops at the edge. | It stops at the edge. | It walks out. |
+| A seam into an area of its own layout | It stops at the edge. | It walks on over the next area's cells. | It walks on over the next area's cells. |
+| An edge opening that leads nowhere | It stops at the edge. | It stops at the edge. | It stops at the edge. |
+| Stairs, or any spot opening | It walks over them. | It walks over them. | It walks over them. |
+
+An actor that walks out stays in its area, in that area's pixels, until your game moves it with
+`moveTo` ([how-to.md](how-to.md#send-an-actor-to-another-area)).
 
 | Situation | Result |
 |---|---|
@@ -156,8 +168,10 @@ an open doorway included.
 | A walker heads into an actor whose `solid` is false. | It walks through. |
 | A walker whose own `solid` is false heads into a solid actor. | It stops. `solid` says whether others stop at this actor. |
 | The gate's `solid` turns false. | Walkers pass from that tick on. |
-| A walker other than the player reaches a doorway in the area's edge. | It stops at the edge. |
+| A walker heads into a frozen actor that was solid when it was frozen. | It stops with the two boxes meeting. |
+| A walker other than the player reaches a doorway in the area's edge. | It stops at the edge, or walks out, by its confinement (the table above). |
 | The camera runs a scroll or a fade. | Every walker stands until it ends. |
+| A walker is frozen. | It stands until it is woken ([actors.md](actors.md#freeze-wake-and-frozen)). |
 
 - **Actors walk in spawn order.** An actor that walks later in the tick meets the earlier ones where
   they now stand. Take two walkers heading the same way in single file. When the front one was spawned
@@ -344,8 +358,8 @@ What is solid to one walking actor on one tick. `tick` builds it and hands it to
 | Part | Solid where |
 |---|---|
 | `area` | WorldKit reports the area's collision map solid (WorldKit's `docs/camera.md`, "AreaSolids"). |
-| `bounds`, when `confined` is true | Any part of `box` lies outside `bounds`. `tick` passes the area's rectangle, and `true` for every actor but the player. |
-| `others` | `box` overlaps one of the rectangles. `tick` passes the boxes of the other solid actors in the area. |
+| `bounds`, when `confined` is true | Any part of `box` lies outside `bounds`. `tick` passes the area's rectangle, and `confined` is true for every actor but the player whose [confinement](actors.md#confinement) is `Area`. |
+| `others` | `box` overlaps one of the rectangles. `tick` passes the boxes of the other solid actors in the area, frozen ones included. For an actor other than the player whose confinement is `Layout`, it adds the strip beyond each edge opening that leads to another layout, as wide as the opening's span. |
 
 - A box of zero width or height is open.
 - A `Solids` is valid during the `walk` call it is handed to. `others` is a span over a list `tick`

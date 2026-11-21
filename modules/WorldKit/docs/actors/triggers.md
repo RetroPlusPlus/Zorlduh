@@ -118,6 +118,16 @@ yours.
 Acted on, touched and near work within one `Actors` value and one area: an actor detects the actors of
 its own set that are in its own area ([concepts.md](concepts.md#several-sets)).
 
+A frozen actor ([actors.md](actors.md#freeze-wake-and-frozen)) is passed over as a target and still
+counts as a setter:
+
+| The frozen actor | Result |
+|---|---|
+| is faced by an actor that performs an action | The action goes to the next awake actor whose box holds the point. |
+| would be touched, neared, entered, or see a value become true | Its triggers hold as they are, and its scripts stay off. |
+| overlaps an awake actor, with a touch trigger in its `setsOff` | The awake actor is touched by it, as by any setter. |
+| comes within a distance of an awake actor, with a near trigger in its `setsOff` | The awake actor is neared by it, as by any setter. |
+
 ### Acted on
 
 An actor performs an action on a tick when one of its [action rows](actors.md#actionrow-and-actions)
@@ -143,7 +153,8 @@ A bell with its box at (64, 64), 16 wide and 8 tall, and a hero with an 8×8 box
 | (68, 72), under the bell | down | The point (72, 80) is in open ground. The action goes unanswered. |
 | (84, 72), under a second bell at (80, 64) | up | The point (88, 71) is in the second bell's box. The second bell is acted on. |
 
-- **One actor per action.** If two boxes hold the point, the actor spawned first is acted on.
+- **One actor per action.** If two boxes hold the point, the awake actor spawned first is acted on. A
+  frozen actor is passed over.
 - **The acting actor stands next to its target.** A walker that walks into a solid actor stops with
   the two boxes meeting, which puts the point inside the target.
 - **The target needs a box.**
@@ -218,6 +229,8 @@ The first tick of your game is the second case for every actor in the camera's s
 | The camera leaves the field and comes back later. | The trigger happens again. Scripts that are still running carry on. |
 | A script spawns an egg in the camera's area. | The trigger happens to the egg on its first tick. |
 | Your code moves an actor into the camera's area with `moveTo`. | The trigger stays quiet: it follows the camera. |
+| An actor frozen before its first tick wakes in the camera's area. | The trigger happens on its first tick awake. |
+| The camera comes into a frozen actor's area, and the actor wakes on a later tick. | The trigger stays quiet: the camera came in while the actor was frozen. |
 
 `tick` reads the camera's area from the `WorldKit::Camera` you hand it. During a scroll that is the
 area being left until the last tick, and during a fade it changes at the middle (WorldKit's

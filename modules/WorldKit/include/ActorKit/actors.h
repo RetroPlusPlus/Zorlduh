@@ -6,14 +6,17 @@
 //     const ActorKit::Id player = actors.spawn(hero, {Farm, Yard}, {72, 96});
 //     actors.player(player);                                         // the player among them
 //     const ActorKit::Id hen = actors.spawn(henOf(brown), {Farm, Field}, {40, 32});
+//     actors.confinement(hen, ActorKit::Confinement::Layout);       // the hen roams its layout
+//     actors.freeze(hen);                                            // and holds as it is until woken
 //     actors.remove(hen);
 //
 //     actors.box(player);        // asked, an actor reports where it is: its place, position, box, facing
 //
 // Spawn copies the value it is handed, so any number of actors come from one value, at any time. Each
-// live actor has its place and position, its own values, its mover and its scripts' running state; the
-// tick (tick.h) runs them all and Sprites (sprites.h) reports what they show. An Actors value is plain
-// data: a copy runs on by itself from where the original was.
+// live actor has its place and position, its own values, its mover, its scripts' running state, its
+// confinement and whether it is frozen; the tick (tick.h) runs the awake ones and Sprites (sprites.h)
+// reports what they all show. An Actors value is plain data: a copy runs on by itself from where the
+// original was.
 #pragma once
 
 #include <algorithm>
@@ -45,6 +48,21 @@
 
 namespace ActorKit {
 
+// What a walking actor's walk is held inside: its area, its layout, or the map's walls alone. Set for
+// each live actor with Actors::confinement; every actor starts at Area. The player walks out through its
+// area's openings whatever its confinement.
+//
+//     actors.confinement(gardener, ActorKit::Confinement::Layout);   // the gardener roams its layout
+//
+//   Area    Its box stays inside its area's rectangle, at an open doorway too.
+//   Layout  It walks out through an edge opening that leads to an area of its own layout. At one that
+//           leads to another layout, its box stays inside its area's rectangle.
+//   None    It walks out through every edge opening that leads somewhere.
+//
+// Walls, and edge openings that lead nowhere, hold every actor whatever its confinement. An actor that
+// walks out is still in its area, in that area's pixels, until the game moves it with Actors::moveTo.
+enum class Confinement : std::uint8_t { Area, Layout, None };
+
 namespace detail {
 
 // One live actor.
@@ -59,8 +77,9 @@ struct Live {
           mover(other.mover ? other.mover->copyFor(position) : nullptr), processor(other.processor), own(other.own),
           gameReads(other.gameReads), newlySpawned(other.newlySpawned), started(other.started),
           removing(other.removing), solid(other.solid), touched(other.touched), touching(other.touching),
-          within(other.within), wasTrue(other.wasTrue), queued(other.queued), shownIn(other.shownIn),
-          shownAt(other.shownAt), freshReported(other.freshReported), keyPhase(other.keyPhase) {}
+          within(other.within), wasTrue(other.wasTrue), queued(other.queued), confinement(other.confinement),
+          frozen(other.frozen), solidKnown(other.solidKnown), shownIn(other.shownIn), shownAt(other.shownAt),
+          freshReported(other.freshReported), keyPhase(other.keyPhase) {}
 
     Live& operator=(const Live&) = delete;
 
@@ -82,6 +101,10 @@ struct Live {
     std::vector<char> within;                             // per script: a near trigger's actor within reach
     std::vector<char> wasTrue;                            // per script: a becomes trigger's value
     std::vector<retropp::ActionId> queued;                // actions asked for with Actors::act
+
+    Confinement confinement = Confinement::Area;   // what its walk is held inside, unless it is the player
+    bool frozen = false;       // Actors::freeze: it holds as it is, and the tick passes over it
+    bool solidKnown = false;   // its `solid` has been worked out at least once
 
     WorldKit::Place shownIn{};     // where it was when the last tick began: what the last frame showed
     retropp::Vec2i shownAt{};
@@ -234,6 +257,31 @@ public:
 
     // The player, or kNoId.
     [[nodiscard]] Id player() const noexcept { return player_; }
+
+    // Sets what the actor's walk is held inside: its area, its layout, or the map's walls alone
+    // (Confinement). It holds on every walk from the next one until it is set again. Spawn starts it at
+    // Confinement::Area, moveTo keeps it, and a copy of the set carries it. The player walks out through
+    // its area's openings whatever its confinement.
+    void confinement(Id id, Confinement confinement) { require(id).confinement = confinement; }
+
+    // What the actor's walk is held inside.
+    [[nodiscard]] Confinement confinement(Id id) const { return require(id).confinement; }
+
+    // Freezes the actor: from the next tick it stays exactly as it is until wake. Its position, its values,
+    // where its scripts are, what they asked for and the ticks left in their waits all hold, and so does
+    // its solidity. It is still there: Sprites reports it, its box stops walkers while it is solid, and it
+    // touches and nears the awake actors it meets. Each tick passes over it: it stands, its actions wait
+    // for it to wake, an action aimed at it goes to the next actor whose box holds the point, and its
+    // triggers hold as they are. Its place goes unchecked. Called from a handler, it holds from that
+    // tick's solidity on. Freezing a frozen actor leaves it as it is.
+    void freeze(Id id) { require(id).frozen = true; }
+
+    // Wakes the actor: from the next tick it takes part again, carrying on from what it held. Called from
+    // a handler, it takes part from that tick's solidity on. Waking an awake actor leaves it as it is.
+    void wake(Id id) { require(id).frozen = false; }
+
+    // Whether the actor is frozen. Spawn starts every actor awake.
+    [[nodiscard]] bool frozen(Id id) const { return require(id).frozen; }
 
     // Whether an actor `id` is live.
     [[nodiscard]] bool has(Id id) const noexcept { return find(id) != nullptr; }

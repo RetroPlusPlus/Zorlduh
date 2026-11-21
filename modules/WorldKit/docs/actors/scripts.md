@@ -82,8 +82,9 @@ place in the body and its own waits.
 | `body` | Runs it, one step per tick, in step 6 of the [tick](actors.md#tick). |
 | `priority`, `interrupts` | ScriptKit's, among the scripts of the one actor (ScriptKit's `docs/scripts.md`, "Script"). |
 
-- **An actor is live wherever it is.** Its scripts start and run in every area, whichever area the
-  camera is in.
+- **An actor is live wherever it is, while it is awake.** Its scripts start and run in every area,
+  whichever area the camera is in. A frozen actor's scripts hold where they are, every wait with the
+  ticks it had left, until it wakes ([actors.md](actors.md#freeze-wake-and-frozen)).
 - **A script reaches its own actor's scripts by name.** `call`, `stop`, `restart` and `interrupts`
   name scripts of the same actor's list, by address. List those scripts by address:
   `.scripts = {&patrol, &flee}`.
@@ -174,6 +175,8 @@ The slime's `hurt` script, hit on tick N with its `Health` at 1:
 
 - **Requests are written in order:** actor by actor in spawn order, and each actor's in the order its
   scripts asked.
+- **A frozen asker's requests wait.** What its scripts asked for on its last tick awake is written in
+  step 1 of its first tick awake.
 - **A script that has asked for something reads on the next tick.** After a `set` or a command, the
   script stops at the next entry that reads a value, and runs that entry a tick later, when the request
   has been written (ScriptKit's `docs/script-processor.md`, "Reading after asking").
