@@ -7,7 +7,7 @@ commands [scripts.md](scripts.md), for movers [movers.md](movers.md), and for lo
 
 ```cpp
 #include "ActorKit/actor.h"    // Actor, Id, kNoId, Side, ScriptRef, Scripts, ActionRow, Actions
-#include "ActorKit/actors.h"   // Actors
+#include "ActorKit/actors.h"   // Actors, Confinement
 #include "ActorKit/config.h"   // Config, AnyBindings, AnyHandlers
 #include "ActorKit/tick.h"     // tick
 ```
@@ -21,6 +21,7 @@ commands [scripts.md](scripts.md), for movers [movers.md](movers.md), and for lo
 - [`Side`](#side)
 - [`ScriptRef` and `Scripts`](#scriptref-and-scripts)
 - [`ActionRow` and `Actions`](#actionrow-and-actions)
+- [`Confinement`](#confinement)
 - [`Actors`](#actors)
 - [`Config`](#config)
 - [`tick`](#tick)
@@ -203,6 +204,44 @@ bound to `actedOn` of that action.
   of another type than the row's member belongs to.
 - To have an actor perform an action from your own code, call [`Actors::act`](#act).
 
+## `Confinement`
+
+```cpp
+enum class Confinement : std::uint8_t { Area, Layout, None };
+```
+
+What an actor's walk is held inside: its area, its layout, or the map's walls alone. Every actor starts
+at `Area`.
+Set another with [`Actors::confinement`](#confinement-1) for an actor that walks from area to area, as
+the player does.
+
+```cpp
+state.actors.confinement(gardener, ActorKit::Confinement::Layout);   // the gardener roams its layout
+```
+
+`gardener` is an `ActorKit::Id` your game kept from `spawn`.
+
+| `Confinement` | At an edge opening into an area of its own layout | At an edge opening into another layout |
+|---|---|---|
+| `Area` (the default) | It is held, its box inside its area. | It is held, its box inside its area. |
+| `Layout` | It walks out. | It is held, its box inside its area. |
+| `None` | It walks out. | It walks out. |
+
+Walls, and edge openings that lead nowhere, hold every actor whatever its confinement. A spot opening,
+such as stairs, is inside the area, and every actor walks over it.
+
+Watch for:
+
+- **Walking out is all ActorKit does.** An actor that walks out through an opening stays in its area,
+  in that area's pixels, beyond its edge. Your game moves it into the next area with
+  [`moveTo`](#moveto) ([how-to.md](how-to.md#send-an-actor-to-another-area)).
+- **Beyond the edge** it walks as the player does: past a scroll or a fade the ground is open within the
+  opening's span, as far as it walks; past a seam it walks over the next area's own cells, and that
+  area's walls hold it.
+- **The player** walks out through every opening that leads somewhere, whatever its confinement.
+- **Your world decides the layouts.** `Layout` lets an actor through every edge opening whose `leadsTo`
+  names an area of the actor's own layout, and holds it at every one that names another.
+
 ## `Actors`
 
 ```cpp
@@ -215,6 +254,13 @@ public:
 
     void player(Id id);
     Id player() const noexcept;
+
+    void confinement(Id id, Confinement confinement);
+    Confinement confinement(Id id) const;
+
+    void freeze(Id id);
+    void wake(Id id);
+    bool frozen(Id id) const;
 
     bool has(Id id) const noexcept;
     std::size_t size() const noexcept;
@@ -241,7 +287,8 @@ public:
 ```
 
 A set of live actors: every actor from its spawn to its removal, with its place, position, own values,
-mover and scripts' progress. Keep it in your game state and hand it to [`tick`](#tick) every tick.
+mover, scripts' progress, confinement and whether it is frozen. Keep it in your game state and hand it to
+[`tick`](#tick) every tick.
 
 Every member that takes an id throws `std::out_of_range`, naming the id, unless a live actor of the set
 has that id. `has` and `remove` are the two exceptions: they return `false`.
@@ -322,11 +369,99 @@ Recording it has two effects:
 
 | Effect | Detail |
 |---|---|
-| The player walks out through its area's openings. | Every other actor stops at its area's edge ([movers.md](movers.md#what-a-mover-collides-with)). |
+| The player walks out through every opening of its area that leads somewhere, whatever its [`confinement`](#confinement-1). | Every other actor's walk is held inside what its confinement names ([movers.md](movers.md#what-a-mover-collides-with)). |
 | `PlayerHere`, `PlayerX` and `PlayerY` are filled in from it. | For every actor's scripts ([scripts.md](scripts.md#the-six-values)). |
 
 The camera stays your game's to move. To follow the player with it, call `WorldKit::Camera::follow` with
 `box(player())` ([how-to.md](how-to.md#follow-the-player-with-the-camera)).
+
+### `confinement`
+
+```cpp
+void confinement(Id id, Confinement confinement);
+Confinement confinement(Id id) const;
+```
+
+`confinement(id, c)` sets what the actor's walk is held inside ([`Confinement`](#confinement)).
+`confinement(id)` returns it. Set it once, for an actor that walks out through openings: it holds on
+every walk until you set it again.
+
+```cpp
+const ActorKit::Id hound = state.actors.spawn(Hound(art), {Castle, WideHall}, {120, 80});
+state.actors.confinement(hound, ActorKit::Confinement::Layout);   // roams the castle
+
+state.actors.confinement(hound, ActorKit::Confinement::None);     // later: goes anywhere
+```
+
+`Hound(art)` is your function returning an `ActorKit::Actor`; `Castle` and `WideHall` are your layout
+and area numbers.
+
+| Call | Result |
+|---|---|
+| `spawn` | The new actor's confinement is `Confinement::Area`. |
+| `confinement(id, c)` | It is `c` from the next walk on. |
+| `moveTo(id, …)` | It stays as it is. |
+| A copy of the set | The copy's actor has the same confinement. |
+
+- The player walks out through every opening that leads somewhere, whatever its confinement. The
+  setting takes over when the actor stops being the player.
+- An actor that walks out stays in its area until your game moves it with [`moveTo`](#moveto).
+
+### `freeze`, `wake` and `frozen`
+
+```cpp
+void freeze(Id id);
+void wake(Id id);
+bool frozen(Id id) const;
+```
+
+`freeze` holds the actor exactly as it is until `wake`. `frozen` reports whether it is frozen. A frozen
+actor is still there: drawn if it is on screen, and solid if it was solid. Every tick passes over it, and
+its scripts stay off. Every actor starts awake.
+
+Use it to hold part of your world still while the rest runs: the actors of an area the camera has left,
+or an actor a cut scene puts on hold.
+
+```cpp
+state.actors.freeze(hen);        // from the next tick, the hen holds as it is
+if (state.actors.frozen(hen)) {
+    state.actors.wake(hen);      // from the next tick, it carries on from what it held
+}
+```
+
+`hen` is an `ActorKit::Id` your game kept from `spawn`.
+
+| Step of [`tick`](#tick) | An awake actor | A frozen actor |
+|---|---|---|
+| 1. Requests | What its scripts asked for on the tick before is written. | What its scripts asked for stays asked, and is written on its first tick awake. |
+| 2. Solidity | Its `solid` is worked out. | It keeps the solidity it last had. One whose `solid` is yet to be worked out has it worked out once, here. |
+| 3. Walking | It walks by its drive. | It stands. While it is solid, its box stops the actors that walk. |
+| 4. Actions | It performs its actions, and is acted on. | Its actions, and those asked for with `act`, wait for its first tick awake. An action aimed at it goes to the next actor whose box holds the point. |
+| 5. Triggers | Touch, near, enter and becomes are worked out for it. | Its triggers hold as they are, and so do its `Touched` and what it remembers of each trigger. Its body still counts for others: an awake actor it overlaps is touched by it, and one it is near is neared by it, by the triggers its `setsOff` lists. |
+| 6. Scripts | Its processor steps. | Its processor holds: every script where it is, every wait with the ticks it had left. |
+| The place check | `tick` throws for an actor in a place outside the world. | Its place goes unchecked. |
+
+On its first tick awake, the tick goes on from what the actor held:
+
+| While it was frozen | On its first tick awake |
+|---|---|
+| A value one of its `Becomes` triggers reads went true | That `Becomes` script starts. |
+| A setter came onto it | Its touch scripts for that setter start. |
+| It was frozen before its first tick | Its `Enter` scripts start if it is in the camera's area. |
+| The camera's area became its area on an earlier tick | Its `Enter` scripts stay off. |
+
+Watch for:
+
+- **When it holds.** Called between ticks, `freeze` and `wake` hold from the next tick. Called from one
+  of your handlers, during step 1, they hold from step 2 of the same tick.
+- **One `wake` undoes it.** Freezing a frozen actor, or waking an awake one, leaves it as it is.
+- **Every other member works on a frozen actor:** `remove`, `moveTo`, `get`, `set`, `place`, `box`,
+  `key`, `fresh`, `confinement` and `act`. `set` writes its own value at once, and its scripts see the
+  value on its first tick awake.
+- **Its place goes unchecked,** so your game may move a frozen actor anywhere. Once it wakes there, `tick`
+  throws for a place outside the world.
+- **A copy of the set** carries which actors are frozen.
+- **To hold a whole set still,** leave that set's `tick` call out.
 
 ### `has`, `size` and `ids`
 
@@ -388,10 +523,10 @@ Puts the actor at `at` in `place`, at once.
 |---|---|
 | Carry the player where the camera says, through a scroll, a fade or a seam | [how-to.md](how-to.md#follow-the-player-with-the-camera) |
 | Warp an actor | [how-to.md](how-to.md#warp-an-actor) |
-| Send any actor into another area | [how-to.md](how-to.md#send-an-actor-to-another-area) |
+| Send any actor into another area, or carry one that its [`confinement`](#confinement-1) let walk out through an opening | [how-to.md](how-to.md#send-an-actor-to-another-area) |
 
 - `moveTo` puts the actor exactly there, walls included.
-- The actor keeps its facing, its values and its scripts.
+- The actor keeps its facing, its values, its scripts, its confinement, and whether it is frozen.
 - The engine eases a sprite from where it was last drawn. To show the actor at its new position at
   once, call [`fresh`](drawing.md#fresh-keys) on the same tick.
 - `ActorKit::Enter` follows the camera: it happens when the camera's area changes. Moving an actor into
@@ -533,7 +668,8 @@ template <class State, class Input>
 void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, const Input& input, State& state);
 ```
 
-One tick of every live actor in `actors`. Call it once per tick for each set.
+One tick of the actors in `actors`. Every awake actor takes part, and a frozen one holds as it is
+([`freeze`](#freeze-wake-and-frozen)). Call it once per tick for each set.
 
 ```cpp
 loop.simTick([&](const retropp::InputState& in) {
@@ -546,8 +682,9 @@ type of yours: movers and action rows read the members you named in `movedBy` an
 
 The tick runs six steps in order.
 
-**1. Requests.** For each actor in spawn order, everything its scripts asked for on the tick before is
-done, in the order asked:
+**1. Requests.** A frozen actor's requests wait for its first tick awake. For each actor awake as the
+tick begins, in spawn order, everything its scripts asked for on its last tick awake is done, in the
+order asked:
 
 | The script asked for | What happens |
 |---|---|
@@ -558,20 +695,23 @@ done, in the order asked:
 | `ActorKit::remove()` | The asker is removed once every request of this step is written. |
 | any other command | It goes to `config.handlers`, with the asker's id. |
 
-**2. Solidity.** Each actor's `solid` is evaluated against its values.
+**2. Solidity.** Each awake actor's `solid` is evaluated against its values. A frozen actor keeps the
+solidity it last had; one whose `solid` is yet to be evaluated has it evaluated here, once.
 
-**3. Walking.** While `camera.transitioning()` is false, each actor with a mover walks by its drive, in
-spawn order. An actor that walks later meets the earlier ones where they now stand.
+**3. Walking.** While `camera.transitioning()` is false, each awake actor with a mover walks by its
+drive, in spawn order, held inside what its [confinement](#confinement) names. An actor that walks
+later meets the earlier ones where they now stand, and a frozen solid actor stops it like any other.
 [movers.md](movers.md#what-a-mover-collides-with) lists what stops it.
 
-**4. Actions.** For each actor in spawn order: each action row whose member is true, then each action
-queued with `act`. The action is performed on the actor faced
+**4. Actions.** For each awake actor in spawn order: each action row whose member is true, then each
+action queued with `act`. The action is performed on the awake actor faced
 ([triggers.md](triggers.md#the-detections)).
 
-**5. Triggers.** Touch, near, enter and becomes are detected for every actor, and the scripts they set
-off start. The camera's area is the one `camera` is in when `tick` is called.
+**5. Triggers.** Touch, near, enter and becomes are detected for every awake actor, and the scripts they
+set off start. Every actor of the set is a setter, frozen ones included. The camera's area is the one
+`camera` is in when `tick` is called.
 
-**6. Scripts.** Each actor with a running script is handed its values, and its script processor
+**6. Scripts.** Each awake actor with a running script is handed its values, and its script processor
 advances once. A script started in step 4 or 5 runs its first entries here, on the same tick.
 
 - An actor spawned during a tick, or by your code since the last one, takes part from the next tick.
@@ -581,7 +721,7 @@ advances once. A script started in step 4 or 5 runs its first entries here, on t
 | Throws | When |
 |---|---|
 | `std::invalid_argument` | `config.world` is null. |
-| `std::out_of_range` | An actor is in a layout or area outside the world. The message names the actor and the place. |
+| `std::out_of_range` | An awake actor is in a layout or area outside the world. The message names the actor and the place. A frozen actor's place goes unchecked. |
 | `std::out_of_range` | An actor reads a value that is outside its own, ActorKit's six and your bindings. The message names the actor and the value's id. |
 | `std::out_of_range` | A script sets one of your game's values and `config.bindings` is empty or lacks it. |
 | `std::out_of_range` | A script asks for a command and `config.handlers` is empty or lacks it. The message names the command. |

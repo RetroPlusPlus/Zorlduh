@@ -169,6 +169,8 @@ zorlduh_add_test(signs_animation)
 zorlduh_add_test(menus)
 zorlduh_add_test(ScriptKit)
 zorlduh_add_test(ActorKit)
+zorlduh_add_test(ActorKit_confinement)
+zorlduh_add_test(ActorKit_freezing)
 # The asset tests decode the sheets from the source tree; the maps come from the bytes baked into
 # the test binary.
 target_compile_definitions(zorlduh-test-assets PRIVATE

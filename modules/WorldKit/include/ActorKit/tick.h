@@ -1,5 +1,5 @@
-// tick — one call a tick that runs every live actor: their scripts' requests, their walking, their
-// actions, the triggers that happen to them and their scripts.
+// tick — one call a tick that runs every awake actor: their scripts' requests, their walking, their
+// actions, the triggers that happen to them and their scripts. A frozen actor holds as it is.
 //
 //     loop.simTick([&](const retropp::InputState& in) {
 //         ActorKit::tick(state.actors, config.actors, state.camera, readInput(in), state);
@@ -91,36 +91,83 @@ inline void startScripts(Live& live, std::uint32_t kind, int side, const ScriptK
     return detection.has_value() && detection->kind == kind;
 }
 
+// Appends to `strips` the rectangle beyond each edge opening of `area` that leads to a layout other than
+// `layout`: as wide as the opening's span, reaching out from the wall, in the area's pixels.
+inline void otherLayoutStrips(std::vector<retropp::IntRect>& strips, const WorldKit::Area& area, int layout,
+                              int cellSize) {
+    constexpr int kFar = 1 << 24;   // farther out than any walk goes
+    const int width = area.collision->width * cellSize;
+    const int height = area.collision->height * cellSize;
+    for (const WorldKit::Opening& opening : area.openings) {
+        if (opening.side == WorldKit::Side::None || opening.leadsTo.area == WorldKit::kNoArea) {
+            continue;
+        }
+        const int leadsTo = opening.leadsTo.layout == WorldKit::kSameLayout ? layout : opening.leadsTo.layout;
+        if (leadsTo == layout) {
+            continue;
+        }
+        const int first = opening.span.first * cellSize;
+        const int length = (opening.span.last - opening.span.first + 1) * cellSize;
+        switch (opening.side) {
+            case WorldKit::Side::East:
+                strips.push_back({.x = width, .y = first, .width = kFar, .height = length});
+                break;
+            case WorldKit::Side::West:
+                strips.push_back({.x = -kFar, .y = first, .width = kFar, .height = length});
+                break;
+            case WorldKit::Side::North:
+                strips.push_back({.x = first, .y = -kFar, .width = length, .height = kFar});
+                break;
+            case WorldKit::Side::South:
+                strips.push_back({.x = first, .y = height, .width = length, .height = kFar});
+                break;
+            case WorldKit::Side::None:
+                break;
+        }
+    }
+}
+
 }  // namespace detail
 
-// One tick of every live actor, in this order:
+// One tick of the live actors. Every actor spawned before the tick is present; a frozen one
+// (Actors::freeze) holds as it is, and the rest are awake and take part. In this order:
 //
-//   1. Requests. For each actor in spawn order, each thing its scripts asked for on the last tick, in the
-//      order asked: a `set` of an own value is written to the actor; a `set` of one of ActorKit's six is
-//      dropped; a `set` of one of the game's goes through `config.bindings`; ActorKit::spawn and
-//      ActorKit::remove are done; any other command goes to `config.handlers` with the actor's id.
-//      Removals take effect once every request is written.
-//   2. Solidity. Each actor's `solid` is worked out against its values.
-//   3. Walking, while `camera.transitioning()` is false: each actor with a mover, in spawn order, is
-//      walked by its drive against its area's collision map, the boxes of the other solid actors in its
-//      area, and — for every actor but the player — everything outside its area's own rectangle.
-//   4. Actions. Each action an actor's rows drive this tick, and each asked for with Actors::act, is
-//      performed on the actor it faces: that actor's scripts on ActorKit::Interact start when the action
-//      is `config.interactAction`, and its scripts on any of the game's triggers bound to the action.
-//   5. Triggers. Every detection the trigger map binds is worked out, and the scripts it sets off start.
-//      The camera's area is the one `camera` is in when tick is called.
-//   6. Scripts. Each actor with a running script is handed its values, and its processor steps once.
+//   1. Requests. For each actor awake as the tick begins, in spawn order, each thing its scripts asked
+//      for on its last tick awake, in the order asked: a `set` of an own value is written to the actor; a
+//      `set` of one of ActorKit's six is dropped; a `set` of one of the game's goes through
+//      `config.bindings`; ActorKit::spawn and ActorKit::remove are done; any other command goes to
+//      `config.handlers` with the actor's id. Removals take effect once every request is written. A
+//      frozen actor's requests stay asked until its first tick awake.
+//   2. Solidity. Each awake actor's `solid` is worked out against its values. A frozen actor keeps the
+//      solidity it last had; one whose `solid` is yet to be worked out has it worked out here, once.
+//   3. Walking, while `camera.transitioning()` is false: each awake actor with a mover, in spawn order,
+//      is walked by its drive against its area's collision map, the boxes of the other solid actors in
+//      its area, frozen ones included, and what its confinement holds it inside: for every actor but
+//      the player, everything outside its area's own rectangle under Confinement::Area, and the strip
+//      beyond each edge opening that leads to another layout under Confinement::Layout. Under
+//      Confinement::None, and for the player, the map and the actors are all that stop it.
+//   4. Actions. Each action an awake actor's rows drive this tick, and each asked for with Actors::act,
+//      is performed on the awake actor it faces: that actor's scripts on ActorKit::Interact start when
+//      the action is `config.interactAction`, and its scripts on any of the game's triggers bound to the
+//      action. A frozen actor's actions asked for with act wait for its first tick awake.
+//   5. Triggers. Every detection the trigger map binds is worked out for each awake actor, with every
+//      present actor as a setter, and the scripts it sets off start. The camera's area is the one
+//      `camera` is in when tick is called. A frozen actor's Touched and what it remembers of each
+//      trigger hold.
+//   6. Scripts. Each awake actor with a running script is handed its values, and its processor steps
+//      once.
 //
 // An actor spawned during a tick, or since the last, takes part from the next. A script started in step
-// 5 asks for its first things in step 6, and they are written in step 1 of the next tick. `camera` is
-// read only: the camera and each actor's area are the game's to change.
+// 5 asks for its first things in step 6, and they are written in step 1 of the next tick. A freeze or a
+// wake from a handler holds from step 2 of the same tick. `camera` is read only: the camera and each
+// actor's area are the game's to change.
 //
 // Throws std::invalid_argument when `config.world` is null; std::out_of_range naming the actor for an
-// actor in a place outside the world or reading an unbound value — one outside its own, ActorKit's six
-// and the game's bindings — and naming the command for one missing from the handlers; std::logic_error
-// when a mover's or an action's drive is a member of another type than Input, or the config's bindings
-// or handlers are written for another type than State. Whatever a binding, a handler or ScriptKit throws
-// passes through.
+// awake actor in a place outside the world or for an actor reading an unbound value — one outside its
+// own, ActorKit's six and the game's bindings — and naming the command for one missing from the
+// handlers; std::logic_error when a mover's or an action's drive is a member of another type than Input,
+// or the config's bindings or handlers are written for another type than State. Whatever a binding, a
+// handler or ScriptKit throws passes through.
 template <class State, class Input>
 void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, const Input& input, State& state) {
     using detail::ActorsAccess;
@@ -134,12 +181,17 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
 
     ActorsAccess::begin(actors);
 
-    // 1. Requests.
+    // 1. Requests, of the actors awake as the tick begins.
+    std::vector<Live*> askers;
+    askers.reserve(everyone.size());
+    for (const std::unique_ptr<Live>& live : everyone) {
+        if (!live->frozen) {
+            askers.push_back(live.get());
+        }
+    }
     ActorsAccess::defer(actors, true);
     try {
-        const std::size_t count = everyone.size();
-        for (std::size_t n = 0; n < count; ++n) {
-            Live* const asker = everyone[n].get();
+        for (Live* const asker : askers) {
             for (const ScriptKit::Request& request : asker->processor.requests()) {
                 if (const ScriptKit::Command* command = request.command()) {
                     if (command->id() == detail::SpawnCommand.id()) {
@@ -183,10 +235,15 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
     ActorsAccess::defer(actors, false);
     ActorsAccess::applyRemovals(actors);
 
-    // Every actor taking part this tick, in spawn order.
+    // Every actor present this tick, in spawn order, and among them the ones awake, which take part.
+    std::vector<Live*> present;
     std::vector<Live*> taking;
     for (const std::unique_ptr<Live>& live : everyone) {
         if (live->newlySpawned) {
+            continue;
+        }
+        present.push_back(live.get());
+        if (live->frozen) {
             continue;
         }
         const WorldKit::Place place = live->place;
@@ -204,10 +261,14 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
     }
     const auto gather = [&](const Live& live) { detail::gatherValues(values, live, player, config.bindings, state); };
 
-    // 2. Solidity.
-    for (Live* live : taking) {
+    // 2. Solidity. A frozen actor keeps the solidity it last had, worked out once if it is yet to have one.
+    for (Live* live : present) {
+        if (live->frozen && live->solidKnown) {
+            continue;
+        }
         gather(*live);
         live->solid = ScriptKit::evaluate(live->actor->solid, values);
+        live->solidKnown = true;
     }
 
     // 3. Walking.
@@ -218,17 +279,22 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
                 continue;
             }
             others.clear();
-            for (const Live* other : taking) {
+            for (const Live* other : present) {
                 if (other != live && other->solid && other->place == live->place) {
                     others.push_back(detail::areaBox(*other));
                 }
             }
             const WorldKit::Layout& layout = world.layouts[static_cast<std::size_t>(live->place.layout)];
-            const retropp::IndexGrid& map = *layout.areas[static_cast<std::size_t>(live->place.area)].collision;
+            const WorldKit::Area& area = layout.areas[static_cast<std::size_t>(live->place.area)];
+            const retropp::IndexGrid& map = *area.collision;
+            const bool held = live != player;
+            if (held && live->confinement == Confinement::Layout) {
+                detail::otherLayoutStrips(others, area, live->place.layout, layout.cellSize);
+            }
             const Solids solids{WorldKit::AreaSolids{.world = &world, .layout = live->place.layout, .area = live->place.area},
                                 retropp::IntRect{.x = 0, .y = 0, .width = map.width * layout.cellSize,
                                                  .height = map.height * layout.cellSize},
-                                live != player, others};
+                                held && live->confinement == Confinement::Area, others};
             if (live->actor->mover.kind()->readsValues()) {
                 gather(*live);
             }
@@ -279,12 +345,13 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
         }
     }
 
-    // 5. Triggers. First who touches whom, so Touched holds for every actor; then each actor's triggers.
+    // 5. Triggers. First who touches whom, so Touched holds for every awake actor; then each awake actor's
+    // triggers. Every present actor is a setter, frozen ones included.
     std::vector<std::vector<std::uint32_t>> touchedBy(taking.size());
     for (std::size_t t = 0; t < taking.size(); ++t) {
         Live& target = *taking[t];
         std::vector<std::pair<std::uint32_t, Id>> now;
-        for (const Live* setter : taking) {
+        for (const Live* setter : present) {
             if (setter == &target || setter->place != target.place ||
                 !detail::overlap(detail::areaBox(*setter), detail::areaBox(target))) {
                 continue;
@@ -322,7 +389,7 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
             if (detail::boundTo(config.triggers, on.kind, DetectionKind::Near)) {
                 bool within = false;
                 const long long reach = static_cast<long long>(on.number) * on.number;
-                for (const Live* setter : taking) {
+                for (const Live* setter : present) {
                     if (setter != &target && setter->place == target.place &&
                         detail::listed(setter->actor->setsOff, on.kind) &&
                         detail::gapSquared(detail::areaBox(*setter), box) <= reach) {

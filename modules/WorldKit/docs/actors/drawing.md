@@ -375,6 +375,8 @@ for (const WorldKit::Shown& shown : state.camera.shown(world)) {
 
 - **`state` is read through your bindings,** for the looks' conditions. `Sprites` only reads.
 - **An actor spawned this tick is reported at once.**
+- **A frozen actor is reported like any other,** where it stands, with the first look whose condition
+  holds on that frame ([actors.md](actors.md#freeze-wake-and-frozen)).
 - **The position is in the area's pixels.** Draw the sprites on a layer with that area's scroll, one
   layer for each area ([A layer for each area](#a-layer-for-each-area)).
 - **A mover's frame resolves its art through the renderer** that loaded the sheet. A look carries its

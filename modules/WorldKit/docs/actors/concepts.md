@@ -200,6 +200,8 @@ to ticks.
 | `get(id, value)`, `set(id, value, worth)` | Read and write one of the actor's own values. |
 | `moveTo(id, place, at)` | Puts the actor somewhere at once. |
 | `player(id)` | Records which actor is the player. |
+| `confinement(id, c)` | Sets what the actor's walk is held inside: its area (the default), its layout, or the map's walls alone. |
+| `freeze(id)`, `wake(id)`, `frozen(id)` | Hold the actor exactly as it is, let it carry on, and report which it is. |
 
 - **Ids** count from 1 in spawn order. Each id is handed out once, so an id you kept names the same
   actor for as long as that actor lives. `ActorKit::kNoId` is 0.
@@ -246,6 +248,10 @@ A script asks, and the next tick writes. With the gate above and a hero walking 
   the frame it is spawned on.
 - **During a scroll or a fade, actors stand still and their scripts keep running.** A wait that began
   before a 32-tick scroll is 32 ticks further on when the scroll ends.
+- **Every awake actor takes part; a frozen one holds as it is.** `freeze(id)` keeps the actor's
+  position, values, scripts and waits exactly where they are, while it is still drawn, still solid if
+  it was, and still touches the awake actors it meets. `wake(id)` lets it carry on from there
+  ([actors.md](actors.md#freeze-wake-and-frozen)).
 
 [actors.md](actors.md#tick) has the exact rule of each step.
 
@@ -348,8 +354,13 @@ A walking actor stops at three things:
 | What stops it | Which actors |
 |---|---|
 | The solid cells of its area's collision map | all |
-| The box of every other solid actor in its area and its set | all |
-| The edge of its area | all but the player, which walks out through the area's openings |
+| The box of every other solid actor in its area and its set, frozen ones included | all |
+| What its confinement holds it inside: by default the edge of its area | all but the player, which walks out through the area's openings |
+
+An actor's confinement is `Area`, `Layout` or `None`. Set to `Layout`, it walks out through the openings
+into the other areas of its layout; set to `None`, through every opening that leads somewhere. It then
+stands beyond the edge, in its area's pixels, until your game moves it with `moveTo`
+([actors.md](actors.md#confinement)).
 
 An actor with a mover takes its box and its facing from the mover, and shows the mover's frame while
 every one of its looks' conditions is false.
@@ -387,8 +398,8 @@ Tell ActorKit that the hero is the player, once, when you spawn it:
 state.actors.player(hero);
 ```
 
-`player` records the id. The player walks out through its area's openings, where every other actor
-stops at the edge, and `PlayerHere`, `PlayerX` and `PlayerY` are filled in from it.
+`player` records the id. The player walks out through its area's openings, where every other actor's
+walk is held inside its confinement, and `PlayerHere`, `PlayerX` and `PlayerY` are filled in from it.
 
 The camera stays in your hands so that a game already running WorldKit adds ActorKit with its camera
 code as it is.

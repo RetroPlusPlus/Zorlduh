@@ -145,8 +145,9 @@ if (state.warpRequested) {
 
 ## Send an actor to another area
 
-The player leaves its area through an opening. Every other actor stops at the area's edge. To
-take one of those into another area, move it from your code when it reaches the edge:
+The player leaves its area through an opening. Every other actor's walk is held inside its
+[confinement](actors.md#confinement): by default its area, so it stops at the area's edge. To take one
+of those into another area, move it from your code when it reaches the edge:
 
 ```cpp
 // A hen that reaches the yard's east gateway goes into the field, beside its west gateway.
@@ -167,11 +168,37 @@ if (state.actors.place(hen) == yard && box.x + box.width >= kYardWidth) {
 
 - The new position is in the destination area's pixels. Work it out from where the two openings are on
   their maps.
-- A walker other than the player stops with its box against the area's edge, so the test is the box's far side
-  reaching the area's width.
+- Confined to its area, a walker other than the player stops with its box against the area's edge, so
+  the test is the box's far side reaching the area's width.
 - From a script, do the same in a command's handler, which is handed the asking actor's id
   ([scripts.md](scripts.md#commands)).
 - The actor keeps its values and its scripts, and its scripts keep running in the new area.
+
+**Walk out through the opening.** Set the actor's confinement to `Layout` or `None`, once, and its walk
+goes out through the opening as the player's does. It stands beyond the edge, in its area's pixels,
+until your code moves it:
+
+```cpp
+state.actors.confinement(hen, ActorKit::Confinement::Layout);   // once, when the hen is spawned
+
+// Each tick, after ActorKit::tick: the hen has walked wholly out through the yard's east gateway.
+if (state.actors.place(hen) == yard && state.actors.box(hen).x >= kYardWidth) {
+    const retropp::Vec2i at = state.actors.position(hen);
+    state.actors.moveTo(hen, field, {.x = at.x - kYardWidth, .y = at.y + kGatewayDrop});
+    state.actors.fresh(hen);
+}
+```
+
+| `Confinement` | The hen at the east gateway |
+|---|---|
+| `Area` | It stops with its box against the edge. |
+| `Layout` | It walks out when the gateway leads to an area of its own layout, and stops at one into another layout. |
+| `None` | It walks out through any gateway that leads somewhere. |
+
+- Beyond a scroll or a fade the ground is open within the opening's span, so the hen keeps walking
+  until your code moves it. Beyond a seam it walks over the next area's own cells.
+- `at.x - kYardWidth` keeps how far past the edge it has walked, and puts the hen that far inside the
+  field's west gateway.
 
 ## Open and shut something with Interact
 
@@ -480,6 +507,8 @@ const ActorKit::Actor torch{.slot = "actors", .box = {.x = 0, .y = 8, .width = 8
   other in one set, as the hero and everything it meets are here.
 - Each set counts its ids from 1. Keep each id with the set it came from.
 - A set you leave out of a tick stays as it is. Skip `actors` while a menu is open and the torches keep
-  running.
+  running. To hold one actor still while the rest of its set runs, freeze it with
+  `state.actors.freeze(id)`: it stays as it is, still drawn and still solid, until
+  `state.actors.wake(id)` ([actors.md](actors.md#freeze-wake-and-frozen)).
 
 [concepts.md](concepts.md#several-sets) has the rules.
