@@ -44,14 +44,14 @@ how, the sprites of what moves, and whatever fills the rest of the screen.
 |---|---|
 | [getting-started.md](getting-started.md) | A complete program, four areas joined by a door, stairs and a seam, built as `WorldKit-example-getting-started`, explained part by part |
 | [concepts.md](concepts.md) | Areas, layouts and openings; how movement plugs in; a tick of following; scrolls, fades and seams; the camera and its law; drawing and depth; where each part lives in a game |
-| [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a layer over the player, things at more than one depth, a camera law of your own, a movement module, the fade's look, another layout, a seam and how deep seams are drawn, things in an area, a reserved part of the screen |
+| [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a layer over the player, things at more than one depth, a layer of your own among the world's, a camera law of your own, a movement module, the fade's look, another layout, a seam and how deep seams are drawn, things in an area, a reserved part of the screen |
 
 ### Reference
 
 | Page | Covers | Header |
 |---|---|---|
-| [areas.md](areas.md) | `Side`, `Transition`, `Span`, `Destination`, `Opening`, `CellValue`, `MapLayer`, `ActorSlot`, `Area`, `CameraLaw`, `Layout`, `World`, `Place`, `validate`, `ActorZ` | `area.h` |
-| [camera.md](camera.md) | `Camera`, `Step`, `Shown`, `AreaSolids` | `camera.h`, `solids.h` |
+| [areas.md](areas.md) | `Side`, `Transition`, `Span`, `Destination`, `Opening`, `CellValue`, `MapLayer`, `ReservedLayer`, `ActorSlot`, `Area`, `CameraLaw`, `Layout`, `World`, `Place`, `validate`, `ActorZ`, `LayerZ`, `placeOf` | `area.h` |
+| [camera.md](camera.md) | `Camera`, `Step`, `Shown`, `ActorZ` and `LayerZ` by `Shown`, `AreaSolids` | `camera.h`, `solids.h` |
 | [drawing.md](drawing.md) | `WorldLayers`, `Actors`, `Fade`, `TopZ`, `AreaLayerKey`, `ActorsKey`, `ViewStencil` | `world_layers.h` |
 
 ### Actors
@@ -66,6 +66,9 @@ how, the sprites of what moves, and whatever fills the rest of the screen.
 |---|---|---|
 | Areas with their own maps and art; openings in walls and at spots; one-way and two-way links | available | areas.md |
 | An area's map layers, each at its own depth, and its actor slots among them; cells that draw nothing through a sheet's transparent index | available | areas.md, drawing.md |
+| A depth an area reserves for a layer of the game's own, of any kind, found by name | available | areas.md, how-to.md |
+| The depths of the areas on screen spread so every lower declared depth is under every higher one and each layer has a depth of its own; an area alone at its declared depths | available | drawing.md |
+| Layouts and areas named; a place found by the names of its layout and area | available | areas.md |
 | Several layouts in one world, each with its own cell size, view and settings; openings leading between them | available | areas.md |
 | Checks on the data: names, placement, overlap, destinations, scroll and seam geometry, layers and slots | available | areas.md |
 | What is solid: the collision map, off the map, the way out through an exit, the next area past a seam | available | camera.md |

@@ -13,8 +13,10 @@ movement module's: WorldKit answers its questions and moves nothing itself.
 // The world, once: each layout's areas, their layers, actor slots and openings.
 const WorldKit::World world{.layouts = {
     WorldKit::Layout{
+        .name = "overworld",
         .areas = {
-            WorldKit::Area{.layers = {{.name = "ground", .tiles = &meadowTiles, .art = overworldArt, .z = kGroundZ},
+            WorldKit::Area{.name = "meadow",
+                           .layers = {{.name = "ground", .tiles = &meadowTiles, .art = overworldArt, .z = kGroundZ},
                                       {.name = "overhang", .tiles = &meadowRock, .art = overlayArt, .z = kOverheadZ}},
                            .actorSlots = {{.name = "actors", .z = kActorsZ}},
                            .collision = &meadowCollision,
@@ -44,10 +46,11 @@ frame.regions = WorldKit::Fade(camera, world);
 
 | Piece | What it is | Page |
 |---|---|---|
-| `Area`, `MapLayer`, `ActorSlot`, `Opening`, `Layout`, `World`, `validate` | what a world is: layouts of areas, their layers and slots, their openings, where each leads | [docs/areas.md](docs/areas.md) |
+| `Area`, `MapLayer`, `ReservedLayer`, `ActorSlot`, `Opening`, `Layout`, `World`, `validate` | what a world is: named layouts of named areas, their layers, the depths they reserve for layers of the game's own, their slots and openings, where each leads | [docs/areas.md](docs/areas.md) |
+| `ActorZ`, `LayerZ`, `placeOf` | a slot's or a layer's depth, declared or drawn for an area on screen, and a place found by its names | [docs/areas.md](docs/areas.md#actorz), [docs/camera.md](docs/camera.md#actorz-layerz-by-shown) |
 | `Camera` | which layout and area the screen is in, where it looks, the scroll or fade running | [docs/camera.md](docs/camera.md) |
 | `AreaSolids` | what is solid in an area, for anything that moves | [docs/camera.md](docs/camera.md#areasolids) |
-| `WorldLayers`, `Actors`, `Fade`, `TopZ` | the areas on screen as tile layers at their depths, the game's sprites at an actor slot, confined to the view, the fade over them, and the depth above it all | [docs/drawing.md](docs/drawing.md) |
+| `WorldLayers`, `Actors`, `Fade`, `TopZ` | the areas on screen as tile layers, each alone at its declared depths and spread among the others when several are on screen, the game's sprites at an actor slot, confined to the view, the fade over them, and the depth above it all | [docs/drawing.md](docs/drawing.md) |
 
 The module is header-only and needs C++20. It includes the headers of the engine,
 [LayerKit](../LayerKit/README.md) and [CameraKit](../CameraKit/README.md) alone, and its actors add
@@ -125,9 +128,10 @@ modules/WorldKit/
   CMakeLists.txt                    the WorldKit::WorldKit and ActorKit::ActorKit targets and the example option
   include/WorldKit/
     area.h                          Side, Transition, Span, Destination, Opening, CellValue, MapLayer,
-                                    ActorSlot, Area, CameraLaw, Layout, World, Place, validate, ActorZ
+                                    ReservedLayer, ActorSlot, Area, CameraLaw, Layout, World, Place,
+                                    validate, ActorZ, LayerZ, placeOf
     solids.h                        AreaSolids
-    camera.h                        Step, Shown, Camera
+    camera.h                        Step, Shown, ActorZ and LayerZ by Shown, Camera
     world_layers.h                  AreaLayerKey, ActorsKey, TopZ, ViewStencil, WorldLayers, Actors, Fade
   include/ActorKit/
     actor.h                         Actor, Id, Side, ScriptRef, Scripts, ActionRow, Actions

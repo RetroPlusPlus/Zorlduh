@@ -32,10 +32,12 @@ view reaches past an area's edge and no other area is attached there, the layers
 
 Areas are grouped in layouts: a layout is a list of areas that share a cell size, an open collision
 value, a view, a camera law and the settings of their transitions. An overworld is a layout; a dungeon
-is another; a world is the list of layouts. Layouts and areas are named by their indices. A game writes
-an enum for each, whose values are the indices, so its openings read `.leadsTo = {.layout =
-Layout::DungeonOne, .area = Room::Entrance, ...}`, and whatever the module hands back about a place
-(the place entered, the areas shown) is a pair of those values.
+is another; a world is the list of layouts. Every layout and area has a `name`, unique among its
+layouts or among its layout's areas, and an index, its position in the list. A game writes an enum for
+each, whose values are the indices, so its openings read `.leadsTo = {.layout = Layout::DungeonOne,
+.area = Room::Entrance, ...}`, and whatever the module hands back about a place (the place entered, the
+areas shown) is a pair of those values. `placeOf(world, "dungeon-one", "entrance")` finds the same
+place by name, and every message the module throws names both.
 
 ## Openings
 
@@ -157,12 +159,17 @@ its art, at its own depth, keyed `"area:<layout>:<area>:<layer>"`, placed by the
 area, and confined to the layout's view — the part of the screen the world is given; the rest is the
 game's.
 
-Depth is the engine's z axis, and the map layers and the actor slots share it. The things a game draws
-in the current area go on one sprite layer per slot, built by `Actors` at the current area's depth for
-that slot, scrolled and confined like the map layers: so the player walks over a path, under a canopy,
-into the shade of a cave mouth, by depth alone. A cell of a layer that draws nothing is a slot of its
-sheet whose pixels are all transparent indices, and the layers below show through it. Whatever is drawn
-over the whole world — effects, a HUD — takes a depth above `TopZ(world)`.
+Depth is the engine's z axis, and the map layers, the reserved layers and the actor slots share it. The
+things a game draws in the current area go on one sprite layer per slot, built by `Actors` at the
+current area's depth for that slot, scrolled and confined like the map layers: so the player walks over
+a path, under a canopy, into the shade of a cave mouth, by depth alone. A layer of the game's own goes
+at a depth the area reserves for it. A cell of a layer that draws nothing is a slot of its sheet whose
+pixels are all transparent indices, and the layers below show through it. Whatever is drawn over the
+whole world — effects, a HUD — takes a depth above `TopZ(world)`.
+
+An area alone on screen is drawn at the depths the game declared. With more areas on screen — across a
+seam, during a scroll — WorldKit spreads the depths so every lower declared depth is under every higher
+one across all of them and each layer has a depth of its own ([drawing.md](drawing.md#how-the-layers-stack)).
 
 The fade is one region over the whole screen, returned only while a fade runs. All of it is in
 `world_layers.h`, the one header that builds draw types.

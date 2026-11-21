@@ -194,7 +194,8 @@ TEST(Player, IsDrawnAtTheActorsDepthInEveryAreaBetweenUnderfootAndOverhead) {
             EXPECT_EQ(WorldKit::ActorZ(config.world, place, zorlduh::kActorSlot), zorlduh::kActorsZ) << l << ":" << a;
         }
     }
-    EXPECT_EQ(WorldKit::TopZ(config.world), zorlduh::kOverheadZ);
+    // The overhead layer drawn at most at kOverheadZ × N + N − 1, N = the world's 17 areas.
+    EXPECT_EQ(WorldKit::TopZ(config.world), zorlduh::kOverheadZ * 17 + 16);
     EXPECT_GT(zorlduh::EffectsZ(config.world), zorlduh::kOverheadZ);
     EXPECT_GT(zorlduh::HudZ(config.world), zorlduh::EffectsZ(config.world));
     EXPECT_GT(zorlduh::DialogZ(config.world), zorlduh::HudZ(config.world));

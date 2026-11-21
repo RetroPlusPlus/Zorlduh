@@ -97,11 +97,11 @@ constexpr CameraKit::View kView{.size = {.width = 160, .height = 128}, .origin =
 // The values in a map, drawn as the tiles of the same name. Only grass is walked on.
 enum class Cell : std::uint16_t { Grass = 0, Fence = 1, Kennel = 2 };
 
-// Depths: the ground, the puddle's slot under the actors, the actors, and the egg row above the world.
+// Every area's depths: the ground, the slot under the actors' feet for the puddle and the pond, and the
+// actors. The egg row along the top is above the whole world, at TopZ + 1.
 constexpr std::int32_t kGroundZ = 0;
 constexpr std::int32_t kUnderfootZ = 5;
 constexpr std::int32_t kActorsZ = 10;
-constexpr std::int32_t kHudZ = 20;
 
 // A map ringed by fence, grass inside, with the cells of `openings` opened in the fence and `kennel`
 // built inside.
@@ -221,8 +221,10 @@ WorldKit::World FarmWorld(const Maps& maps, const Art& art) {
     using WorldKit::Side;
     using WorldKit::Transition;
     return WorldKit::World{.layouts = {WorldKit::Layout{
+        .name = "farm",
         .areas = {
-            WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.yard, .art = Ground(art, art.grass), .z = kGroundZ}},
+            WorldKit::Area{.name = "yard",
+                           .layers = {{.name = "ground", .tiles = &maps.yard, .art = Ground(art, art.grass), .z = kGroundZ}},
                            .actorSlots = {{.name = "underfoot", .z = kUnderfootZ}, {.name = "actors", .z = kActorsZ}},
                            .collision = &maps.yard,
                            .openings = {{.name = "gate", .side = Side::East, .span = {7, 8},
@@ -231,13 +233,15 @@ WorldKit::World FarmWorld(const Maps& maps, const Art& art) {
                                         {.name = "gap", .side = Side::South, .span = {9, 10},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::Pond, .opening = "gap"}}}},
-            WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.field, .art = Ground(art, art.field), .z = kGroundZ}},
+            WorldKit::Area{.name = "field",
+                           .layers = {{.name = "ground", .tiles = &maps.field, .art = Ground(art, art.field), .z = kGroundZ}},
                            .actorSlots = {{.name = "underfoot", .z = kUnderfootZ}, {.name = "actors", .z = kActorsZ}},
                            .collision = &maps.field,
                            .openings = {{.name = "gate", .side = Side::West, .span = {11, 12},
                                          .transition = Transition::Scroll,
                                          .leadsTo = {.area = Area::Yard, .opening = "gate"}}}},
-            WorldKit::Area{.layers = {{.name = "ground", .tiles = &maps.pond, .art = Ground(art, art.grass), .z = kGroundZ}},
+            WorldKit::Area{.name = "pond",
+                           .layers = {{.name = "ground", .tiles = &maps.pond, .art = Ground(art, art.grass), .z = kGroundZ}},
                            .actorSlots = {{.name = "underfoot", .z = kUnderfootZ}, {.name = "actors", .z = kActorsZ}},
                            .collision = &maps.pond,
                            .openings = {{.name = "gap", .side = Side::North, .span = {9, 10},
@@ -458,16 +462,15 @@ LayerKit::Sprites Underfoot(const State& state, const ActorKit::Config& config, 
 
 // ── An area's actors on screen ───────────────────────────────────────────────────────────────────
 
-// The layer of `sprites`, the actors of the area `shown` at its slot `slot`: at that slot's depth, with that
-// area's scroll, kept inside the view. Each area has a layer of its own, keyed by the area, so a layer's
-// scroll moves only with the camera, and an area scrolling in brings its actors with it.
+// The layer of `sprites`, the actors of the area `shown` at its slot `slot`: at the depth that slot is drawn
+// at for that area, with that area's scroll, kept inside the view. Each area has a layer of its own, keyed by
+// the area, so a layer's scroll moves only with the camera, and an area scrolling in brings its actors with it.
 retropp::DrawLayer AreaSlot(const WorldKit::World& world, const WorldKit::Shown& shown, std::string_view slot,
                             LayerKit::Sprites sprites) {
-    const WorldKit::Place place{.layout = shown.layout, .area = shown.area};
     const std::string key =
         "farm:" + std::to_string(shown.layout) + ":" + std::to_string(shown.area) + ":" + std::string(slot);
     const CameraKit::View& view = world.layouts[static_cast<std::size_t>(shown.layout)].view;
-    return LayerKit::SpriteLayer(key, WorldKit::ActorZ(world, place, slot), {std::move(sprites)},
+    return LayerKit::SpriteLayer(key, WorldKit::ActorZ(world, shown, slot), {std::move(sprites)},
                                  {.scroll = shown.scroll, .regions = WorldKit::ViewStencil(view)});
 }
 
@@ -515,6 +518,7 @@ int main() {
     const Maps maps;
     const WorldKit::World world = FarmWorld(maps, art);
     WorldKit::validate(world);
+    const std::int32_t hudZ = WorldKit::TopZ(world) + 1;   // the egg row, over the whole world
 
     // Handed over once: the world, which input action is Interact, the farm's values, and what the farm
     // does for its two commands.
@@ -590,7 +594,7 @@ int main() {
             frame.layers.push_back(
                 AreaSlot(world, shown, "actors", ActorKit::Sprites(state.actors, config, place, "actors", state)));
         }
-        frame.layers.push_back(LayerKit::SpriteLayer("hud:eggs", kHudZ, {EggRow(state.eggs, art)}));
+        frame.layers.push_back(LayerKit::SpriteLayer("hud:eggs", hudZ, {EggRow(state.eggs, art)}));
         frame.regions = WorldKit::Fade(state.camera, world);
         renderer.renderFrame(frame);
     });
