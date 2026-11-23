@@ -4,7 +4,9 @@
 #                       targets retropp::engine, LayerKit::LayerKit and CameraKit::CameraKit.
 #   ActorKit::ActorKit  the actors of a WorldKit world (headers "ActorKit/…"), on WorldKit::WorldKit and
 #                       the targets LayerKit::LayerKit and ScriptKit::ScriptKit. Defined when the project
-#                       has the target ScriptKit::ScriptKit as this directory is added.
+#                       has the target ScriptKit::ScriptKit as this directory is added. "WorldKit/scene.h",
+#                       the scene, includes ActorKit's headers: a game that includes it links
+#                       ActorKit::ActorKit.
 #
 # A project adds this directory and links the target for the level it uses.
 add_library(WorldKit INTERFACE)

@@ -5,7 +5,8 @@ What a world is made of, and the check that it holds together. The types are in
 
 ```cpp
 #include "WorldKit/area.h"   // Side, Transition, Span, Destination, Opening, CellValue, MapLayer, ReservedLayer,
-                             // ActorSlot, Area, CameraLaw, Layout, World, Place, validate, ActorZ, LayerZ, placeOf
+                             // ActorSlot, Place, Reach, AtEdge, AwakeWhen, AnyActor, AreaActor, LayoutActor,
+                             // WorldActor, Area, CameraLaw, Layout, World, validate, ActorZ, LayerZ, placeOf
 ```
 
 ## Contents
@@ -16,6 +17,11 @@ What a world is made of, and the check that it holds together. The types are in
 - [`MapLayer`](#maplayer)
 - [`ReservedLayer`](#reservedlayer)
 - [`ActorSlot`](#actorslot)
+- [`Reach`](#reach)
+- [`AtEdge`](#atedge)
+- [`AwakeWhen`](#awakewhen)
+- [`AnyActor`](#anyactor)
+- [`AreaActor`, `LayoutActor`, `WorldActor`](#areaactor-layoutactor-worldactor)
 - [`Area`](#area)
 - [`CameraLaw`](#cameralaw)
 - [`Layout`](#layout)
@@ -174,6 +180,156 @@ area's map layers — over every map layer below the slot's depth and under ever
 has as many slots as it needs, or none: an `"actors"` slot over the ground and under a canopy, a
 `"flyers"` slot above the canopy, a `"swimmers"` slot under a water surface.
 
+## `Reach`
+
+```cpp
+enum class Reach : std::uint8_t { Area, Layout, World };
+```
+
+How far an actor of a [scene](scene.md) may roam. An actor written in an area's `actors` has
+`Reach::Area`, in a layout's `Reach::Layout`, and in the world's `Reach::World`; `SceneActor::reach`
+changes it while the game runs ([scene.md](scene.md#reach)).
+
+| `Reach` | Inside it | Its edge |
+|---|---|---|
+| `Area` | its own area | every opening out of it |
+| `Layout` | every area of its layout | every opening into another layout |
+| `World` | every area of the world | — |
+
+An actor goes through an opening inside its reach by the opening's transition
+([scene.md](scene.md#where-an-actor-goes-through-an-opening)). An opening outside it is the edge of its
+reach, where its [`AtEdge`](#atedge) applies.
+
+## `AtEdge`
+
+```cpp
+enum class AtEdge : std::uint8_t { Stop, Despawn, Hide };
+```
+
+What an actor does at an opening that leads outside its reach. Written on its entry, `.atEdge`, and
+changed with `SceneActor::atEdge`.
+
+| `AtEdge` | At a gap in a wall | At a spot |
+|---|---|---|
+| `Stop` (the default) | It is held there. | It walks across and stays in its area. |
+| `Despawn` | It goes out and is removed: its id is retired. | It is removed as its center steps onto the spot. |
+| `Hide` | It goes out and is hidden. | It is hidden as its center steps onto the spot. |
+
+A hidden actor is out of the world: not drawn, not ticked, not solid, not touchable, until the game puts
+it somewhere again with `actors().moveTo`. It keeps its id, its values and where its scripts are
+([scene.md](scene.md#the-edge-of-a-reach)).
+
+```cpp
+.actors = {{.actor = Bat(art), .at = {24, 24}, .atEdge = WorldKit::AtEdge::Despawn}},   // gone up the stairs
+```
+
+## `AwakeWhen`
+
+```cpp
+enum class AwakeWhen : std::uint8_t { Always, InLayout, OnScreen };
+```
+
+When an actor of a scene is awake, taking part in each tick. The rest of the time it is frozen: it holds
+exactly as it is, still drawn and still solid, and carries on from there when it wakes.
+
+| `AwakeWhen` | The actor is awake |
+|---|---|
+| `Always` (the default) | all the time |
+| `InLayout` | while any area of the layout it is in is on screen |
+| `OnScreen` | while the area it is in is on screen |
+
+On screen is what the camera shows: its own area, the areas across seams in view, and the area scrolling
+in ([scene.md](scene.md#awake-or-frozen)).
+
+```cpp
+.actors = {{.actor = Gardener(art), .in = GroundsArea::Garden, .at = {96, 40}, .awakeWhen = WorldKit::AwakeWhen::InLayout}},
+```
+
+## `AnyActor`
+
+```cpp
+class AnyActor {
+public:
+    AnyActor() = default;
+    template <class T> AnyActor(T actor);         // holds a copy of `actor`
+    explicit operator bool() const noexcept;      // whether it holds a value
+    template <class T> const T* as() const noexcept;
+};
+```
+
+An actor value held for a scene, so `area.h` includes the engine's and WorldKit's headers alone. You write it as
+`.actor = Guard(art)`, with any function or value giving an `ActorKit::Actor`; the scene reads it back as
+that `ActorKit::Actor`.
+
+| Member | Returns |
+|---|---|
+| `AnyActor()` | an empty one |
+| `AnyActor(actor)` | one that holds a copy of `actor` |
+| `operator bool()` | whether it holds a value |
+| `as<T>()` | the value when it is a `T`, `nullptr` otherwise |
+
+- **Copies share** the one value they hold.
+- **`validate` rejects an entry whose `actor` is empty.** The scene rejects one that holds another type
+  than `ActorKit::Actor`, with `std::logic_error`.
+
+## `AreaActor`, `LayoutActor`, `WorldActor`
+
+```cpp
+struct AreaActor {
+    std::string name;
+    AnyActor actor;
+    retropp::Vec2i at{};
+    AtEdge atEdge = AtEdge::Stop;
+    AwakeWhen awakeWhen = AwakeWhen::Always;
+};
+
+struct LayoutActor {
+    std::string name;
+    AnyActor actor;
+    int in = 0;
+    retropp::Vec2i at{};
+    AtEdge atEdge = AtEdge::Stop;
+    AwakeWhen awakeWhen = AwakeWhen::Always;
+};
+
+struct WorldActor {
+    std::string name;
+    AnyActor actor;
+    Place in{};
+    retropp::Vec2i at{};
+    AtEdge atEdge = AtEdge::Stop;
+    AwakeWhen awakeWhen = AwakeWhen::Always;
+};
+```
+
+An actor that starts in the world: an entry of an area's, a layout's or the world's `actors`. Where you
+write it is how far it may roam, its [`Reach`](#reach):
+
+```cpp
+const WorldKit::AreaActor guard{.actor = Guard(art), .at = {40, 64}};                              // in an area's actors: stays there
+const WorldKit::LayoutActor hound{.actor = Hound(art), .in = CastleArea::WideHall, .at = {120, 80}};   // in a layout's: roams it
+const WorldKit::WorldActor marker{.name = "marker", .actor = Marker(art), .in = {Castle, Hall}, .at = {76, 68}};   // in the world's: anywhere
+```
+
+`Guard`, `Hound`, `Marker` and `art` are your functions returning an `ActorKit::Actor` and what they make
+it from; `Castle`, `Hall` and `CastleArea::WideHall` are your layout and area numbers.
+[scene.md](scene.md#overview) shows the three written in a world.
+
+| Field | Meaning | Default |
+|---|---|---|
+| `name` | what `Scene::actor` and `Scene::follow` find it by; unique across the whole world | empty: found by its id |
+| `actor` | the `ActorKit::Actor` it is | empty, which `validate` rejects |
+| `in` | `LayoutActor`: an area index of its layout; `WorldActor`: a place of the world | area 0; layout 0 area 0 |
+| `at` | its top-left in that area's pixels, put exactly there, walls included | (0, 0) |
+| `atEdge` | what it does at the edge of its reach ([`AtEdge`](#atedge)) | `Stop` |
+| `awakeWhen` | when it is awake ([`AwakeWhen`](#awakewhen)) | `Always` |
+
+The scene spawns every entry when it is built, in the order the world is written: for each layout, each
+area's entries and then the layout's; then the world's ([scene.md](scene.md#constructors)). The world
+says who is there at the start; `Scene::spawn` takes the same entries while the game runs.
+
+A world with a system of its own for what lives in it leaves every `actors` empty.
+
 ## `Area`
 
 ```cpp
@@ -183,6 +339,7 @@ struct Area {
     std::vector<ActorSlot> actorSlots;               // any number
     const retropp::IndexGrid* collision = nullptr;   // the area's size; one value is open
     std::vector<Opening> openings;
+    std::vector<AreaActor> actors;                   // who starts here and stays here
 };
 ```
 
@@ -192,7 +349,8 @@ world. Every depth is the game's: it hands them in when it builds the world, fro
 keeps its depths in. An area alone on screen is drawn at exactly those depths; with more areas on
 screen, WorldKit spreads them so every lower depth stays under every higher one
 ([drawing.md](drawing.md#how-the-layers-stack)). Collision, the openings and the camera read the
-collision map alone; the layers are only drawn.
+collision map alone; the layers are only drawn. Its `actors` start in it and stay in it
+([`AreaActor`](#areaactor-layoutactor-worldactor)).
 
 ## `CameraLaw`
 
@@ -212,6 +370,7 @@ the game's own state. How the camera gets to the law's place is the module's: se
 struct Layout {
     std::string name;                        // unique within the world
     std::vector<Area> areas;                 // indices are area ids
+    std::vector<LayoutActor> actors;         // who starts in its areas and roams it
     int cellSize = 8;                        // the side of one map cell, in pixels
     CellValue open{};                        // the one collision-map value that is not solid
     CameraKit::View view{};                  // the screen the camera shows, and where it sits on a layer
@@ -233,14 +392,16 @@ the opening lines it up either way. The scroll settings are those of the layout 
 darkens in the layout being left and lightens in the one entered. `seamDepth` is how far through seams
 the camera looks for areas to show: 1 for the areas joined to the current one, 2 for those and the areas
 joined to them, and so on, and 0 for every area a chain of seams reaches; the camera's law and the solid
-query reach one seam whatever it is. A layout is a plain value: it copies,
+query reach one seam whatever it is. Its `actors` start in one of its areas and roam it
+([`LayoutActor`](#areaactor-layoutactor-worldactor)). A layout is a plain value: it copies,
 and the camera reads it on every call rather than keeping a pointer to it.
 
 ## `World`, `Place`
 
 ```cpp
 struct World {
-    std::vector<Layout> layouts;   // indices are layout ids
+    std::vector<Layout> layouts;      // indices are layout ids
+    std::vector<WorldActor> actors;   // who starts in it and goes anywhere
 };
 
 struct Place {
@@ -249,7 +410,9 @@ struct Place {
 };
 ```
 
-The world is its layouts; every camera call takes it. A place is a layout and an area in it, the pair
+The world is its layouts, and its `actors` start in a place of it and go anywhere
+([`WorldActor`](#areaactor-layoutactor-worldactor)); every camera call takes it. A place is a layout
+and an area in it, the pair
 the module hands back when a game needs both (the place entered, the areas shown). A game names a
 place by its enums, or by the names of its layout and area through [`placeOf`](#placeof).
 
@@ -297,6 +460,16 @@ name: `WorldKit: layout 0 'overworld' area 1 'lake' opening 'east door' …`.
 | a seam whose far end is not a seam | `joins seamlessly into '…', which is not seamless` |
 | a seam whose far end does not lead back to it | `joins seamlessly into '…', which does not lead back to it` |
 | a seam whose far end's offset is not the opposite of its own | `joins seamlessly into '…', whose offset is not the negation of its own` |
+| an actor entry whose `actor` is empty | `actor N '…' has no actor` |
+| an actor name used twice anywhere in the world, every level together | `actor N '…' is named twice` |
+| a layout's actor whose `in` is an area the layout lacks | `actor N '…' is in area A, which the layout lacks` |
+| a world's actor whose `in` is a place the world lacks | `actor N '…' is in layout L area A, which the world lacks` |
+
+An actor entry is named by its level, its index among that level's `actors` and its name:
+`WorldKit: layout 0 'castle' area 0 'hall' actor 0 'guard' …` for an area's,
+`WorldKit: layout 0 'castle' actor 0 '' …` for a layout's, and `WorldKit: actor 0 'marker' …` for the
+world's. The entries are checked in the order the scene spawns them, so the second use of a name is the
+one named. Unnamed entries are any number.
 
 The depth rule keeps every depth in the engine's range whatever is on screen: with N areas in the
 world, a layer declared at `z` is drawn between `z × N` and `z × N + N − 1`. Left to your game's own

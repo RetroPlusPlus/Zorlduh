@@ -402,7 +402,8 @@ state.actors.player(hero);
 walk is held inside its confinement, and `PlayerHere`, `PlayerX` and `PlayerY` are filled in from it.
 
 The camera stays in your hands so that a game already running WorldKit adds ActorKit with its camera
-code as it is.
+code as it is. A game that hands its camera to a `WorldKit::Scene` leaves these lines to the scene, which
+follows the actor it is told to and carries it ([../scene.md](../scene.md)).
 
 [how-to.md](how-to.md#follow-the-player-with-the-camera) has the whole recipe.
 

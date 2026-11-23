@@ -6,8 +6,10 @@ layers at depths the game gives, grouped into **layouts** and joined only by the
 game says what each area is and where each opening leads; WorldKit says what is solid, takes the thing
 the screen follows through each opening — by a scroll, a fade, or seamlessly, with the next area simply
 there beyond the wall — keeps the camera within the area, and draws whatever is on screen, with the
-game's sprites at each area's actor slots: over a path, under a canopy. What moves through the world is the game's own, or a
-movement module's: WorldKit answers its questions and moves nothing itself.
+game's sprites at each area's actor slots: over a path, under a canopy. What walks through the world is the game's own, or a
+movement module's: WorldKit answers its questions. Its **scene** runs the whole world for a game that hands
+its camera over: every actor written in the world, the camera following one of them, each actor carried
+through the openings its reach allows, and the frame.
 
 ```cpp
 // The world, once: each layout's areas, their layers, actor slots and openings.
@@ -51,6 +53,8 @@ frame.regions = WorldKit::Fade(camera, world);
 | `Camera` | which layout and area the screen is in, where it looks, the scroll or fade running | [docs/camera.md](docs/camera.md) |
 | `AreaSolids` | what is solid in an area, for anything that moves | [docs/camera.md](docs/camera.md#areasolids) |
 | `WorldLayers`, `Actors`, `Fade`, `TopZ` | the areas on screen as tile layers, each alone at its declared depths and spread among the others when several are on screen, the game's sprites at an actor slot, confined to the view, the fade over them, and the depth above it all | [docs/drawing.md](docs/drawing.md) |
+| `AreaActor`, `LayoutActor`, `WorldActor`, `AnyActor`, `Reach`, `AtEdge`, `AwakeWhen` | the actors that start in an area, a layout or the world, how far each may roam, what it does at the edge of that, and when it is awake | [docs/areas.md](docs/areas.md#areaactor-layoutactor-worldactor) |
+| `Scene`, `SceneActor`, `SceneLayerKey` | the world running: the camera handed over and the actor it follows, every actor ticked, carried through openings and drawn, and each actor's reach, edge and freeze | [docs/scene.md](docs/scene.md) |
 
 The module is header-only and needs C++20. It includes the headers of the engine,
 [LayerKit](../LayerKit/README.md) and [CameraKit](../CameraKit/README.md) alone, and its actors add
@@ -67,6 +71,16 @@ ActorKit has its own headers, `"ActorKit/…"`, its own namespace, `ActorKit`, a
 `ActorKit::ActorKit`. A game with a system of its own for what lives in the world links
 `WorldKit::WorldKit` alone. [docs/actors/concepts.md](docs/actors/concepts.md#overview) opens with an
 example of the whole use and explains each line.
+
+The scene, `WorldKit::Scene` in `"WorldKit/scene.h"`, runs ActorKit for a game: you write the actors in
+the world, hand the scene your camera, and name the actor it follows ([docs/scene.md](docs/scene.md)).
+Every ActorKit call stays yours on the scene's actors. Three ways to work, in the one module:
+
+| You want | You use |
+|---|---|
+| A world with your own system for what lives in it | WorldKit's world, camera, solids and layers. No ActorKit header is included. |
+| ActorKit, wired your own way | ActorKit's set, `tick` and `Sprites` by hand beside the camera, as the farm does. |
+| The whole world run for you | `WorldKit::Scene`. |
 
 | Type or function | Purpose | Reference |
 |---|---|---|
@@ -104,8 +118,10 @@ The directory's `CMakeLists.txt` defines two INTERFACE targets on one include di
 
 | Target | Headers | Expects |
 |---|---|---|
-| `WorldKit::WorldKit` | `"WorldKit/…"` | the engine as `retropp::engine`, the layer kit as `LayerKit::LayerKit` and the camera as `CameraKit::CameraKit` |
-| `ActorKit::ActorKit` | `"ActorKit/…"` | `WorldKit::WorldKit` and ScriptKit as `ScriptKit::ScriptKit`; defined when `ScriptKit::ScriptKit` exists as the directory is added |
+| `WorldKit::WorldKit` | `"WorldKit/…"` but `scene.h` | the engine as `retropp::engine`, the layer kit as `LayerKit::LayerKit` and the camera as `CameraKit::CameraKit` |
+| `ActorKit::ActorKit` | `"ActorKit/…"` and `"WorldKit/scene.h"` | `WorldKit::WorldKit` and ScriptKit as `ScriptKit::ScriptKit`; defined when `ScriptKit::ScriptKit` exists as the directory is added |
+
+A game that includes `WorldKit/scene.h` links `ActorKit::ActorKit`.
 
 | CMake option | Default | Effect |
 |---|---|---|
@@ -128,11 +144,13 @@ modules/WorldKit/
   CMakeLists.txt                    the WorldKit::WorldKit and ActorKit::ActorKit targets and the example option
   include/WorldKit/
     area.h                          Side, Transition, Span, Destination, Opening, CellValue, MapLayer,
-                                    ReservedLayer, ActorSlot, Area, CameraLaw, Layout, World, Place,
+                                    ReservedLayer, ActorSlot, Place, Reach, AtEdge, AwakeWhen, AnyActor,
+                                    AreaActor, LayoutActor, WorldActor, Area, CameraLaw, Layout, World,
                                     validate, ActorZ, LayerZ, placeOf
     solids.h                        AreaSolids
     camera.h                        Step, Shown, ActorZ and LayerZ by Shown, Camera
     world_layers.h                  AreaLayerKey, ActorsKey, TopZ, ViewStencil, WorldLayers, Actors, Fade
+    scene.h                         SceneLayerKey, SceneActor, Scene (with ActorKit::ActorKit)
   include/ActorKit/
     actor.h                         Actor, Id, Side, ScriptRef, Scripts, ActionRow, Actions
     actors.h                        Confinement, Actors
@@ -151,9 +169,9 @@ modules/WorldKit/
     scripts/                        its scripts, a file each
     shaders/                        the pond's ripple shader
     assets/                         its sheets and palette images
-  docs/                             the guide
+  docs/                             the guide; docs/scene.md the scene
   docs/actors/                      the actors' guide
 ```
 
-`world_layers.h` is the only header that builds draw types, so a game's simulation can include the rest
-without anything to draw.
+`world_layers.h` and `scene.h` are the headers under `include/WorldKit/` that build draw types, so a
+game's simulation includes the rest and stays plain data.

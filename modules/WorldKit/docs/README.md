@@ -24,14 +24,17 @@ What the module takes care of:
 
 - the world's data: layouts, areas and their openings, checked once so a wrong link is found at startup;
 - what is solid in an area, for anything that moves — a walker from a movement module, a mover the game
-  writes itself; the module moves nothing;
+  writes itself, each walking by its own rules;
 - noticing when the thing the screen follows goes out through an opening, and taking it through: a
   scroll that slides the next area in and carries the thing through, a fade that lands it at the
   entrance, or across a seam, the change into the next area's pixels with nothing on screen moving;
 - the camera: within an area by a camera law the game may replace, following only where there is room
   to follow and only as the thing moves;
 - the areas on screen as tile layers, each at its own depth, and the things the game draws at an area's
-  actor slots, all confined to the part of the screen the world is given, and the fade over everything.
+  actor slots, all confined to the part of the screen the world is given, and the fade over everything;
+- for a game that hands its camera to a [scene](scene.md): the actors written in the world, live in one
+  ActorKit set, the camera following one of them, every other carried through the openings its reach
+  allows, each awake or frozen by its rule, and all of them drawn at their slots.
 
 What stays with the game: the maps and art, the depths, the naming of layouts and areas, what moves and
 how, the sprites of what moves, and whatever fills the rest of the screen.
@@ -44,15 +47,17 @@ how, the sprites of what moves, and whatever fills the rest of the screen.
 |---|---|
 | [getting-started.md](getting-started.md) | A complete program, four areas joined by a door, stairs and a seam, built as `WorldKit-example-getting-started`, explained part by part |
 | [concepts.md](concepts.md) | Areas, layouts and openings; how movement plugs in; a tick of following; scrolls, fades and seams; the camera and its law; drawing and depth; where each part lives in a game |
-| [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a layer over the player, things at more than one depth, a layer of your own among the world's, a camera law of your own, a movement module, the fade's look, another layout, a seam and how deep seams are drawn, things in an area, a reserved part of the screen |
+| [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a layer over the player, things at more than one depth, a layer of your own among the world's, a camera law of your own, a movement module, the fade's look, another layout, a seam and how deep seams are drawn, things in an area, the world run by the scene, an actor in the world, an actor roaming beyond its area, despawning or hiding at the edge of a reach, freezing actors off screen, a slot's sprites changed on their way, the camera driven by hand beside the scene, a reserved part of the screen |
+| [scene.md](scene.md) | The world running: `Scene` and `SceneActor` — what a tick does, where actors go through openings, the edge of a reach, awake or frozen, drawing, the level beneath, and the reference |
 
 ### Reference
 
 | Page | Covers | Header |
 |---|---|---|
-| [areas.md](areas.md) | `Side`, `Transition`, `Span`, `Destination`, `Opening`, `CellValue`, `MapLayer`, `ReservedLayer`, `ActorSlot`, `Area`, `CameraLaw`, `Layout`, `World`, `Place`, `validate`, `ActorZ`, `LayerZ`, `placeOf` | `area.h` |
+| [areas.md](areas.md) | `Side`, `Transition`, `Span`, `Destination`, `Opening`, `CellValue`, `MapLayer`, `ReservedLayer`, `ActorSlot`, `Reach`, `AtEdge`, `AwakeWhen`, `AnyActor`, `AreaActor`, `LayoutActor`, `WorldActor`, `Area`, `CameraLaw`, `Layout`, `World`, `Place`, `validate`, `ActorZ`, `LayerZ`, `placeOf` | `area.h` |
 | [camera.md](camera.md) | `Camera`, `Step`, `Shown`, `ActorZ` and `LayerZ` by `Shown`, `AreaSolids` | `camera.h`, `solids.h` |
 | [drawing.md](drawing.md) | `WorldLayers`, `Actors`, `Fade`, `TopZ`, `AreaLayerKey`, `ActorsKey`, `ViewStencil` | `world_layers.h` |
+| [scene.md](scene.md) | `Scene`, `SceneActor`, `SceneLayerKey` | `scene.h` |
 
 ### Actors
 
@@ -77,6 +82,10 @@ how, the sprites of what moves, and whatever fills the rest of the screen.
 | A seamless join: the next area drawn beyond the wall, walked into with nothing moving on screen; areas drawn through chains of seams, as deep as the layout says | available | camera.md |
 | The camera within an area through `CameraKit::follow` or a law of the game's own; following only where there is room, and only as the thing moves | available | areas.md, camera.md |
 | An area's layers, each at its own depth, for every area on screen, and the game's sprites at the current area's actor slots, confined to the view; the world's top depth; the fade as a frame region | available | drawing.md |
+| The world running as a scene: the camera handed over, one actor followed by id or name, the tick, the frame | available | scene.md |
+| Actors written in the world at three levels, each level its reach; spawned at any time through the scene | available | areas.md, scene.md |
+| An actor through an opening inside its reach by the opening's transition; `Stop`, `Despawn` or `Hide` at the edge of it; its reach changed while the game runs | available | scene.md |
+| Every actor live wherever it is, awake or frozen by its rule — always, while its layout is on screen, while its area is — or by hand | available | scene.md |
 | Openings that open and close (a locked door, a shutter) | not provided — see [how-to.md](how-to.md#shut-a-door) | how-to.md |
 | A scroll or a seam from a spot | not provided | — |
-| More than one thing followed; things in other areas while they are off screen | not provided | — |
+| More than one thing followed by the camera at once | not provided | — |

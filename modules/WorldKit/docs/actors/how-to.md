@@ -109,6 +109,8 @@ if (step.entered) {
 - If the player can be removed, test `state.actors.has(hero)` before these lines.
 - To make another actor the player, call `state.actors.player(other)`, and put the camera on it as
   [Warp an actor](#warp-an-actor) does.
+- A game that hands its camera to a `WorldKit::Scene` leaves these lines to the scene:
+  `scene.follow(hero)` is the whole of it ([../how-to.md](../how-to.md#run-the-world-with-the-scene)).
 
 ## Warp an actor
 
@@ -199,6 +201,9 @@ if (state.actors.place(hen) == yard && state.actors.box(hen).x >= kYardWidth) {
   until your code moves it. Beyond a seam it walks over the next area's own cells.
 - `at.x - kYardWidth` keeps how far past the edge it has walked, and puts the hen that far inside the
   field's west gateway.
+- A game that hands its camera to a `WorldKit::Scene` leaves these lines to the scene: an actor whose
+  reach takes in the next area goes through by itself
+  ([../how-to.md](../how-to.md#let-an-actor-roam-beyond-its-area)).
 
 ## Open and shut something with Interact
 

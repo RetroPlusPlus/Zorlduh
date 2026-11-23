@@ -121,10 +121,10 @@ Each of these is yours to add. The page shows how.
 
 | Feature | How | Page |
 |---|---|---|
-| Moving the camera | Call `WorldKit::Camera::follow` with the actor's box, and put the actor where the camera says | [how-to.md](how-to.md#follow-the-player-with-the-camera) |
-| Drawing | Put `Sprites` on a layer for each area on screen and each slot | [drawing.md](drawing.md#a-layer-for-each-area) |
-| An actor other than the player going through a door | Move it with `moveTo` when it reaches the door. Its `confinement` is what lets its walk cross the door first. | [how-to.md](how-to.md#send-an-actor-to-another-area) |
-| An actor shown in place as it changes area | Call `fresh` for it on the tick it moves into the next area | [drawing.md](drawing.md#fresh-keys) |
+| Moving the camera | Call `WorldKit::Camera::follow` with the actor's box, and put the actor where the camera says, or `WorldKit::Scene` does it | [how-to.md](how-to.md#follow-the-player-with-the-camera), [../scene.md](../scene.md) |
+| Drawing | Put `Sprites` on a layer for each area on screen and each slot, or `WorldKit::Scene` does it | [drawing.md](drawing.md#a-layer-for-each-area), [../scene.md](../scene.md#drawing) |
+| An actor other than the player going through a door | Move it with `moveTo` when it reaches the door. Its `confinement` is what lets its walk cross the door first. Or `WorldKit::Scene` does it. | [how-to.md](how-to.md#send-an-actor-to-another-area), [../scene.md](../scene.md#where-an-actor-goes-through-an-opening) |
+| An actor shown in place as it changes area | Call `fresh` for it on the tick it moves into the next area, or `WorldKit::Scene` does it | [drawing.md](drawing.md#fresh-keys), [../scene.md](../scene.md#what-the-scene-does-in-a-tick) |
 | Detection between two sets | Put the actors in one set, or exchange through a value | [concepts.md](concepts.md#several-sets) |
 | Counting things that happen on one tick | Use a command | [scripts.md](scripts.md#count-with-a-command) |
 | Random behavior | Bind a value of yours that your tick rolls | [how-to.md](how-to.md#give-a-script-something-random) |
