@@ -52,7 +52,9 @@ menu over a menu, and a list of every area, a page at a time, that puts the play
 - [x] **World** — layouts of areas with their own maps and art, each area drawn in layers at depths the
   game gives with named slots for the things moving in it, openings that scroll, fade or join seamlessly
   to the next area, the camera within an area and across a seam, the world confined to its part of the
-  screen ([`modules/WorldKit/`](modules/WorldKit/README.md))
+  screen; and the scene, the whole world run for a game that hands its camera over — the actors written
+  in the world, one followed by the camera, the rest carried through the openings their reach allows
+  ([`modules/WorldKit/`](modules/WorldKit/README.md), [scene](modules/WorldKit/docs/scene.md))
 - [x] **Actor kit** — actors declared as values and spawned at any time, moved by walkers of the game's
   choosing, with values of their own, triggers and scripts, all run by one call a tick, reporting where
   they are and their sprites when asked; a part of WorldKit
