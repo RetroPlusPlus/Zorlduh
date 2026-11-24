@@ -354,7 +354,7 @@ A walking actor stops at three things:
 | What stops it | Which actors |
 |---|---|
 | The solid cells of its area's collision map | all |
-| The box of every other solid actor in its area and its set, frozen ones included | all |
+| The box of every other solid actor in its area and its set, frozen ones included, once the two boxes are apart | all |
 | What its confinement holds it inside: by default the edge of its area | all but the player, which walks out through the area's openings |
 
 An actor's confinement is `Area`, `Layout` or `None`. Set to `Layout`, it walks out through the openings

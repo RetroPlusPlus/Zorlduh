@@ -428,27 +428,37 @@ TEST_F(SceneActors, StopHoldsEachActorAtTheEdgeOfItsReach) {
 // ── Carried inside its reach ───────────────────────────────────────────────────────────────────────
 
 TEST_F(SceneActors, AnActorInsideItsReachGoesOnByTheOpeningsTransitionOnTheTickItCrosses) {
-    // The east door: the carry in, in the hall's pixels, shown fresh.
+    // The east door: into the hall's pixels where it crossed, in the doorway, under its own key; then it
+    // walks in.
     const Id door = spawnAt(Reach::World, kCourt, {150, 60}, Dir::Right);
     tick();
-    const std::string own = actors().key(door);
+    const std::string doorKey = actors().key(door);
     EXPECT_EQ(ticksUntilItLeaves(door), 5);   // its center at 160 on the fifth tick more
     EXPECT_EQ(actors().place(door), kHall);
-    EXPECT_EQ(actors().position(door), (Vec2i{12, 60}));   // from 156, 16 on, 160 back
-    EXPECT_NE(actors().key(door), own);
+    EXPECT_EQ(actors().position(door), (Vec2i{-4, 60}));   // from 156, 160 back: half in the doorway
+    EXPECT_EQ(actors().key(door), doorKey);
     EXPECT_FALSE(scene().camera().transitioning());
+    tick();
+    EXPECT_EQ(actors().position(door), (Vec2i{-3, 60}));   // a pixel a tick, in through the doorway
+    EXPECT_EQ(actors().place(door), kHall);
 
-    // The seam: into the garden's pixels on the crossing tick.
+    // The seam: into the garden's pixels on the crossing tick, under its own key.
     const Id seam = spawnAt(Reach::Layout, kCourt, {110, 10}, Dir::Up);
+    tick();
+    const std::string seamKey = actors().key(seam);
     EXPECT_GT(ticksUntilItLeaves(seam), 0);
     EXPECT_EQ(actors().place(seam), kGarden);
     EXPECT_EQ(actors().position(seam), (Vec2i{110, 91}));   // from y −5, 96 down
+    EXPECT_EQ(actors().key(seam), seamKey);
 
-    // The stairs: centered on the cellar's stairs, the camera staying in the court.
+    // The stairs: centered on the cellar's stairs, the camera staying in the court, shown fresh.
     const Id stairs = spawnAt(Reach::Layout, kCourt, {100, 50}, Dir::Up);
-    EXPECT_EQ(ticksUntilItLeaves(stairs), 15);   // its center at 39, inside the stairs
+    tick();
+    const std::string stairsKey = actors().key(stairs);
+    EXPECT_EQ(ticksUntilItLeaves(stairs), 14);   // its center at 39, inside the stairs
     EXPECT_EQ(actors().place(stairs), kCellar);
     EXPECT_EQ(actors().position(stairs), (Vec2i{44, 32}));
+    EXPECT_NE(actors().key(stairs), stairsKey);
     EXPECT_FALSE(scene().camera().transitioning());
     EXPECT_EQ(scene().camera().area(), Keep::Court);
 }
@@ -603,6 +613,34 @@ TEST_F(SceneActors, AnOnScreenActorWakesWhenAScrollBringsItsAreaOnScreenAndWalks
     tick();
     EXPECT_GT(actors().position(inHall).x, 100);
     EXPECT_EQ(scene().camera().area(), Keep::Hall);
+}
+
+const ScriptKit::Script counter{.name = "counter", .on = ActorKit::Enter,
+                                .body = {ScriptKit::loop({set(Mine, Mine + 1), wait(1)})}};
+
+TEST_F(SceneActors, WhileAScrollRunsTheWholeWorldHoldsStillScriptsIncludedAndCarriesOnAfter) {
+    const Id counting = spawnAt(Reach::Area, kCourt, {40, 100}, Dir::Right, AtEdge::Stop, {&counter});
+    const Id marker = scene().actor("marker").id();
+    actors().moveTo(marker, kCourt, {150, 64});
+    scene().follow(marker);
+    while (!scene().camera().transitioning()) {
+        tick(Way{.right = true});
+    }
+    const int count = actors().get(counting, Mine);
+    const Vec2i at = actors().position(counting);
+    int scrolling = 0;
+    while (scene().camera().transitioning()) {
+        tick();
+        ++scrolling;
+        if (scene().camera().transitioning()) {
+            EXPECT_EQ(actors().get(counting, Mine), count);   // its script holds
+            EXPECT_EQ(actors().position(counting), at);      // and so does its walk
+        }
+    }
+    EXPECT_EQ(scrolling, 32);
+    EXPECT_EQ(actors().place(marker), kHall);   // the followed actor carried through meanwhile
+    ticks(3);
+    EXPECT_GT(actors().get(counting, Mine), count);   // and the world carries on once it ends
 }
 
 TEST_F(SceneActors, AnActorFrozenByItsRuleCarriesOnFromWhereItStoppedWhenItWakes) {

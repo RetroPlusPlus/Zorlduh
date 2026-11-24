@@ -112,7 +112,7 @@ in order:
 | 3. The camera's place | When the followed actor is in another place than the camera, the camera goes there, on the actor's box, and the actor is shown fresh. |
 | 4. Awake or frozen | Each actor wakes or freezes by its rule, for the areas the camera shows as the tick begins ([Awake or frozen](#awake-or-frozen)). |
 | 5. Boxes | Each awake actor's box is noted. |
-| 6. ActorKit | `ActorKit::tick` runs every awake actor, against the camera. |
+| 6. ActorKit | `ActorKit::tick` runs every awake actor, against the camera. While a scroll or a fade runs, this step and step 8 wait: the whole world holds still, and only the followed actor is carried. |
 | 7. The followed actor | The camera follows its box, and the actor goes where the camera says. |
 | 8. Every other actor | Each awake actor that went through an opening this tick goes on by the opening's transition, or meets the edge of its reach ([below](#where-an-actor-goes-through-an-opening)). |
 
@@ -127,7 +127,8 @@ spot from outside it.
 **The followed actor** goes through every opening that leads somewhere, and the camera takes it through:
 a scroll carries it the layout's `carry` in while the screen slides, a fade lands it on the entrance at
 the middle, and a seam takes it into the next area's pixels with the picture holding still
-([camera.md](camera.md#camera)). It is shown fresh on the tick it enters the next area.
+([camera.md](camera.md#camera)). Through a fade it is shown fresh on the tick it lands; through a scroll
+or a seam its sprite runs on unbroken under its own key ([Drawing](#drawing)).
 
 **Every other actor** goes through an opening inside its reach by the opening's `transition`, on the tick
 its center crosses:
@@ -135,11 +136,12 @@ its center crosses:
 | The opening's `transition` | Where the actor goes |
 |---|---|
 | `Seamless` | It walks on into the next area, into that area's pixels. |
-| `Scroll` | It stands the layout's `carry` pixels inside the next area's entrance, at its place along the opening. |
+| `Scroll` | It walks on in through the next area's entrance, into that area's pixels, from where it crossed: it comes in through the doorway at its own pace. |
 | `Fade` | It stands on the next area's entrance: centered on a spot, or one cell in from a wall's gap and centered along it. |
 
-The screen holds still for it, and the camera stays where it is. It is shown fresh on that tick, so its
-sprite appears where it lands.
+The screen holds still for it, and the camera stays where it is. Through a fade it is shown fresh on that
+tick, so its sprite appears where it lands; through a seam or a scroll its sprite walks on under its own
+key.
 
 | Reach | The openings inside it |
 |---|---|
@@ -151,8 +153,10 @@ An opening outside its reach is [the edge of its reach](#the-edge-of-a-reach).
 
 Watch for:
 
-- **Nothing walks while a scroll or a fade runs.** That is ActorKit's rule for every actor
-  ([actors/actors.md](actors/actors.md#tick)). An awake actor's scripts still run.
+- **The whole world holds still while a scroll or a fade runs.** Every actor's scripts, waits, triggers
+  and walking wait for the transition to end, so a script timed in ticks keeps every tick of its walk.
+  The followed actor is carried by the camera meanwhile. (ActorKit used by hand steps scripts and holds
+  only the walking: [actors/actors.md](actors/actors.md#tick).)
 - **The followed actor's reach and `atEdge` wait.** While the camera follows it, it goes through every
   opening that leads somewhere, as the player does. Following another actor hands it back to its own.
 
@@ -218,19 +222,32 @@ the start of each tick, for the areas on screen then.
 
 ## Drawing
 
-`layers(state)` is the frame's layers: [`WorldLayers`](drawing.md#worldlayers), then, for each area the
-camera shows and each actor slot of that area, one sprite layer:
+`layers(state)` is the frame's layers: [`WorldLayers`](drawing.md#worldlayers), then one sprite layer
+for each actor slot name among the areas the camera shows, the current area's slots first:
 
 | Of each sprite layer | It is |
 |---|---|
-| the key | [`SceneLayerKey`](#scenelayerkey)`(layout, area, slot)`: `"scene:<layout>:<area>:<slot>"` |
-| the depth | `ActorZ(world, shown, slot)`, the slot's depth for that area on screen ([camera.md](camera.md#actorz-layerz-by-shown)) |
-| the scroll | that area's, so a sprite in that area's pixels lands on its map |
+| the key | [`SceneLayerKey`](#scenelayerkey)`(slot)`: `"scene:<slot>"` |
+| the depth | `ActorZ(world, shown, slot)` for the first area on screen with that slot, the current area when it has it ([camera.md](camera.md#actorz-layerz-by-shown)) |
+| the scroll | the current area's |
 | the regions | [`ViewStencil`](drawing.md#viewstencil) of the current layout's view |
-| the sprites | `ActorKit::Sprites` of that area and slot, each keyed and at the depth of its feet, as ActorKit reports them ([actors/drawing.md](actors/drawing.md)) |
+| the sprites | `ActorKit::Sprites` of that slot in every area on screen, each keyed and at the depth of its feet, as ActorKit reports them ([actors/drawing.md](actors/drawing.md)), moved into the current area's pixels |
 
-Every slot gets its layer, empty or with sprites, so every layer keeps its key from frame to frame. A
-hidden actor is outside every area, so every layer leaves it out.
+A sprite of another area on screen is moved by where that area sits in the current area's pixels: its
+`x`, `y` and `z` all shift by that offset. So the actors on both sides of a seam sort by their feet
+together, and an actor keeps its key through a seam or a scroll: when it changes area, or the current
+area changes, its position and the layer's scroll shift by the same amount, and the engine eases the
+two together. An actor is shown fresh where it really jumps: through a fade, back from hiding, and when
+the camera is put onto the followed actor.
+
+| On screen | The `"scene:actors"` layer holds |
+|---|---|
+| The hall alone | the hall's actors, in the hall's pixels |
+| The wide hall, and the garden across the seam above it | the wide hall's actors as they are, and the garden's 96 pixels up |
+| The hall scrolling east into the wide hall | the hall's actors as they are, and the wide hall's 160 pixels to the right |
+
+Every slot name gets its layer, empty or with sprites, so every layer keeps its key from frame to frame.
+A hidden actor is outside every area, so every layer leaves it out.
 
 To change a sprite on its way to the screen, or add sprites of your own at a slot, hand `layers` a
 function:
@@ -246,7 +263,8 @@ frame.layers = state.scene.layers(state, [&](WorldKit::Place place, std::string_
 
 `pond` is a `WorldKit::Place` of yours and `Ripple` your component returning a `retropp::Sprite`. The
 function is called once for each area on screen and each of its slots, with that area's sprites in that
-area's pixels, and what it returns is drawn at that slot.
+area's pixels. Write what it returns in that area's pixels too: the scene moves it into the current
+area's pixels and draws it at that slot.
 
 `fade()` is the fade over the screen while one runs ([`Fade`](drawing.md#fade)).
 
@@ -632,12 +650,16 @@ if (state.scene.actor(bat).frozen()) {
 ## `SceneLayerKey`
 
 ```cpp
-std::string SceneLayerKey(int layout, int area, std::string_view slot);   // "scene:<layout>:<area>:<slot>"
+std::string SceneLayerKey(std::string_view slot);   // "scene:<slot>"
 ```
 
-The key of the sprite layer `layers` draws for the actor slot `slot` of area `area` of layout `layout`.
-Each area's slot keeps its key from the frame it comes on screen to the frame it leaves. A layer of your
-own uses a key of its own.
+The key of the sprite layer `layers` draws for the actor slots named `slot` across every area on screen.
+It stays the same as the current area changes, so the layer's scroll eases across the change with the
+sprites on it. A layer of your own uses a key of its own.
+
+```cpp
+const std::string key = WorldKit::SceneLayerKey("actors");   // "scene:actors"
+```
 
 ## Exceptions
 

@@ -464,8 +464,9 @@ frame.layers = state.scene.layers(state, [&](WorldKit::Place place, std::string_
 });
 ```
 
-`garden` is a `WorldKit::Place` of yours. Add sprites of your own by pushing them onto `sprites`; find one
-actor's sprite by its key, `state.scene.actors().key(id)`.
+`garden` is a `WorldKit::Place` of yours. Add sprites of your own by pushing them onto `sprites`, placed
+in that area's pixels as the actors' are; find one actor's sprite by its key,
+`state.scene.actors().key(id)`.
 
 ## Drive the camera by hand beside the scene
 

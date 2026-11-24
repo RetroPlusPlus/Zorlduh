@@ -3,8 +3,9 @@
 The guide to the WorldKit module, for anyone building a game on the Polyrhythm engine whose world is
 more than one screen. Every page is written against the shipped headers in `include/WorldKit/`.
 
-**New here? Start with [getting-started.md](getting-started.md)**: a complete program, four areas
-joined by a door, a staircase and a seam, explained part by part. Then read [concepts.md](concepts.md)
+**New here? Start with [getting-started.md](getting-started.md)**: a complete program run by the scene,
+a castle and its grounds joined by doors, stairs and a seam, with five inhabitants, explained part by
+part. Then read [concepts.md](concepts.md)
 for the model and [how-to.md](how-to.md) for recipes.
 
 ## What the module is
@@ -45,7 +46,7 @@ how, the sprites of what moves, and whatever fills the rest of the screen.
 
 | Page | Covers |
 |---|---|
-| [getting-started.md](getting-started.md) | A complete program, four areas joined by a door, stairs and a seam, built as `WorldKit-example-getting-started`, explained part by part |
+| [getting-started.md](getting-started.md) | A complete program run by the scene: a castle and its grounds, two layouts joined by doors, stairs and a seam, and five inhabitants written in the world — the marker the camera follows, a guard, a gardener, a hound promoted from a handler, a bat that despawns — built as `WorldKit-example-getting-started`, explained part by part |
 | [concepts.md](concepts.md) | Areas, layouts and openings; how movement plugs in; a tick of following; scrolls, fades and seams; the camera and its law; drawing and depth; where each part lives in a game |
 | [how-to.md](how-to.md) | Recipes: a side-scroller's edges, a one-way drop, a door that is shut, different art per area, a layer over the player, things at more than one depth, a layer of your own among the world's, a camera law of your own, a movement module, the fade's look, another layout, a seam and how deep seams are drawn, things in an area, the world run by the scene, an actor in the world, an actor roaming beyond its area, despawning or hiding at the edge of a reach, freezing actors off screen, a slot's sprites changed on their way, the camera driven by hand beside the scene, a reserved part of the screen |
 | [scene.md](scene.md) | The world running: `Scene` and `SceneActor` — what a tick does, where actors go through openings, the edge of a reach, awake or frozen, drawing, the level beneath, and the reference |

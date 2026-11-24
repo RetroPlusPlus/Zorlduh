@@ -37,7 +37,8 @@ namespace ActorKit {
 // collision map that WorldKit reports solid; every rectangle in `others`; and, while `confined` is true,
 // everything outside `bounds`, the area's own rectangle. Valid during the walk it is handed to.
 //
-// tick fills `others` with the box of every other solid actor in the area, and for an actor whose
+// tick fills `others` with the box of every other solid actor in the area that lies apart from the
+// walking actor's own box as its walk begins — two solid actors that overlap walk apart —, and for an actor whose
 // confinement is Confinement::Layout, the strip beyond each edge opening that leads to another layout,
 // as wide as the opening's span. It sets `confined` for an actor whose confinement is
 // Confinement::Area, the player (Actors::player) excepted.

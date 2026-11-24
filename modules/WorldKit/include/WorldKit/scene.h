@@ -51,11 +51,10 @@
 
 namespace WorldKit {
 
-// The key of the sprite layer the scene draws for the actor slot named `slot` of area `area` of layout
-// `layout`: "scene:<layout>:<area>:<slot>".
-[[nodiscard]] inline std::string SceneLayerKey(int layout, int area, std::string_view slot) {
-    return "scene:" + std::to_string(layout) + ":" + std::to_string(area) + ":" + std::string{slot};
-}
+// The key of the sprite layer the scene draws for the actor slots named `slot` of every area on screen:
+// "scene:<slot>". It stays the same as the current area changes, so the layer's scroll eases across the
+// change.
+[[nodiscard]] inline std::string SceneLayerKey(std::string_view slot) { return "scene:" + std::string{slot}; }
 
 namespace detail {
 
@@ -236,17 +235,23 @@ public:
     //   4. Each actor is woken or frozen: awake when it is in the world, its freeze() lifted, and its rule
     //      holding for the areas the camera shows now.
     //   5. Each awake actor's box is noted.
-    //   6. ActorKit::tick for every actor, against the camera.
+    //   6. ActorKit::tick for every actor, against the camera — on a tick a scroll or a fade is running as
+    //      it begins, left out, so the whole world holds still: every actor's scripts, waits, triggers
+    //      and walking wait for the transition to end, and step 8 waits with them.
     //   7. The camera follows the followed actor's box, and the actor goes where the camera says: carried
-    //      through an opening while a scroll runs, onto the entrance at the middle of a fade, into the next
-    //      area's pixels, shown fresh on the tick it enters. While following() is kNoId, a scroll or a fade
-    //      the last followed actor started runs to its end, and otherwise the camera is left as it is, for
-    //      the game to drive by hand or to stay where it is.
+    //      through an opening while a scroll runs, into the next area's pixels at a seam or at the scroll's
+    //      end, and onto the entrance at the middle of a fade, shown fresh on that tick. While following()
+    //      is kNoId, a scroll or a fade the last followed actor started runs to its end, and otherwise the
+    //      camera is left as it is, for the game to drive by hand or to stay where it is.
     //   8. Each other awake actor that has gone through an opening this tick goes on by the opening's
-    //      transition: across a seam into the next area, a scroll's carry inside the next area's entrance,
-    //      or onto a fade's entrance, shown fresh — when the opening leads inside its reach. Outside it,
-    //      AtEdge::Despawn removes it, AtEdge::Hide puts it out of the world, and AtEdge::Stop leaves it
-    //      (held at a wall's opening, walking across a spot).
+    //      transition when the opening leads inside its reach: through a seam or a scroll into the next
+    //      area's pixels, coming in through the doorway from where it crossed, or onto a fade's entrance,
+    //      shown fresh. Outside its reach, AtEdge::Despawn removes it, AtEdge::Hide puts it out of the
+    //      world, and AtEdge::Stop leaves it (held at a wall's opening, walking across a spot).
+    //
+    // An actor shown fresh takes a throwaway sprite key for the tick (ActorKit::Actors::fresh), so it
+    // appears at once where it lands. Through a seam or a scroll it keeps its own key: layers() draws it in
+    // the current area's pixels, where its position runs on unbroken, and it eases with everything else.
     //
     // A game holding the whole world still — under a menu or a message — leaves tick out for those ticks.
     // Throws whatever ActorKit::tick throws.
@@ -283,13 +288,20 @@ public:
             }
         }
 
+        // While a scroll or a fade runs, the whole world holds still: steps 5, 6 and 8 wait, and only the
+        // followed actor is carried.
+        const bool held = camera_.transitioning();
+
         // 5. The boxes as the tick begins.
         for (Row& row : rows_) {
-            row.was = actors_.frozen(row.id) ? std::nullopt : std::optional<retropp::IntRect>{actors_.box(row.id)};
+            row.was = held || actors_.frozen(row.id) ? std::nullopt
+                                                      : std::optional<retropp::IntRect>{actors_.box(row.id)};
         }
 
         // 6. The actors.
-        ActorKit::tick(actors_, config_, camera_, input, state);
+        if (!held) {
+            ActorKit::tick(actors_, config_, camera_, input, state);
+        }
 
         // 7. The followed actor.
         Step step{};
@@ -297,11 +309,12 @@ public:
         if (followed != ActorKit::kNoId && !hiddenNow(followed)) {
             if (!placeCameraOnFollowed(freshIds)) {
                 const retropp::IntRect box = actors_.box(followed);
+                const bool fading = detail::fading(camera_);
                 step = camera_.follow(*world_, box);
                 const retropp::Vec2i at = actors_.position(followed);
                 actors_.moveTo(followed, step.entered.value_or(actors_.place(followed)),
                                {.x = at.x + step.move.x, .y = at.y + step.move.y});
-                if (step.entered) {
+                if (step.entered && fading) {
                     freshIds.push_back(followed);
                 }
                 lastBox_ = actors_.box(followed);
@@ -322,16 +335,19 @@ public:
                 continue;
             }
             const Place place = actors_.place(row.id);
-            const Step landing = detail::through(*world_, place, *row.was, actors_.box(row.id));
-            if (!landing.entered) {
+            const Opening* opening = detail::goneThrough(*world_, place, *row.was, actors_.box(row.id));
+            if (opening == nullptr) {
                 continue;
             }
+            const Step landing = detail::landing(*world_, place, *opening, actors_.box(row.id), /*carried=*/false);
             const bool inside = row.reach == Reach::World ||
                                 (row.reach == Reach::Layout && landing.entered->layout == place.layout);
             if (inside) {
                 const retropp::Vec2i at = actors_.position(row.id);
                 actors_.moveTo(row.id, *landing.entered, {.x = at.x + landing.move.x, .y = at.y + landing.move.y});
-                freshIds.push_back(row.id);
+                if (opening->transition == Transition::Fade) {
+                    freshIds.push_back(row.id);
+                }
             } else if (row.atEdge == AtEdge::Despawn) {
                 actors_.remove(row.id);
                 removed.push_back(row.id);
@@ -353,11 +369,15 @@ public:
         return step;
     }
 
-    // The frame's layers: WorldLayers, then for each area the camera shows and each actor slot of that
-    // area, in order, one sprite layer keyed SceneLayerKey, at the depth ActorZ gives that slot for that
-    // area on screen, with that area's scroll, confined to the current layout's view, holding
-    // ActorKit::Sprites of that place and slot; every slot gets its layer, empty or with sprites. Throws what
-    // WorldLayers and ActorKit::Sprites throw.
+    // The frame's layers: WorldLayers, then one sprite layer for each slot name among the areas the camera
+    // shows, in the order the names first appear (the current area's slots first). Each is keyed
+    // SceneLayerKey, drawn at the depth ActorZ gives that slot for the first area on screen that has it,
+    // with the current area's scroll, confined to the current layout's view, and holds ActorKit::Sprites
+    // of every area on screen with that slot, each area's moved into the current area's pixels: its
+    // sprites' x, y and z shifted by where that area sits in them. So the actors of every area on screen
+    // sort by their feet together, and each sprite keeps its key and eases with the layer when the current
+    // area changes. Every slot name gets its layer, empty or with sprites. Throws what WorldLayers and
+    // ActorKit::Sprites throw.
     template <class State>
     [[nodiscard]] LayerKit::Layers layers(const State& state) const {
         return layers(state, [](Place, std::string_view, LayerKit::Sprites sprites) { return sprites; });
@@ -366,24 +386,48 @@ public:
     // The same, with each slot's sprites handed to `dress` with the place and the slot's name, and what it
     // returns drawn in their place: to change a sprite on its way to the screen, or add sprites of the
     // game's own at a slot. `dress` is called once for each area on screen and each of its slots, its
-    // sprites in that area's pixels.
+    // sprites in that area's pixels; the scene moves what it returns into the current area's pixels.
     template <class State, class Dress>
         requires std::invocable<Dress&, Place, std::string_view, LayerKit::Sprites> &&
                  std::same_as<std::invoke_result_t<Dress&, Place, std::string_view, LayerKit::Sprites>, LayerKit::Sprites>
     [[nodiscard]] LayerKit::Layers layers(const State& state, Dress&& dress) const {
         LayerKit::Layers layers = WorldLayers(camera_, *world_);
         const CameraKit::View& view = world_->layouts[static_cast<std::size_t>(camera_.layout())].view;
-        for (const Shown& shown : camera_.shown(*world_)) {
-            const Place place{.layout = shown.layout, .area = shown.area};
+        const std::vector<Shown> shown = camera_.shown(*world_);
+        const retropp::LayerScroll current = shown.front().scroll;
+
+        // One entry per slot name, in the order the names first appear.
+        struct Gathered {
+            std::string_view slot;
+            std::int32_t z = 0;
+            LayerKit::Sprites sprites;
+        };
+        std::vector<Gathered> gathered;
+        for (const Shown& onScreen : shown) {
+            const Place place{.layout = onScreen.layout, .area = onScreen.area};
             const Area& area =
-                world_->layouts[static_cast<std::size_t>(shown.layout)].areas[static_cast<std::size_t>(shown.area)];
+                world_->layouts[static_cast<std::size_t>(onScreen.layout)].areas[static_cast<std::size_t>(onScreen.area)];
+            // Where this area's top-left sits in the current area's pixels.
+            const retropp::Vec2i by{.x = current.x - onScreen.scroll.x, .y = current.y - onScreen.scroll.y};
             for (const ActorSlot& slot : area.actorSlots) {
-                LayerKit::Sprites sprites = dress(place, std::string_view{slot.name},
-                                                  ActorKit::Sprites(actors_, config_, place, slot.name, state));
-                layers.push_back(LayerKit::SpriteLayer(SceneLayerKey(shown.layout, shown.area, slot.name),
-                                                       ActorZ(*world_, shown, slot.name), {std::move(sprites)},
-                                                       {.scroll = shown.scroll, .regions = ViewStencil(view)}));
+                auto entry = std::find_if(gathered.begin(), gathered.end(),
+                                          [&](const Gathered& g) { return g.slot == slot.name; });
+                if (entry == gathered.end()) {
+                    gathered.push_back(Gathered{.slot = slot.name, .z = ActorZ(*world_, onScreen, slot.name)});
+                    entry = std::prev(gathered.end());
+                }
+                for (retropp::Sprite& sprite : dress(place, std::string_view{slot.name},
+                                                     ActorKit::Sprites(actors_, config_, place, slot.name, state))) {
+                    sprite.x += by.x;
+                    sprite.y += by.y;
+                    sprite.z += by.y;
+                    entry->sprites.push_back(std::move(sprite));
+                }
             }
+        }
+        for (Gathered& entry : gathered) {
+            layers.push_back(LayerKit::SpriteLayer(SceneLayerKey(entry.slot), entry.z, {std::move(entry.sprites)},
+                                                   {.scroll = current, .regions = ViewStencil(view)}));
         }
         return layers;
     }

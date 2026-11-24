@@ -11,39 +11,41 @@ movement module's: WorldKit answers its questions. Its **scene** runs the whole 
 its camera over: every actor written in the world, the camera following one of them, each actor carried
 through the openings its reach allows, and the frame.
 
+The castle, [`examples/getting_started.cpp`](examples/getting_started.cpp), run by the scene (an excerpt:
+the file has the rest of each area):
+
 ```cpp
-// The world, once: each layout's areas, their layers, actor slots and openings.
-const WorldKit::World world{.layouts = {
-    WorldKit::Layout{
-        .name = "overworld",
-        .areas = {
-            WorldKit::Area{.name = "meadow",
-                           .layers = {{.name = "ground", .tiles = &meadowTiles, .art = overworldArt, .z = kGroundZ},
-                                      {.name = "overhang", .tiles = &meadowRock, .art = overlayArt, .z = kOverheadZ}},
-                           .actorSlots = {{.name = "actors", .z = kActorsZ}},
-                           .collision = &meadowCollision,
-                           .openings = {{.name = "east door", .side = WorldKit::Side::East, .span = {6, 9},
-                                         .transition = WorldKit::Transition::Scroll,
-                                         .leadsTo = {.area = Area::Lake, .opening = "west door"}},
-                                        {.name = "cave mouth", .at = {.x = 12, .y = 4, .width = 2, .height = 1},
-                                         .transition = WorldKit::Transition::Fade,
-                                         .leadsTo = {.area = Area::Cave, .opening = "cave exit"}}}},
-            ...
+// The world, once: its layouts and areas, and who starts where. Where an inhabitant is written is how far
+// it may roam.
+return WorldKit::World{
+    .layouts = {
+        WorldKit::Layout{
+            .name = "castle",
+            .areas = {
+                WorldKit::Area{.name = "hall", .layers = {Ground(maps.hall, art, art.hall)}, .actorSlots = kActorSlots,
+                               .collision = &maps.hall,
+                               .openings = {{.name = "east door", .side = Side::East, .span = {7, 10},
+                                             .transition = Transition::Scroll,
+                                             .leadsTo = {.area = CastleArea::WideHall, .opening = "west door"}}},
+                               .actors = {{.actor = Guard(art), .at = {40, 64}}}},
+                …   // the wide hall, and the cellar with its bat
+            },
+            .actors = {{.actor = Hound(art), .in = CastleArea::WideHall, .at = {120, 80}}},
+            …   // its cell size, open value and view
         },
-        .cellSize = 8, .open = Cell::Open, .view = kView},
-    WorldKit::Layout{ /* the dungeon */ },
-}};
-WorldKit::validate(world);
+        …   // the grounds: the garden and the orchard, and the gardener
+    },
+    .actors = {{.name = "marker", .actor = Marker(art), .in = {Layout::Castle, CastleArea::Hall}, .at = {76, 68}}},
+};
 
-// Each tick: the player moves against what is solid, and the camera follows it through the openings.
-if (!camera.transitioning()) { player.walk(hero, move, camera.solids(world)); }
-const WorldKit::Step step = camera.follow(world, player.collision(hero).bounds());
-player.place(player.position() + step.move);
+// The scene, once: the world, the camera the program creates, handed over, and the actor it follows.
+State state{.scene = WorldKit::Scene{world, camera, config}};
+state.scene.follow("marker");
 
-// Each frame: the areas' layers, the player among them, the fade over everything.
-frame.layers = WorldKit::WorldLayers(camera, world);
-frame.layers.push_back(WorldKit::Actors(camera, world, "actors", {Player(state)}));
-frame.regions = WorldKit::Fade(camera, world);
+// Each tick, and each frame.
+state.scene.tick(readInput(input), state);
+frame.layers = state.scene.layers(state);
+frame.regions = state.scene.fade();
 ```
 
 | Piece | What it is | Page |
@@ -80,7 +82,7 @@ Every ActorKit call stays yours on the scene's actors. Three ways to work, in th
 |---|---|
 | A world with your own system for what lives in it | WorldKit's world, camera, solids and layers. No ActorKit header is included. |
 | ActorKit, wired your own way | ActorKit's set, `tick` and `Sprites` by hand beside the camera, as the farm does. |
-| The whole world run for you | `WorldKit::Scene`. |
+| The whole world run for you | `WorldKit::Scene`, as the castle does. |
 
 | Type or function | Purpose | Reference |
 |---|---|---|
@@ -125,7 +127,7 @@ A game that includes `WorldKit/scene.h` links `ActorKit::ActorKit`.
 
 | CMake option | Default | Effect |
 |---|---|---|
-| `WORLDKIT_BUILD_EXAMPLES` | `ON` when this directory is the top-level project, otherwise `OFF` | Builds `WorldKit-example-getting-started`, the castle [docs/getting-started.md](docs/getting-started.md) walks through, and `WorldKit-example-farm`, the farmyard [docs/actors/getting-started.md](docs/actors/getting-started.md) walks through. The farm is built when `ActorKit::ActorKit` and `TopDownMovement::TopDownMovement` exist. |
+| `WORLDKIT_BUILD_EXAMPLES` | `ON` when this directory is the top-level project, otherwise `OFF` | Builds `WorldKit-example-getting-started`, the castle [docs/getting-started.md](docs/getting-started.md) walks through, and `WorldKit-example-farm`, the farmyard [docs/actors/getting-started.md](docs/actors/getting-started.md) walks through. The castle is built when `ActorKit::ActorKit` exists: it runs on the scene, with a mover of its own. The farm is built when `ActorKit::ActorKit` and `TopDownMovement::TopDownMovement` exist. |
 
 ## Documentation
 
@@ -162,7 +164,7 @@ modules/WorldKit/
     config.h                        Config, AnyBindings, AnyHandlers
     tick.h                          tick
     sprites.h                       Sprites
-  examples/getting_started.cpp      the getting-started program: the castle
+  examples/getting_started.cpp      the getting-started program: the castle and its grounds, run by the scene
   examples/farm/
     farm.cpp                        the actors' example program: a farmyard
     farm.h                          its places, values and commands

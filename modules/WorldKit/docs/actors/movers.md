@@ -169,6 +169,7 @@ An actor that walks out stays in its area, in that area's pixels, until your gam
 | A walker whose own `solid` is false heads into a solid actor. | It stops. `solid` says whether others stop at this actor. |
 | The gate's `solid` turns false. | Walkers pass from that tick on. |
 | A walker heads into a frozen actor that was solid when it was frozen. | It stops with the two boxes meeting. |
+| A walker's box already overlaps a solid actor's as its walk begins. | It walks through that actor that tick, in any direction. Once the two boxes are apart, they stop at each other again. |
 | A walker other than the player reaches a doorway in the area's edge. | It stops at the edge, or walks out, by its confinement (the table above). |
 | The camera runs a scroll or a fade. | Every walker stands until it ends. |
 | A walker is frozen. | It stands until it is woken ([actors.md](actors.md#freeze-wake-and-frozen)). |
@@ -176,8 +177,10 @@ An actor that walks out stays in its area, in that area's pixels, until your gam
 - **Actors walk in spawn order.** An actor that walks later in the tick meets the earlier ones where
   they now stand. Take two walkers heading the same way in single file. When the front one was spawned
   first, the back one keeps up with it. When the back one was spawned first, it trails by a pixel.
-- **Two solid actors whose boxes overlap hold each other in place.** Spawn solid actors apart, and
-  keep a walker out of a box before its `solid` turns true.
+- **Two solid actors whose boxes overlap walk apart.** Boxes come to overlap through `spawn` or `moveTo`,
+  through a landing in the next area, or when an actor's `solid` turns true while a walker stands in its
+  box. Each walks free of the other until they are apart. To keep a walker out of a gate that shuts on
+  it, have the gate's script wait until its box is clear before `solid` turns true.
 - **A solid actor stays put when walked into.** It stays where it is until its own mover, a script or
   your code moves it.
 
@@ -359,7 +362,7 @@ What is solid to one walking actor on one tick. `tick` builds it and hands it to
 |---|---|
 | `area` | WorldKit reports the area's collision map solid (WorldKit's `docs/camera.md`, "AreaSolids"). |
 | `bounds`, when `confined` is true | Any part of `box` lies outside `bounds`. `tick` passes the area's rectangle, and `confined` is true for every actor but the player whose [confinement](actors.md#confinement) is `Area`. |
-| `others` | `box` overlaps one of the rectangles. `tick` passes the boxes of the other solid actors in the area, frozen ones included. For an actor other than the player whose confinement is `Layout`, it adds the strip beyond each edge opening that leads to another layout, as wide as the opening's span. |
+| `others` | `box` overlaps one of the rectangles. `tick` passes the boxes of the other solid actors in the area that lie apart from the walking actor's box as its walk begins, frozen ones included. For an actor other than the player whose confinement is `Layout`, it adds the strip beyond each edge opening that leads to another layout, as wide as the opening's span. |
 
 - A box of zero width or height is open.
 - A `Solids` is valid during the `walk` call it is handed to. `others` is a span over a list `tick`

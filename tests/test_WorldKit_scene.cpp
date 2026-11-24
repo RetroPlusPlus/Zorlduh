@@ -1,7 +1,8 @@
 // WorldKit's scene: the world running. Building one spawns every actor the world lists, in the order the
 // world is written; the camera follows the actor named to it and carries it through the openings as the
-// camera's own calls do by hand; the frame is the world's layers and one sprite layer per area on screen
-// and slot; a copy runs on by itself; spawn, validate and the scene's lookups throw what they say. The
+// camera's own calls do by hand; the frame is the world's layers and one sprite layer per slot across the
+// areas on screen, in the current area's pixels, each actor under one key across a seam or a scroll; a
+// copy runs on by itself; spawn, validate and the scene's lookups throw what they say. The
 // world is built in code, the actors are moved by a mover of the test's own, and the tests run headless.
 
 #include <gtest/gtest.h>
@@ -477,9 +478,7 @@ TEST_F(Scenes, TheFollowedActorGoesThroughTheEastDoorExactlyAsTheCamerasOwnCalls
             entered = true;
             EXPECT_EQ(*step.entered, kHall);
             EXPECT_EQ(actors().position(id), (Vec2i{12, 56}));   // the carry, 16, in from the hall's west wall
-            EXPECT_NE(actors().key(id), own);                   // shown fresh on the tick it enters
-            (void)tick(kRight);
-            EXPECT_EQ(actors().key(id), own);                   // and under its own key on the next
+            EXPECT_EQ(actors().key(id), own);                   // under its own key through the scroll
             break;
         }
     }
@@ -490,12 +489,15 @@ TEST_F(Scenes, TheFollowedActorOnTheStairsIsInTheCellarOnTheFadesSwitchCenteredO
     world.actors[0].at = {100, 50};
     start();
     scene().follow("marker");
+    (void)tick();
+    const std::string own = actors().key(markerId());
     const WorldKit::Step step = tickUntilEntered(kUp);
     ASSERT_TRUE(step.entered.has_value());
     EXPECT_EQ(*step.entered, kCellar);
     EXPECT_EQ(actors().place(markerId()), kCellar);
     EXPECT_EQ(actors().position(markerId()), (Vec2i{44, 32}));   // centered on the cellar's stairs, cells 5–6 of row 4
     EXPECT_EQ(scene().camera().area(), Keep::Cellar);
+    EXPECT_NE(actors().key(markerId()), own);   // shown fresh on the fade's switch
 }
 
 TEST_F(Scenes, TheFollowedActorAcrossTheSeamIsInTheGardenOnTheCrossingTickAndNoOtherActorMoves) {
@@ -602,7 +604,17 @@ TEST_F(Scenes, TheCameraPlacedByHandStaysWhereItIsPutAndTheNextTicksCarryOnFromT
 
 // ── The frame ──────────────────────────────────────────────────────────────────────────────────────
 
-TEST_F(Scenes, LayersAreTheWorldsAndOneSpriteLayerPerAreaOnScreenAndSlot) {
+// The sprite keyed `key` among `layer`'s sprites, or nullptr.
+const retropp::Sprite* spriteKeyed(const retropp::DrawLayer& layer, std::string_view key) {
+    for (const retropp::Sprite& sprite : spritesOf(layer)) {
+        if (std::string_view{sprite.key.value} == key) {
+            return &sprite;
+        }
+    }
+    return nullptr;
+}
+
+TEST_F(Scenes, LayersAreTheWorldsAndOneSpriteLayerPerSlotAcrossTheAreasOnScreen) {
     world.actors[0].at = {72, 80};   // low enough that the camera leaves the garden out of view
     start();
     scene().follow("marker");
@@ -612,47 +624,113 @@ TEST_F(Scenes, LayersAreTheWorldsAndOneSpriteLayerPerAreaOnScreenAndSlot) {
     ASSERT_EQ(alone.size(), 3u);
     EXPECT_EQ(std::string_view{alone[0].key}, "area:0:0:ground");
     const std::vector<WorldKit::Shown> shown = scene().camera().shown(world);
-    const retropp::DrawLayer* underfoot = layerKeyed(alone, WorldKit::SceneLayerKey(0, Keep::Court, "underfoot"));
-    const retropp::DrawLayer* courtActors = layerKeyed(alone, "scene:0:0:actors");
+    const retropp::DrawLayer* underfoot = layerKeyed(alone, WorldKit::SceneLayerKey("underfoot"));
+    const retropp::DrawLayer* standing = layerKeyed(alone, "scene:actors");
     ASSERT_NE(underfoot, nullptr);
-    ASSERT_NE(courtActors, nullptr);
+    ASSERT_NE(standing, nullptr);
     EXPECT_EQ(underfoot->z, 2);
     EXPECT_TRUE(spritesOf(*underfoot).empty());   // a slot with no sprite still has its layer
-    EXPECT_EQ(courtActors->z, WorldKit::ActorZ(world, shown[0], "actors"));
-    EXPECT_EQ(courtActors->z, 5);
-    EXPECT_EQ(courtActors->scroll, shown[0].scroll);
-    ASSERT_EQ(courtActors->regions.size(), 1u);
-    EXPECT_EQ(courtActors->regions[0].effects[0].stencil, retropp::StencilMode::TransparentOutside);
-    ASSERT_EQ(spritesOf(*courtActors).size(), 2u);   // the guard and the marker
-    EXPECT_EQ(spritesOf(*courtActors)[1].key.value, actors().key(markerId()));
+    EXPECT_EQ(standing->z, WorldKit::ActorZ(world, shown[0], "actors"));
+    EXPECT_EQ(standing->z, 5);
+    EXPECT_EQ(standing->scroll, shown[0].scroll);
+    ASSERT_EQ(standing->regions.size(), 1u);
+    EXPECT_EQ(standing->regions[0].effects[0].stencil, retropp::StencilMode::TransparentOutside);
+    ASSERT_EQ(spritesOf(*standing).size(), 2u);   // the guard and the marker
+    EXPECT_EQ(spritesOf(*standing)[1].key.value, actors().key(markerId()));
     EXPECT_TRUE(scene().fade().empty());
 
-    // During the scroll into the hall: the hall's actors too, its hound among them.
+    // During the scroll into the hall: the same two layers, the hall's hound among the actors, moved into
+    // the court's pixels, its feet included.
     actors().moveTo(markerId(), kCourt, {150, 64});
     while (!scene().camera().transitioning()) {
         (void)tick(kRight);
     }
     const LayerKit::Layers scrolling = scene().layers(*state);
-    EXPECT_EQ(scrolling.size(), 5u);   // two grounds, the court's two slots, the hall's one
-    const retropp::DrawLayer* hallActors = layerKeyed(scrolling, "scene:0:1:actors");
-    ASSERT_NE(hallActors, nullptr);
+    EXPECT_EQ(scrolling.size(), 4u);   // two grounds, then one layer per slot name
+    const retropp::DrawLayer* during = layerKeyed(scrolling, "scene:actors");
+    ASSERT_NE(during, nullptr);
+    EXPECT_EQ(layerKeyed(scrolling, "scene:underfoot")->z, 2 * 2 + 0);   // the court's, spread over two areas
     const std::vector<WorldKit::Shown> both = scene().camera().shown(world);
     ASSERT_EQ(both.size(), 2u);
-    EXPECT_EQ(hallActors->z, WorldKit::ActorZ(world, both[1], "actors"));
-    EXPECT_EQ(hallActors->scroll, both[1].scroll);
-    ASSERT_EQ(spritesOf(*hallActors).size(), 1u);
-    EXPECT_EQ(spritesOf(*hallActors)[0].key.value, actors().key(scene().actor("hound").id()));
+    EXPECT_EQ(during->z, WorldKit::ActorZ(world, both[0], "actors"));
+    EXPECT_EQ(during->scroll, both[0].scroll);
+    ASSERT_EQ(spritesOf(*during).size(), 3u);   // the guard, the marker, the hound
+    const Id hound = scene().actor("hound").id();
+    const LayerKit::Sprites hallAlone = ActorKit::Sprites(actors(), scene().config(), kHall, "actors", *state);
+    ASSERT_EQ(hallAlone.size(), 1u);
+    const retropp::Sprite* moved = spriteKeyed(*during, actors().key(hound));
+    ASSERT_NE(moved, nullptr);
+    EXPECT_EQ(moved->x, hallAlone[0].x + 160);   // the hall's top-left at (160, 0) in the court's pixels
+    EXPECT_EQ(moved->y, hallAlone[0].y);
+    EXPECT_EQ(moved->z, hallAlone[0].z);
 }
 
-TEST_F(Scenes, LayersAcrossTheSeamHoldTheGardensAndFadeIsOneRegionDuringAFade) {
-    world.actors[0].at = {100, 10};
+TEST_F(Scenes, ActorsOnBothSidesOfTheSeamShareALayerAndSortByTheirFeet) {
+    world.actors[0].at = {72, 20};   // near the north wall: the garden is in view above
+    world.layouts[0].areas[Keep::Garden].actors.push_back({.name = "gardener", .actor = walker(), .at = {40, 84}});
     start();
     scene().follow("marker");
     (void)tick();
     const LayerKit::Layers layers = scene().layers(*state);
-    const retropp::DrawLayer* gardenActors = layerKeyed(layers, "scene:0:2:actors");
-    ASSERT_NE(gardenActors, nullptr);
-    EXPECT_TRUE(spritesOf(*gardenActors).empty());
+    ASSERT_EQ(scene().camera().shown(world).size(), 2u);
+    const retropp::DrawLayer* standing = layerKeyed(layers, "scene:actors");
+    ASSERT_NE(standing, nullptr);
+    const retropp::Sprite* gardener = spriteKeyed(*standing, actors().key(scene().actor("gardener").id()));
+    const retropp::Sprite* marker = spriteKeyed(*standing, actors().key(markerId()));
+    ASSERT_NE(gardener, nullptr);
+    ASSERT_NE(marker, nullptr);
+    EXPECT_EQ(gardener->x, 40);                   // the garden's top-left at (0, −96) in the court's pixels
+    EXPECT_EQ(gardener->y, 84 - 96);
+    EXPECT_EQ(gardener->z, 84 + 8 - 96);          // its feet, in the court's pixels
+    EXPECT_LT(gardener->z, marker->z);            // higher up the screen, so drawn first
+}
+
+TEST_F(Scenes, AcrossTheSeamEveryActorKeepsItsKeyAndItsPlaceOnScreen) {
+    world.actors[0].at = {70, 10};
+    start();
+    scene().follow("marker");
+    const Id walking = scene().spawn(WorldKit::WorldActor{.name = "walking", .actor = walker(), .in = kCourt, .at = {120, 12}});
+    const Id guard = scene().actor("guard").id();
+    (void)tick();
+    actors().set(walking, Heading, Dir::Up);
+    const std::string markerKey = actors().key(markerId());
+    const std::string walkingKey = actors().key(walking);
+
+    // Where an actor's sprite is on screen: its position in the layer less the layer's scroll.
+    const auto onScreen = [&](Id id) {
+        const LayerKit::Layers layers = scene().layers(*state);
+        const retropp::DrawLayer* standing = layerKeyed(layers, "scene:actors");
+        const retropp::Sprite* sprite = spriteKeyed(*standing, actors().key(id));
+        return sprite == nullptr ? std::optional<Vec2i>{}
+                                 : std::optional<Vec2i>{Vec2i{.x = sprite->x - standing->scroll.x,
+                                                              .y = sprite->y - standing->scroll.y}};
+    };
+    std::optional<Vec2i> markerWas = onScreen(markerId());
+    std::optional<Vec2i> walkingWas = onScreen(walking);
+    std::optional<Vec2i> guardWas = onScreen(guard);
+    bool markerCrossed = false;
+    for (int n = 0; n < 40; ++n) {
+        (void)tick(kUp);
+        markerCrossed = markerCrossed || actors().place(markerId()) == kGarden;
+        ASSERT_EQ(actors().key(markerId()), markerKey) << "tick " << n;
+        ASSERT_EQ(actors().key(walking), walkingKey) << "tick " << n;
+        for (auto [id, was] : {std::pair{markerId(), &markerWas}, std::pair{walking, &walkingWas}, std::pair{guard, &guardWas}}) {
+            const std::optional<Vec2i> now = onScreen(id);
+            ASSERT_TRUE(now.has_value()) << "tick " << n;
+            ASSERT_LE(std::abs(now->x - (*was)->x), 1) << "tick " << n;   // a pixel at most, a tick
+            ASSERT_LE(std::abs(now->y - (*was)->y), 1) << "tick " << n;
+            *was = now;
+        }
+    }
+    EXPECT_TRUE(markerCrossed);
+    EXPECT_EQ(actors().place(walking), kGarden);
+}
+
+TEST_F(Scenes, FadeIsOneRegionDuringAFade) {
+    world.actors[0].at = {100, 10};
+    start();
+    scene().follow("marker");
+    (void)tick();
 
     actors().moveTo(markerId(), kCourt, {100, 50});
     int walked = 0;
@@ -688,13 +766,35 @@ TEST_F(Scenes, DressIsHandedEachAreaOnScreenAndSlotAndWhatItReturnsIsDrawn) {
     ASSERT_EQ(calls.size(), 2u);
     EXPECT_EQ(calls[0], (std::pair<Place, std::string>{kCourt, "underfoot"}));
     EXPECT_EQ(calls[1], (std::pair<Place, std::string>{kCourt, "actors"}));
-    const std::span<const retropp::Sprite> underfoot = spritesOf(*layerKeyed(layers, "scene:0:0:underfoot"));
+    const std::span<const retropp::Sprite> underfoot = spritesOf(*layerKeyed(layers, "scene:underfoot"));
     ASSERT_EQ(underfoot.size(), 1u);
     EXPECT_EQ(underfoot[0].key.value, "puddle");
-    const std::span<const retropp::Sprite> standing = spritesOf(*layerKeyed(layers, "scene:0:0:actors"));
+    EXPECT_EQ(underfoot[0].x, 30);   // the court is the current area: its pixels as they are
+    const std::span<const retropp::Sprite> standing = spritesOf(*layerKeyed(layers, "scene:actors"));
     ASSERT_EQ(standing.size(), 2u);
     EXPECT_EQ(standing[0].alpha, 0.5f);
     EXPECT_EQ(standing[1].alpha, 0.5f);
+
+    // With the garden in view: dress is handed the garden's slot too, and what it adds there, in the
+    // garden's pixels, is drawn in the court's.
+    actors().moveTo(markerId(), kCourt, {72, 20});
+    (void)tick();
+    calls.clear();
+    const LayerKit::Layers both =
+        scene().layers(*state, [&](Place place, std::string_view slot, LayerKit::Sprites sprites) {
+            calls.emplace_back(place, std::string{slot});
+            if (place == kGarden) {
+                sprites.push_back(retropp::Sprite{.key = "bloom", .x = 30, .y = 40, .z = 48});
+            }
+            return sprites;
+        });
+    ASSERT_EQ(calls.size(), 3u);
+    EXPECT_EQ(calls[2], (std::pair<Place, std::string>{kGarden, "actors"}));
+    const retropp::Sprite* bloom = spriteKeyed(*layerKeyed(both, "scene:actors"), "bloom");
+    ASSERT_NE(bloom, nullptr);
+    EXPECT_EQ(bloom->x, 30);
+    EXPECT_EQ(bloom->y, 40 - 96);
+    EXPECT_EQ(bloom->z, 48 - 96);
 }
 
 // ── Copies ─────────────────────────────────────────────────────────────────────────────────────────

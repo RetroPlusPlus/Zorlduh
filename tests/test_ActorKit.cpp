@@ -989,6 +989,15 @@ TEST_F(Farm, AWalkerStopsAtTheMapAndOtherSolidActorsNeverAtItselfAndAnyButThePla
     EXPECT_EQ(state.camera.area(), 0);
 }
 
+TEST_F(Farm, TwoSolidActorsWhoseBoxesOverlapWalkApartAndThenStopAtEachOtherAgain) {
+    const Id hero = state.actors.spawn(slider(), kA, {40, 40});
+    state.actors.spawn(Actor{.box = {.x = 0, .y = 0, .width = 8, .height = 8}, .solid = true}, kA, {44, 40});
+    ticks(6, Input{.way = {.left = true}});   // from half over the post, out to the left
+    EXPECT_EQ(state.actors.position(hero), (Vec2i{34, 40}));
+    ticks(6, Input{.way = {.right = true}});   // back, until the two boxes meet
+    EXPECT_EQ(state.actors.position(hero), (Vec2i{36, 40}));
+}
+
 // ── The player ─────────────────────────────────────────────────────────────────────────────────────
 
 TEST_F(Entered, ThePlayerScrollsIntoTheNextAreaAndNothingWalksWhileTheScrollRuns) {

@@ -124,8 +124,8 @@ std::string ActorsKey(std::string_view slot);                             // "ac
 The key of a map layer's tile layer, and of the sprite layer `Actors` draws at a slot. The same layer
 keeps the same key from frame to frame, so the engine eases its scroll as the camera moves. An actor
 slot's key names no area, so the layer keeps its key as the camera goes from area to area. A layer of
-the game's own takes a key of its own. A [`Scene`](scene.md#drawing) keys each area's slot layer with
-[`SceneLayerKey`](scene.md#scenelayerkey), `"scene:<layout>:<area>:<slot>"`.
+the game's own takes a key of its own. A [`Scene`](scene.md#drawing) keys its layer for each slot, across
+the areas on screen, with [`SceneLayerKey`](scene.md#scenelayerkey), `"scene:<slot>"`.
 
 ## `ViewStencil`
 

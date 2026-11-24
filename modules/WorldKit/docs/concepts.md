@@ -198,8 +198,10 @@ and area numbers.
 - **Every other actor** goes through an opening inside its reach by the opening's transition, the screen
   holding still for it; at an opening outside its reach it stops, despawns or hides, as its `atEdge` says.
 - **Each actor is awake or frozen by its rule:** always, while its layout is on screen, or while its area
-  is.
-- **The frame** is the world's layers and one sprite layer for each area on screen and each of its slots.
+  is. While a scroll or a fade runs, the whole world holds still, and only the followed actor is carried.
+- **The frame** is the world's layers and one sprite layer for each slot, holding the actors of every area
+  on screen in the current area's pixels, so they sort by their feet together and keep their sprites
+  across a seam or a scroll.
 
 The camera, the actors and every call beneath them stay the game's to use: `scene.camera()` and
 `scene.actors()`. [scene.md](scene.md) has the whole of it.
