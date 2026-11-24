@@ -55,8 +55,13 @@ A world runs its actors in one of three ways, all in the one module:
   of its own, `"ActorKit/…"`. `WorldKit::Scene` runs it: actors written in an area's, a layout's or the
   world's `actors`, the level being how far each may roam; the camera following one of them; every other
   actor carried through the openings its reach allows, or stopped, despawned or hidden at its edge; each
-  actor awake or frozen by a rule of its own; one sprite layer for each area on screen and slot. Every
-  ActorKit call stays available on the scene's actors.
+  actor awake or frozen by a rule of its own; one sprite layer for each slot, holding the actors of every
+  area on screen in the current area's pixels, so actors on both sides of a seam sort by their feet and
+  each keeps its sprite across a seam or a scroll. Every ActorKit call stays available on the scene's
+  actors.
+- **Two solid actors whose boxes overlap walk apart.** Boxes come to overlap through a spawn, a move, a
+  landing in the next area or a gate shutting on a walker; each walks free of the other until they are
+  apart, and they stop at each other from then on.
 
 ## Implementation details
 
@@ -77,5 +82,3 @@ from the next.
 - **A switchboard,** a system in the game's state through which one actor's script affects others by
   values alone, streamlining what the game's bound values do today.
 - **The game's own actors** — the player among them, and a wandering enemy — built on the scene.
-- **One screen-wide actor layer** across a seam, so two actors overlapping on the seam line, one in each
-  area, sort by their feet; today they are ordered by their areas.
