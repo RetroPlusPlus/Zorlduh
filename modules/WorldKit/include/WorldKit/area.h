@@ -18,12 +18,15 @@
 //                                              .leadsTo = {.area = Area::Lake, .opening = "west door"}},
 //                                             {.name = "cave mouth", .at = {.x = 12, .y = 4, .width = 2, .height = 1},
 //                                              .transition = WorldKit::Transition::Fade,
-//                                              .leadsTo = {.area = Area::Cave, .opening = "cave exit"}}}},
+//                                              .leadsTo = {.area = Area::Cave, .opening = "cave exit"}}},
+//                                .actors = {{.actor = Sheep(art), .at = {40, 64}}}},   // stays in the meadow
 //                 ...
 //             },
+//             .actors = {{.actor = Fox(art), .in = Area::Lake, .at = {96, 40}}},     // roams the overworld
 //             .cellSize = 8, .open = Cell::Open, .view = kView},
-//         WorldKit::Layout{ ... the dungeon ... },
-//     }};
+//         WorldKit::Layout{ ... the dungeon ... }},
+//         .actors = {{.name = "hero", .actor = Hero(art), .in = {Layout::Overworld, Area::Meadow}, .at = {72, 56}}},
+//     };
 //     WorldKit::validate(world);
 //     const WorldKit::Place lake = WorldKit::placeOf(world, "overworld", "lake");
 //
@@ -33,21 +36,26 @@
 // An area alone on screen is drawn at those depths; with more areas on screen, every lower depth is
 // drawn under every higher one across all of them (camera.h, detail::spread). A layout is a named set of
 // areas that share a cell size, a view and the settings of their transitions; a world is one or more
-// layouts. A place is found by its index or, through placeOf, by the names of its layout and area. Areas have
+// layouts. An area, a layout and the world each list the actors that start there, and the level an actor
+// is written at is how far it may roam; a WorldKit::Scene (scene.h) spawns and runs them. A place is
+// found by its index or, through placeOf, by the names of its layout and area. Areas have
 // no position in a larger world. An opening in one leads to an opening in another, in the same layout
 // or in any other, and that link is the only thing joining them; two areas sit side by side only while
 // a scroll between them runs, or for as long as they are joined seamlessly. Every position inside an
 // area is in that area's own pixels, from its map's top-left.
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -162,16 +170,108 @@ struct ActorSlot {
     std::int32_t z = 0;
 };
 
-// One area: its name, unique within its layout; its layers, its actor slots, its collision map and its
-// openings. The layers and slots are in any order; each one's `z` places it. The maps are the
-// game's and must outlive the world; every one is the size of the collision map, which is the area's
-// size.
+// A place in the world: a layout and an area in it.
+struct Place {
+    int layout = 0;
+    int area = 0;
+
+    [[nodiscard]] constexpr bool operator==(const Place&) const noexcept = default;
+};
+
+// How far an actor may roam: its area, its layout, or the whole world. An actor written on an area has
+// Reach::Area, on a layout Reach::Layout, on the world Reach::World; SceneActor::reach changes it
+// (scene.h).
+enum class Reach : std::uint8_t { Area, Layout, World };
+
+// What an actor does at an opening that leads outside its reach.
+//
+//   Stop     It is held at the opening. A spot it walks across, and stays in its area. The default.
+//   Despawn  It goes out through the opening and is removed: its id is retired.
+//   Hide     It goes out through the opening and is put away. A hidden actor is out of the world: not
+//            drawn, not ticked, not solid, not touchable, until the game puts it somewhere again with
+//            Actors::moveTo. It keeps its id, its values and where its scripts are.
+//
+// At a spot, Despawn and Hide act on the tick the actor's center steps onto it.
+enum class AtEdge : std::uint8_t { Stop, Despawn, Hide };
+
+// When an actor is awake, taking part in each tick: always; while any area of the layout it is in is on
+// screen; while the area it is in is on screen. On screen is what the camera shows: its own area, the
+// areas across seams that are in view, and the area scrolling in. The rest of the time it is frozen: it
+// holds exactly as it is, still drawn and still solid, and carries on from there when it wakes.
+enum class AwakeWhen : std::uint8_t { Always, InLayout, OnScreen };
+
+// An actor value of any type, held for a scene: written as `.actor = Guard(art)`. A WorldKit::Scene reads
+// it back as the actor value it was made from (scene.h). Copies share the one value they hold.
+class AnyActor {
+public:
+    // An empty holder.
+    AnyActor() = default;
+
+    // Holds a copy of `actor`.
+    template <class T>
+        requires(!std::same_as<std::remove_cvref_t<T>, AnyActor>)
+    AnyActor(T actor) : held_(std::make_shared<const T>(std::move(actor))), type_(&typeid(T)) {}
+
+    // Whether it holds a value.
+    [[nodiscard]] explicit operator bool() const noexcept { return held_ != nullptr; }
+
+    // The value it holds when that value is a T; nullptr when it holds another type or is empty.
+    template <class T>
+    [[nodiscard]] const T* as() const noexcept {
+        return type_ != nullptr && *type_ == typeid(T) ? static_cast<const T*>(held_.get()) : nullptr;
+    }
+
+private:
+    std::shared_ptr<const void> held_;
+    const std::type_info* type_ = nullptr;
+};
+
+// An actor that starts in an area: `{.actor = Guard(art), .at = {40, 64}}` among the area's `actors`. Its
+// reach is the area. `name` finds it in the scene (Scene::actor) and is unique across the whole world, or
+// empty; `at` is its top-left in the area's pixels, put exactly there, walls included.
+struct AreaActor {
+    std::string name;
+    AnyActor actor;
+    retropp::Vec2i at{};
+    AtEdge atEdge = AtEdge::Stop;
+    AwakeWhen awakeWhen = AwakeWhen::Always;
+};
+
+// An actor that starts in an area of a layout and roams the layout: `{.actor = Hound(art), .in =
+// CastleArea::WideHall, .at = {120, 80}}` among the layout's `actors`. `in` is the index of an area of that
+// layout; the rest is as AreaActor's.
+struct LayoutActor {
+    std::string name;
+    AnyActor actor;
+    int in = 0;
+    retropp::Vec2i at{};
+    AtEdge atEdge = AtEdge::Stop;
+    AwakeWhen awakeWhen = AwakeWhen::Always;
+};
+
+// An actor that starts in a place of the world and goes anywhere: `{.name = "marker", .actor =
+// Marker(art), .in = {Castle, Hall}, .at = {76, 68}}` among the world's `actors`. The rest is as
+// AreaActor's.
+struct WorldActor {
+    std::string name;
+    AnyActor actor;
+    Place in{};
+    retropp::Vec2i at{};
+    AtEdge atEdge = AtEdge::Stop;
+    AwakeWhen awakeWhen = AwakeWhen::Always;
+};
+
+// One area: its name, unique within its layout; its layers, its actor slots, its collision map, its
+// openings and the actors that start in it. The layers and slots are in any order; each one's `z` places
+// it. The maps are the game's and must outlive the world; every one is the size of the collision map,
+// which is the area's size.
 struct Area {
     std::string name;
     std::vector<MapLayer> layers;
     std::vector<ActorSlot> actorSlots;
     const retropp::IndexGrid* collision = nullptr;
     std::vector<Opening> openings;
+    std::vector<AreaActor> actors;
 };
 
 // A camera law: where the camera should be, given the rectangle it may show (an area, in that area's
@@ -180,11 +280,13 @@ struct Area {
 using CameraLaw = std::function<retropp::Vec2i(retropp::IntRect bounds, retropp::PixelSize view,
                                                retropp::Vec2i focus)>;
 
-// A named set of areas that share one cell size, one open value, one view and the settings below. Its
-// name is unique within the world. Area indices are positions in `areas`.
+// A named set of areas that share one cell size, one open value, one view and the settings below, and
+// the actors that start in its areas and roam it. Its name is unique within the world. Area indices are
+// positions in `areas`.
 struct Layout {
     std::string name;
     std::vector<Area> areas;
+    std::vector<LayoutActor> actors;
 
     // The side of one map cell, in pixels.
     int cellSize = 8;
@@ -218,17 +320,11 @@ struct Layout {
     std::uint32_t seamDepth = 0;
 };
 
-// The whole world. Layout indices are positions in `layouts`.
+// The whole world, and the actors that start in it and go anywhere. Layout indices are positions in
+// `layouts`.
 struct World {
     std::vector<Layout> layouts;
-};
-
-// A place in the world: a layout and an area in it.
-struct Place {
-    int layout = 0;
-    int area = 0;
-
-    [[nodiscard]] constexpr bool operator==(const Place&) const noexcept = default;
+    std::vector<WorldActor> actors;
 };
 
 namespace detail {
@@ -430,12 +526,34 @@ void eachSeamless(const World& world, int layout, int area, Fn&& fn) {
 // offset; a scroll that is not from a wall to the facing wall of the next area through a span of the
 // same length; a seamless join from a spot, or that is not wall to facing wall through spans of one
 // length, into a layout of another cell size, or whose far end is not seamless, does not lead back to
-// it, or does not carry the negated offset. A game calls it once, after building the world.
+// it, or does not carry the negated offset; an actor entry whose `actor` is empty; an actor name
+// used twice anywhere in the world, every level together; a layout's actor in an area the layout lacks;
+// a world's actor in a place the world lacks. An actor entry is named by its level, its index and its
+// name: `WorldKit: layout 0 'castle' actor 1 'hound' …`, `WorldKit: actor 0 'marker' …`. The type an
+// entry's `actor` holds is the scene's to check. A game calls it once, after building the world.
 inline void validate(const World& world) {
     std::int64_t areaCount = 0;
     for (const Layout& layout : world.layouts) {
         areaCount += static_cast<std::int64_t>(layout.areas.size());
     }
+    // Every actor entry's name so far, in the order an entry is spawned: each area's, each layout's, the
+    // world's.
+    std::vector<const std::string*> actorNames;
+    const auto checkActor = [&](const std::string& where, std::size_t n, const std::string& name, const AnyActor& actor) {
+        const std::string named = where + " actor " + std::to_string(n) + " '" + name + "'";
+        if (!actor) {
+            throw std::invalid_argument(named + " has no actor");
+        }
+        if (name.empty()) {
+            return;
+        }
+        for (const std::string* other : actorNames) {
+            if (*other == name) {
+                throw std::invalid_argument(named + " is named twice");
+            }
+        }
+        actorNames.push_back(&name);
+    };
     for (std::size_t l = 0; l < world.layouts.size(); ++l) {
         const Layout& layout = world.layouts[l];
         const std::string thisLayout = detail::where(world, static_cast<int>(l));
@@ -603,6 +721,30 @@ inline void validate(const World& world) {
                                                 "', whose offset is not the negation of its own");
                 }
             }
+            for (std::size_t n = 0; n < area.actors.size(); ++n) {
+                checkActor(here, n, area.actors[n].name, area.actors[n].actor);
+            }
+        }
+        for (std::size_t n = 0; n < layout.actors.size(); ++n) {
+            const LayoutActor& entry = layout.actors[n];
+            checkActor(thisLayout, n, entry.name, entry.actor);
+            if (entry.in < 0 || static_cast<std::size_t>(entry.in) >= layout.areas.size()) {
+                throw std::invalid_argument(thisLayout + " actor " + std::to_string(n) + " '" + entry.name +
+                                            "' is in area " + std::to_string(entry.in) + ", which the layout lacks");
+            }
+        }
+    }
+    for (std::size_t n = 0; n < world.actors.size(); ++n) {
+        const WorldActor& entry = world.actors[n];
+        checkActor("WorldKit:", n, entry.name, entry.actor);
+        const bool inWorld = entry.in.layout >= 0 && static_cast<std::size_t>(entry.in.layout) < world.layouts.size() &&
+                             entry.in.area >= 0 &&
+                             static_cast<std::size_t>(entry.in.area) <
+                                 world.layouts[static_cast<std::size_t>(entry.in.layout)].areas.size();
+        if (!inWorld) {
+            throw std::invalid_argument("WorldKit: actor " + std::to_string(n) + " '" + entry.name + "' is in layout " +
+                                        std::to_string(entry.in.layout) + " area " + std::to_string(entry.in.area) +
+                                        ", which the world lacks");
         }
     }
 }

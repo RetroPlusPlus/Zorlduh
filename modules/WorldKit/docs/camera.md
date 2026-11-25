@@ -38,6 +38,10 @@ public:
 };
 ```
 
+A game keeps one camera in its state and follows the thing the screen follows with it each tick. A game
+that hands its camera to a [`Scene`](scene.md) reaches it through `scene.camera()`, where every member
+below works as written, and the scene follows the actor it is told to.
+
 | Member | What it does |
 |---|---|
 | `Camera(layout, area)` | A camera in area `area` of layout `layout`, looking at its top-left. |

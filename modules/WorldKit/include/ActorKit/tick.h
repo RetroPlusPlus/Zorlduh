@@ -142,7 +142,8 @@ inline void otherLayoutStrips(std::vector<retropp::IntRect>& strips, const World
 //      solidity it last had; one whose `solid` is yet to be worked out has it worked out here, once.
 //   3. Walking, while `camera.transitioning()` is false: each awake actor with a mover, in spawn order,
 //      is walked by its drive against its area's collision map, the boxes of the other solid actors in
-//      its area, frozen ones included, and what its confinement holds it inside: for every actor but
+//      its area that lie apart from its own as its walk begins, frozen ones included — so two solid
+//      actors that overlap walk apart —, and what its confinement holds it inside: for every actor but
 //      the player, everything outside its area's own rectangle under Confinement::Area, and the strip
 //      beyond each edge opening that leads to another layout under Confinement::Layout. Under
 //      Confinement::None, and for the player, the map and the actors are all that stop it.
@@ -278,9 +279,12 @@ void tick(Actors& actors, const Config& config, const WorldKit::Camera& camera, 
             if (!live->mover) {
                 continue;
             }
+            // The solid actors whose boxes lie apart from the walker's; two that overlap walk apart.
             others.clear();
+            const retropp::IntRect own = detail::areaBox(*live);
             for (const Live* other : present) {
-                if (other != live && other->solid && other->place == live->place) {
+                if (other != live && other->solid && other->place == live->place &&
+                    !detail::overlap(detail::areaBox(*other), own)) {
                     others.push_back(detail::areaBox(*other));
                 }
             }

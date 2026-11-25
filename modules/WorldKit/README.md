@@ -6,42 +6,46 @@ layers at depths the game gives, grouped into **layouts** and joined only by the
 game says what each area is and where each opening leads; WorldKit says what is solid, takes the thing
 the screen follows through each opening — by a scroll, a fade, or seamlessly, with the next area simply
 there beyond the wall — keeps the camera within the area, and draws whatever is on screen, with the
-game's sprites at each area's actor slots: over a path, under a canopy. What moves through the world is the game's own, or a
-movement module's: WorldKit answers its questions and moves nothing itself.
+game's sprites at each area's actor slots: over a path, under a canopy. What walks through the world is the game's own, or a
+movement module's: WorldKit answers its questions. Its **scene** runs the whole world for a game that hands
+its camera over: every actor written in the world, the camera following one of them, each actor carried
+through the openings its reach allows, and the frame.
+
+The castle, [`examples/getting_started.cpp`](examples/getting_started.cpp), run by the scene (an excerpt:
+the file has the rest of each area):
 
 ```cpp
-// The world, once: each layout's areas, their layers, actor slots and openings.
-const WorldKit::World world{.layouts = {
-    WorldKit::Layout{
-        .name = "overworld",
-        .areas = {
-            WorldKit::Area{.name = "meadow",
-                           .layers = {{.name = "ground", .tiles = &meadowTiles, .art = overworldArt, .z = kGroundZ},
-                                      {.name = "overhang", .tiles = &meadowRock, .art = overlayArt, .z = kOverheadZ}},
-                           .actorSlots = {{.name = "actors", .z = kActorsZ}},
-                           .collision = &meadowCollision,
-                           .openings = {{.name = "east door", .side = WorldKit::Side::East, .span = {6, 9},
-                                         .transition = WorldKit::Transition::Scroll,
-                                         .leadsTo = {.area = Area::Lake, .opening = "west door"}},
-                                        {.name = "cave mouth", .at = {.x = 12, .y = 4, .width = 2, .height = 1},
-                                         .transition = WorldKit::Transition::Fade,
-                                         .leadsTo = {.area = Area::Cave, .opening = "cave exit"}}}},
-            ...
+// The world, once: its layouts and areas, and who starts where. Where an inhabitant is written is how far
+// it may roam.
+return WorldKit::World{
+    .layouts = {
+        WorldKit::Layout{
+            .name = "castle",
+            .areas = {
+                WorldKit::Area{.name = "hall", .layers = {Ground(maps.hall, art, art.hall)}, .actorSlots = kActorSlots,
+                               .collision = &maps.hall,
+                               .openings = {{.name = "east door", .side = Side::East, .span = {7, 10},
+                                             .transition = Transition::Scroll,
+                                             .leadsTo = {.area = CastleArea::WideHall, .opening = "west door"}}},
+                               .actors = {{.actor = Guard(art), .at = {40, 64}}}},
+                …   // the wide hall, and the cellar with its bat
+            },
+            .actors = {{.actor = Hound(art), .in = CastleArea::WideHall, .at = {120, 80}}},
+            …   // its cell size, open value and view
         },
-        .cellSize = 8, .open = Cell::Open, .view = kView},
-    WorldKit::Layout{ /* the dungeon */ },
-}};
-WorldKit::validate(world);
+        …   // the grounds: the garden and the orchard, and the gardener
+    },
+    .actors = {{.name = "marker", .actor = Marker(art), .in = {Layout::Castle, CastleArea::Hall}, .at = {76, 68}}},
+};
 
-// Each tick: the player moves against what is solid, and the camera follows it through the openings.
-if (!camera.transitioning()) { player.walk(hero, move, camera.solids(world)); }
-const WorldKit::Step step = camera.follow(world, player.collision(hero).bounds());
-player.place(player.position() + step.move);
+// The scene, once: the world, the camera the program creates, handed over, and the actor it follows.
+State state{.scene = WorldKit::Scene{world, camera, config}};
+state.scene.follow("marker");
 
-// Each frame: the areas' layers, the player among them, the fade over everything.
-frame.layers = WorldKit::WorldLayers(camera, world);
-frame.layers.push_back(WorldKit::Actors(camera, world, "actors", {Player(state)}));
-frame.regions = WorldKit::Fade(camera, world);
+// Each tick, and each frame.
+state.scene.tick(readInput(input), state);
+frame.layers = state.scene.layers(state);
+frame.regions = state.scene.fade();
 ```
 
 | Piece | What it is | Page |
@@ -51,6 +55,8 @@ frame.regions = WorldKit::Fade(camera, world);
 | `Camera` | which layout and area the screen is in, where it looks, the scroll or fade running | [docs/camera.md](docs/camera.md) |
 | `AreaSolids` | what is solid in an area, for anything that moves | [docs/camera.md](docs/camera.md#areasolids) |
 | `WorldLayers`, `Actors`, `Fade`, `TopZ` | the areas on screen as tile layers, each alone at its declared depths and spread among the others when several are on screen, the game's sprites at an actor slot, confined to the view, the fade over them, and the depth above it all | [docs/drawing.md](docs/drawing.md) |
+| `AreaActor`, `LayoutActor`, `WorldActor`, `AnyActor`, `Reach`, `AtEdge`, `AwakeWhen` | the actors that start in an area, a layout or the world, how far each may roam, what it does at the edge of that, and when it is awake | [docs/areas.md](docs/areas.md#areaactor-layoutactor-worldactor) |
+| `Scene`, `SceneActor`, `SceneLayerKey` | the world running: the camera handed over and the actor it follows, every actor ticked, carried through openings and drawn, and each actor's reach, edge and freeze | [docs/scene.md](docs/scene.md) |
 
 The module is header-only and needs C++20. It includes the headers of the engine,
 [LayerKit](../LayerKit/README.md) and [CameraKit](../CameraKit/README.md) alone, and its actors add
@@ -67,6 +73,16 @@ ActorKit has its own headers, `"ActorKit/…"`, its own namespace, `ActorKit`, a
 `ActorKit::ActorKit`. A game with a system of its own for what lives in the world links
 `WorldKit::WorldKit` alone. [docs/actors/concepts.md](docs/actors/concepts.md#overview) opens with an
 example of the whole use and explains each line.
+
+The scene, `WorldKit::Scene` in `"WorldKit/scene.h"`, runs ActorKit for a game: you write the actors in
+the world, hand the scene your camera, and name the actor it follows ([docs/scene.md](docs/scene.md)).
+Every ActorKit call stays yours on the scene's actors. Three ways to work, in the one module:
+
+| You want | You use |
+|---|---|
+| A world with your own system for what lives in it | WorldKit's world, camera, solids and layers. No ActorKit header is included. |
+| ActorKit, wired your own way | ActorKit's set, `tick` and `Sprites` by hand beside the camera, as the farm does. |
+| The whole world run for you | `WorldKit::Scene`, as the castle does. |
 
 | Type or function | Purpose | Reference |
 |---|---|---|
@@ -104,12 +120,14 @@ The directory's `CMakeLists.txt` defines two INTERFACE targets on one include di
 
 | Target | Headers | Expects |
 |---|---|---|
-| `WorldKit::WorldKit` | `"WorldKit/…"` | the engine as `retropp::engine`, the layer kit as `LayerKit::LayerKit` and the camera as `CameraKit::CameraKit` |
-| `ActorKit::ActorKit` | `"ActorKit/…"` | `WorldKit::WorldKit` and ScriptKit as `ScriptKit::ScriptKit`; defined when `ScriptKit::ScriptKit` exists as the directory is added |
+| `WorldKit::WorldKit` | `"WorldKit/…"` but `scene.h` | the engine as `retropp::engine`, the layer kit as `LayerKit::LayerKit` and the camera as `CameraKit::CameraKit` |
+| `ActorKit::ActorKit` | `"ActorKit/…"` and `"WorldKit/scene.h"` | `WorldKit::WorldKit` and ScriptKit as `ScriptKit::ScriptKit`; defined when `ScriptKit::ScriptKit` exists as the directory is added |
+
+A game that includes `WorldKit/scene.h` links `ActorKit::ActorKit`.
 
 | CMake option | Default | Effect |
 |---|---|---|
-| `WORLDKIT_BUILD_EXAMPLES` | `ON` when this directory is the top-level project, otherwise `OFF` | Builds `WorldKit-example-getting-started`, the castle [docs/getting-started.md](docs/getting-started.md) walks through, and `WorldKit-example-farm`, the farmyard [docs/actors/getting-started.md](docs/actors/getting-started.md) walks through. The farm is built when `ActorKit::ActorKit` and `TopDownMovement::TopDownMovement` exist. |
+| `WORLDKIT_BUILD_EXAMPLES` | `ON` when this directory is the top-level project, otherwise `OFF` | Builds `WorldKit-example-getting-started`, the castle [docs/getting-started.md](docs/getting-started.md) walks through, and `WorldKit-example-farm`, the farmyard [docs/actors/getting-started.md](docs/actors/getting-started.md) walks through. The castle is built when `ActorKit::ActorKit` exists: it runs on the scene, with a mover of its own. The farm is built when `ActorKit::ActorKit` and `TopDownMovement::TopDownMovement` exist. |
 
 ## Documentation
 
@@ -128,11 +146,13 @@ modules/WorldKit/
   CMakeLists.txt                    the WorldKit::WorldKit and ActorKit::ActorKit targets and the example option
   include/WorldKit/
     area.h                          Side, Transition, Span, Destination, Opening, CellValue, MapLayer,
-                                    ReservedLayer, ActorSlot, Area, CameraLaw, Layout, World, Place,
+                                    ReservedLayer, ActorSlot, Place, Reach, AtEdge, AwakeWhen, AnyActor,
+                                    AreaActor, LayoutActor, WorldActor, Area, CameraLaw, Layout, World,
                                     validate, ActorZ, LayerZ, placeOf
     solids.h                        AreaSolids
     camera.h                        Step, Shown, ActorZ and LayerZ by Shown, Camera
     world_layers.h                  AreaLayerKey, ActorsKey, TopZ, ViewStencil, WorldLayers, Actors, Fade
+    scene.h                         SceneLayerKey, SceneActor, Scene (with ActorKit::ActorKit)
   include/ActorKit/
     actor.h                         Actor, Id, Side, ScriptRef, Scripts, ActionRow, Actions
     actors.h                        Confinement, Actors
@@ -144,16 +164,16 @@ modules/WorldKit/
     config.h                        Config, AnyBindings, AnyHandlers
     tick.h                          tick
     sprites.h                       Sprites
-  examples/getting_started.cpp      the getting-started program: the castle
+  examples/getting_started.cpp      the getting-started program: the castle and its grounds, run by the scene
   examples/farm/
     farm.cpp                        the actors' example program: a farmyard
     farm.h                          its places, values and commands
     scripts/                        its scripts, a file each
     shaders/                        the pond's ripple shader
     assets/                         its sheets and palette images
-  docs/                             the guide
+  docs/                             the guide; docs/scene.md the scene
   docs/actors/                      the actors' guide
 ```
 
-`world_layers.h` is the only header that builds draw types, so a game's simulation can include the rest
-without anything to draw.
+`world_layers.h` and `scene.h` are the headers under `include/WorldKit/` that build draw types, so a
+game's simulation includes the rest and stays plain data.

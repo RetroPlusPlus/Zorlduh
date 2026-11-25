@@ -15,6 +15,7 @@ layer by layer, with the things in them at the depths each area gives.
 - [A seamless join](#a-seamless-join)
 - [The camera and its law](#the-camera-and-its-law)
 - [Drawing](#drawing)
+- [The scene](#the-scene)
 - [Where each part lives in a game](#where-each-part-lives-in-a-game)
 
 ## Areas and layouts
@@ -64,12 +65,13 @@ from both sides; a fade goes between any two openings.
 
 ## Movement plugs in
 
-The module moves nothing. What is solid in an area is a query — `camera.solids(world)` — that answers
+Walking is the game's, or a movement module's. What is solid in an area is a query — `camera.solids(world)` — that answers
 whether a rectangle of pixels touches anything solid: a cell whose collision value is not the layout's
 `open`, or anywhere off the map except straight out through an exit. Anything that moves asks it: a
 walker from a movement module (the query has the `solidBox` member such modules look for), or a mover a
-game writes in a few lines. The module never sees what moves, only the box of the one thing the screen
-follows, handed to `follow` each tick.
+game writes in a few lines. The camera sees only the box of the one thing the screen follows, handed to
+`follow` each tick. [The scene](#the-scene) walks ActorKit's actors with their own movers and carries
+them through the openings.
 
 The way out through an exit is what lets the followed thing cross the edge: past a scroll or a fade, the
 cells straight out from an edge opening's span, as far out as anything goes, are open; past a seam they
@@ -172,7 +174,37 @@ seam, during a scroll — WorldKit spreads the depths so every lower declared de
 one across all of them and each layer has a depth of its own ([drawing.md](drawing.md#how-the-layers-stack)).
 
 The fade is one region over the whole screen, returned only while a fade runs. All of it is in
-`world_layers.h`, the one header that builds draw types.
+`world_layers.h`, the one header that builds draw types, beside the scene's frame in `scene.h`.
+
+## The scene
+
+The world is what the world is: built once, its layouts, areas, layers, slots, openings, and the actors
+that start in it. A `WorldKit::Scene` is the world running: the camera the game hands it, and every actor,
+live wherever it is.
+
+```cpp
+State state{.scene = WorldKit::Scene{world, WorldKit::Camera{Castle, Hall}, config}};
+state.scene.follow("marker");
+```
+
+`State` is the game's state type, `config` its `ActorKit::Config`, and `Castle` and `Hall` its layout
+and area numbers.
+
+- **Actors are written in the world,** in an area's, a layout's or the world's `actors`, and the level is
+  how far each may roam: its area, its layout, or anywhere. The scene spawns them all, into one ActorKit
+  set, so every actor meets every other whatever its reach.
+- **`follow`** names the actor the camera follows. Each tick the scene runs the actors, follows that
+  actor's box with the camera and moves the actor where the camera says, as the calls above do by hand.
+- **Every other actor** goes through an opening inside its reach by the opening's transition, the screen
+  holding still for it; at an opening outside its reach it stops, despawns or hides, as its `atEdge` says.
+- **Each actor is awake or frozen by its rule:** always, while its layout is on screen, or while its area
+  is. While a scroll or a fade runs, the whole world holds still, and only the followed actor is carried.
+- **The frame** is the world's layers and one sprite layer for each slot, holding the actors of every area
+  on screen in the current area's pixels, so they sort by their feet together and keep their sprites
+  across a seam or a scroll.
+
+The camera, the actors and every call beneath them stay the game's to use: `scene.camera()` and
+`scene.actors()`. [scene.md](scene.md) has the whole of it.
 
 ## Where each part lives in a game
 
@@ -184,3 +216,6 @@ The fade is one region over the whole screen, returned only while a fade runs. A
 | `camera.follow(world, box)` | every tick, after the thing has moved | the tick |
 | `WorldLayers(...)`, `Actors(...)`, `Fade(...)` | every frame | the components that draw the world |
 | the depths of the map layers and the actor slots, `TopZ(world)` | once, with the world | the game's one depth table |
+| `Scene`, for a game that hands its camera over | once, from the world, the camera and the game's `ActorKit::Config` | the game state, in place of the `Camera` |
+| `scene.tick(input, state)` | every tick | the tick, in place of `follow` and the moving lines |
+| `scene.layers(state)`, `scene.fade()` | every frame | the frame, in place of `WorldLayers`, `Actors` and `Fade` |

@@ -121,20 +121,14 @@ namespace detail {
     return at;
 }
 
-// Where a box other than the one the camera follows goes through an opening of the area at `from`, in one tick:
-// `box` is where the box is now and `was` where it was on the tick before, both in that area's pixels.
-// It takes the first opening that leads somewhere, in the order the area lists them, that the box has
-// gone through: for a wall's gap, its center has come past the wall within the span (it was on this
-// side of it on the tick before); for a spot, its center has come into the spot from outside it. Then:
-//
-//   Seamless   move: into the next area's pixels                                       entered: next place
-//   Scroll     move: the leaving layout's `carry` outward, then into the next area's pixels    "
-//   Fade       move: onto the entrance, as arrival() places a box                              "
-//
-// The scroll's move is where the camera leaves a box it follows when its scroll ends; the seam's and
-// the fade's are the moves the camera hands such a box. A box still inside its area gets an empty
-// Step. For a validated world.
-[[nodiscard]] inline Step through(const World& world, Place from, retropp::IntRect was, retropp::IntRect box) {
+// The opening of the area at `from` that a box other than the one the camera follows has gone through in
+// one tick, or nullptr while it is still inside: `box` is where the box is now and `was` where it was on
+// the tick before, both in that area's pixels. It is the first opening that leads somewhere, in the order
+// the area lists them, that the box has gone through: for a wall's gap, its center has come past the wall
+// within the span (it was on this side of it on the tick before); for a spot, its center has come into
+// the spot from outside it. For a validated world.
+[[nodiscard]] inline const Opening* goneThrough(const World& world, Place from, retropp::IntRect was,
+                                                retropp::IntRect box) {
     const Layout& here = world.layouts[static_cast<std::size_t>(from.layout)];
     const Area& area = here.areas[static_cast<std::size_t>(from.area)];
     const retropp::Vec2i now = center(box);
@@ -149,28 +143,63 @@ namespace detail {
         const bool gone = isEdge(opening)
                               ? outThrough(here, from.area, opening, now) && !outThrough(here, from.area, opening, before)
                               : nowInside == static_cast<int>(i) && wasInside != nowInside;
-        if (!gone) {
-            continue;
-        }
-        const Link next = link(world, from.layout, from.area, opening);
-        switch (opening.transition) {
-            case Transition::Seamless:
-                return Step{.move = {.x = -next.origin.x, .y = -next.origin.y}, .entered = next.to};
-            case Transition::Scroll: {
-                const retropp::Vec2i out = outward(opening.side);
-                return Step{.move = {.x = out.x * here.carry - next.origin.x, .y = out.y * here.carry - next.origin.y},
-                            .entered = next.to};
-            }
-            case Transition::Fade:
-            default: {
-                const Layout& there = world.layouts[static_cast<std::size_t>(next.to.layout)];
-                const retropp::IntRect landing = arrival(there, next.to.area, next.entrance, box);
-                return Step{.move = {.x = landing.x - box.x, .y = landing.y - box.y}, .entered = next.to};
-            }
+        if (gone) {
+            return &opening;
         }
     }
-    return Step{};
+    return nullptr;
 }
+
+// Where a box at `box` that has gone through `opening`, an opening of the area at `from` that leads
+// somewhere, goes:
+//
+//   Seamless   move: into the next area's pixels                                       entered: next place
+//   Scroll     move: the leaving layout's `carry` outward, then into the next area's pixels    "
+//   Fade       move: onto the entrance, as arrival() places a box                              "
+//
+// The scroll's move is where the camera leaves a box it follows when its scroll ends; the seam's and
+// the fade's are the moves the camera hands such a box. With `carried` false, the scroll's move is the
+// change into the next area's pixels alone, as across a seam, so the box comes in through the doorway
+// from where it crossed. For a validated world.
+[[nodiscard]] inline Step landing(const World& world, Place from, const Opening& opening, retropp::IntRect box,
+                                  bool carried = true) {
+    const Layout& here = world.layouts[static_cast<std::size_t>(from.layout)];
+    const Link next = link(world, from.layout, from.area, opening);
+    switch (opening.transition) {
+        case Transition::Seamless:
+            return Step{.move = {.x = -next.origin.x, .y = -next.origin.y}, .entered = next.to};
+        case Transition::Scroll: {
+            const retropp::Vec2i out = outward(opening.side);
+            const int carry = carried ? here.carry : 0;
+            return Step{.move = {.x = out.x * carry - next.origin.x, .y = out.y * carry - next.origin.y},
+                        .entered = next.to};
+        }
+        case Transition::Fade:
+        default: {
+            const Layout& there = world.layouts[static_cast<std::size_t>(next.to.layout)];
+            const retropp::IntRect at = arrival(there, next.to.area, next.entrance, box);
+            return Step{.move = {.x = at.x - box.x, .y = at.y - box.y}, .entered = next.to};
+        }
+    }
+}
+
+// Where a box other than the one the camera follows goes through an opening of the area at `from`, in one
+// tick: landing() for the opening goneThrough() finds, and an empty Step while the box is still inside its
+// area. For a validated world.
+[[nodiscard]] inline Step through(const World& world, Place from, retropp::IntRect was, retropp::IntRect box,
+                                  bool carried = true) {
+    const Opening* opening = goneThrough(world, from, was, box);
+    return opening == nullptr ? Step{} : landing(world, from, *opening, box, carried);
+}
+
+}  // namespace detail
+
+class Camera;
+
+namespace detail {
+
+// Whether a fade is running on `camera`.
+[[nodiscard]] inline bool fading(const Camera& camera) noexcept;
 
 }  // namespace detail
 
@@ -533,6 +562,12 @@ private:
     std::variant<std::monostate, Scrolling, Fading> transition_{};
     std::optional<int> inside_;             // the spot opening the followed box's center is in
     std::optional<retropp::Vec2i> focus_;   // the followed box's center last tick, in the current area's pixels
+
+    friend bool detail::fading(const Camera& camera) noexcept;
 };
+
+[[nodiscard]] inline bool detail::fading(const Camera& camera) noexcept {
+    return std::holds_alternative<Camera::Fading>(camera.transition_);
+}
 
 }  // namespace WorldKit

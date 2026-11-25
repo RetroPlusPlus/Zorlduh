@@ -160,15 +160,14 @@ every layer of the frame.
 | The walker's own collision shape is empty. | Set the shape in the mover's config. |
 | The actor was put there by `spawn` or `moveTo`. Both place it exactly, walls included. | Choose a position in open ground. |
 | The map's walkable value differs from the layout's `open`. | Set `open` in your `WorldKit::Layout`. |
+| The two boxes already overlapped as the walk began: two solid actors that overlap walk apart ([movers.md](movers.md#what-a-mover-collides-with)). | Spawn and move actors apart. For a gate that shuts while a walker stands in it, have its script wait until the box is clear: put `waitWhile(ActorKit::Touched)` before the `set`, and list `ActorKit::On::Touch` in the walker's `setsOff`. |
 
 ## An actor is held in place
 
-A walker whose box overlaps something solid stays where it is.
+A walker whose box overlaps a solid cell of its area's map stays where it is.
 
 | Cause | Fix |
 |---|---|
-| Two solid actors were spawned with their boxes overlapping. | Spawn them apart. |
-| An actor's `solid` turned true while a walker stood in its box. | Have the script that shuts it wait until the box is clear: put `waitWhile(ActorKit::Touched)` before the `set`, and list `ActorKit::On::Touch` in the walker's `setsOff`. |
 | The actor was spawned or moved into a wall. | Choose a position in open ground. |
 
 ## An actor stops at a doorway

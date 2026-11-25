@@ -137,10 +137,14 @@ The template's verbs and systems:
   actor of a set, works out what happened between them — acted on, touched, come near, entered, a value
   becoming true — and steps their scripts. Each actor runs its own copy of its scripts, and one actor
   affects another only through a value the other reads. Asked, an actor reports where it is and a set
-  reports its sprites; moving the camera and drawing at the world's actor slots stay the game's own
-  calls. Actors are a part of the WorldKit module, in place with an example program of their own, a
-  farmyard, beside the world's; the game's own actors — the player among them, and one wandering enemy —
-  come next.
+  reports its sprites; moving the camera and drawing at the world's actor slots are the game's own
+  calls, or the scene's. The **scene** runs a whole world for a game that hands its camera over: actors
+  are written in an area, a layout or the world, and the level is how far each may roam; the camera
+  follows one actor named to it; every other actor goes through the openings its reach allows and
+  stops, despawns or hides at the edge of it; and each is awake or frozen by a rule of its own — always,
+  while its layout is on screen, or while its area is. Actors are a part of the WorldKit module, in place
+  with an example program of their own, a farmyard, beside the world's; the game's own actors — the
+  player among them, and one wandering enemy — come next.
 - **Combat:** a sword swing with a hitbox ahead of the player, enemy knockback and death, player damage
   with knockback and invulnerability (shown by flicker), death and restart.
 - **HUD:** hearts in half-heart steps; a heart pickup dropped by enemies.
@@ -173,7 +177,11 @@ sets a script off: one of the actor module's own — interact, touch, near, ente
 game names and binds), **own value** (a value each actor holds its own instance of), **look** (the art
 an actor shows, chosen by its values), **mover** (what moves an actor: a walker of the game's choosing,
 driven by the pad, a value or a function), **player** (the one actor a set marks as the one the game's
-camera follows, free to leave its area through an opening).
+camera follows, free to leave its area through an opening), **scene** (the world running: the camera
+handed over and every actor written in the world, live), **reach** (how far an actor of a scene may roam:
+its area, its layout or the world), **edge** (of a reach: an opening that leads outside it, where the
+actor stops, despawns or hides), **awake** (of an actor of a scene: taking part in the tick, by its rule
+or by hand; the rest of the time it is frozen).
 
 ## Hard constraints
 
@@ -233,7 +241,8 @@ camera follows, free to leave its area through an opening).
   (`include/ActorKit/`), on the engine, LayerKit, the world and ScriptKit: it
   keeps the live actors, walks them, detects what happens between them and runs their scripts, and
   reports their positions and sprites when asked. It reads the world and the camera and changes neither:
-  the camera and the drawing stay the game's own calls to WorldKit. A mover is the game's own type,
+  the camera and the drawing are the game's own calls to WorldKit, or, for a game that hands the camera
+  over, the scene's, built from those same calls. A mover is the game's own type,
   taken by its shape, so ActorKit includes no movement module. Actors detect the actors of their own
   set, and sets exchange through the game's values.
 - Library first: when a system could be general, it is written general and placed where it can be

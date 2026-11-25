@@ -17,6 +17,13 @@ Recipes for the questions a game asks once it has more than one area.
 - [Lead into another layout](#lead-into-another-layout)
 - [Join two maps seamlessly](#join-two-maps-seamlessly)
 - [Put things in an area](#put-things-in-an-area)
+- [Run the world with the scene](#run-the-world-with-the-scene)
+- [Put an actor in the world](#put-an-actor-in-the-world)
+- [Let an actor roam beyond its area](#let-an-actor-roam-beyond-its-area)
+- [Despawn or hide an actor at the edge of its reach](#despawn-or-hide-an-actor-at-the-edge-of-its-reach)
+- [Freeze actors that are off screen](#freeze-actors-that-are-off-screen)
+- [Change a slot's sprites on their way to the screen](#change-a-slots-sprites-on-their-way-to-the-screen)
+- [Drive the camera by hand beside the scene](#drive-the-camera-by-hand-beside-the-scene)
 - [Keep part of the screen for something else](#keep-part-of-the-screen-for-something-else)
 
 ## Scroll between the screens of a side-scroller
@@ -304,6 +311,180 @@ for (const WorldKit::Shown& area : camera.shown(world)) {
 layer keeps its key from the frame it comes into view to the frame it leaves, and the current area's
 from before a crossing to after it. During a scroll `shown` also lists the next area, so its things slide
 in with it.
+
+For things that are ActorKit actors, a [`Scene`](scene.md) builds these layers itself, one for each area
+on screen and each of its slots ([Run the world with the scene](#run-the-world-with-the-scene)).
+
+## Run the world with the scene
+
+Hand the camera to a `WorldKit::Scene`, name the actor it follows, and make the scene's three calls:
+
+```cpp
+struct State {
+    WorldKit::Scene scene;
+};
+State state{.scene = WorldKit::Scene{world, WorldKit::Camera{Castle, Hall}, config}};
+state.scene.follow("marker");
+
+loop.simTick([&](const retropp::InputState& in) { state.scene.tick(readInput(in), state); });
+loop.renderLoop([&] {
+    frame.layers = state.scene.layers(state);
+    frame.regions = state.scene.fade();
+    renderer.renderFrame(frame);
+});
+```
+
+`world` is your validated world with its actors written in it, `config` your `ActorKit::Config` with its
+`world` left out, and `readInput`, `loop`, `renderer` and `frame` your input function, run loop, renderer
+and frame.
+
+- **`config` names your bindings and handlers** for `State`, the type you hand `tick`. A game whose actors
+  use the world alone writes `WorldKit::Scene{world, camera}`.
+- **The scene sets the config's `world`** to the world it runs.
+- **To hold everything still** under a menu or a message, leave `scene.tick` out for those ticks.
+- **`tick` returns the camera's `Step`:** `step.entered` is where your game reacts to a new area.
+
+## Put an actor in the world
+
+Write it in the `actors` of the level it belongs to: an area's for one that stays there, a layout's for
+one that roams the layout, the world's for one that goes anywhere.
+
+```cpp
+WorldKit::Area hall{.name = "hall",
+                    .layers = {{.name = "ground", .tiles = &maps.hall, .art = stone}},
+                    .actorSlots = {{.name = "actors", .z = 10}},
+                    .collision = &maps.hall,
+                    .actors = {{.actor = Guard(art), .at = {40, 64}}}};   // the guard paces the hall
+```
+
+`maps`, `stone`, `Guard` and `art` are your maps, ground art, and function returning an
+`ActorKit::Actor` with what it makes it from. A layout's entry names its area with `.in`, a world's its
+place: `{.actor = Hound(art), .in = WideHall, .at = {120, 80}}`,
+`{.name = "marker", .actor = Marker(art), .in = {Castle, Hall}, .at = {76, 68}}`.
+
+To spawn one while the game runs, hand the scene the same entry:
+
+```cpp
+state.scene.spawn(WorldKit::AreaActor{.actor = Bat(art), .at = {24, 24}}, {Castle, Cellar});
+```
+
+- **`at` is the actor's top-left in its area's pixels,** put exactly there, walls included.
+- **A name is for an actor you need to find,** such as the one the camera follows. Names are unique across
+  the whole world; `validate` rejects one used twice.
+- **A script spawns too,** with `ActorKit::spawn`; its actor stays in its area until you give it a reach.
+
+## Let an actor roam beyond its area
+
+Set its reach. In a handler, so one of its scripts decides when:
+
+```cpp
+const ActorKit::Handlers<State> handlers{
+    {GoAnywhere, [](State& state, ActorKit::Id asker, const ScriptKit::Arguments&) {
+         state.scene.actor(asker).reach(WorldKit::Reach::World);   // this is now a global actor
+     }},
+};
+```
+
+`GoAnywhere` is a `ScriptKit::Command` of yours that the hound's touch script asks for. From its next walk
+the hound goes through every opening that leads somewhere, carried into the next area by the opening's
+transition ([scene.md](scene.md#where-an-actor-goes-through-an-opening)).
+
+| Set to | It goes through |
+|---|---|
+| `Reach::Area` | its area's openings all hold it: it stays in its area |
+| `Reach::Layout` | the openings into its own layout's areas |
+| `Reach::World` | every opening that leads somewhere |
+
+- **The script asks; the handler sets it.** A script reaches the scene through a command, as it reaches
+  anything of your game's.
+- **A smaller reach governs the next crossing.** An actor already beyond it stays where it is.
+
+## Despawn or hide an actor at the edge of its reach
+
+Set its `atEdge`. A bat that flies up the cellar's stairs and is gone:
+
+```cpp
+.actors = {{.actor = Bat(art), .at = {24, 24}, .atEdge = WorldKit::AtEdge::Despawn}},
+```
+
+`Despawn` removes it as its center steps onto the stairs, or crosses a door's gap, and retires its id. To
+keep it for later, `Hide` puts it out of the world instead: a hidden actor is out of the world, not drawn,
+not ticked, not solid, not touchable, until your game puts it somewhere again, its id, values and scripts
+kept. Put it back when your game wants it:
+
+```cpp
+if (state.scene.actor(bat).hidden() && state.batReturns) {
+    state.scene.actors().moveTo(bat, {Castle, Cellar}, {24, 24});
+    state.batReturns = false;
+}
+```
+
+`bat` is the bat's `ActorKit::Id` and `batReturns` a member of your state. On the next tick it is in the
+cellar again, awake by its rule, its waits carrying on from where they stood.
+
+- **`Stop`, the default, holds it at the opening.** At a spot it walks across and stays in its area.
+- **The followed actor goes through every opening that leads somewhere.** While the camera follows it,
+  its `atEdge` waits.
+- **Spawn a despawned actor again** from its entry with `state.scene.spawn`.
+
+## Freeze actors that are off screen
+
+Set `awakeWhen` on the entries of a world big enough to care:
+
+```cpp
+.actors = {{.actor = Gardener(art), .in = Garden, .at = {96, 40}, .awakeWhen = WorldKit::AwakeWhen::InLayout}},
+```
+
+`Gardener` is your function and `Garden` your area number. The gardener walks while any area of its
+layout is on screen and holds exactly as it is otherwise, still drawn when its area comes into view.
+
+| `awakeWhen` | Awake while |
+|---|---|
+| `Always` (the default) | all the time |
+| `InLayout` | any area of its layout is on screen |
+| `OnScreen` | its own area is on screen |
+
+- **On screen** is the camera's area, the areas across seams in view and the area scrolling in.
+- **A frozen actor carries on from exactly where it stopped:** its waits keep the ticks they had left.
+- **To hold one still by hand,** `state.scene.actor(x).freeze()`; `wake()` hands it back to its rule.
+
+## Change a slot's sprites on their way to the screen
+
+Hand `layers` a function. It is called with each area on screen, each of its slots and that slot's
+sprites, and what it returns is drawn:
+
+```cpp
+frame.layers = state.scene.layers(state, [&](WorldKit::Place place, std::string_view slot, LayerKit::Sprites sprites) {
+    if (slot == "actors" && place == garden) {
+        for (retropp::Sprite& sprite : sprites) {
+            sprite.alpha = 0.75f;   // the garden's actors in its shade
+        }
+    }
+    return sprites;
+});
+```
+
+`garden` is a `WorldKit::Place` of yours. Add sprites of your own by pushing them onto `sprites`, placed
+in that area's pixels as the actors' are; find one actor's sprite by its key,
+`state.scene.actors().key(id)`.
+
+## Drive the camera by hand beside the scene
+
+The scene's camera is yours to move whenever you like, and the scene carries on from where you put it:
+
+```cpp
+state.scene.actors().moveTo(marker, {Castle, Hall}, {8, 56});                  // a warp within the area
+state.scene.camera().place(world, state.scene.actors().box(marker));           // the camera on it at once
+```
+
+`marker` is the followed actor's `ActorKit::Id`. Every `Camera` call works on `state.scene.camera()`, and
+a game that follows by hand calls `follow(world, box)` itself while `state.scene.following()` is
+`ActorKit::kNoId`.
+
+- **Into another area,** `moveTo` alone does it: on the next tick the scene puts the camera in the followed
+  actor's new place, on its box.
+- **While `following()` is `kNoId`,** the camera stays where you put it, and a scroll or fade your own
+  `follow` starts runs at its own pace.
 
 ## Keep part of the screen for something else
 

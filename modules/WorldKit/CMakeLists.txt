@@ -4,7 +4,9 @@
 #                       targets retropp::engine, LayerKit::LayerKit and CameraKit::CameraKit.
 #   ActorKit::ActorKit  the actors of a WorldKit world (headers "ActorKit/…"), on WorldKit::WorldKit and
 #                       the targets LayerKit::LayerKit and ScriptKit::ScriptKit. Defined when the project
-#                       has the target ScriptKit::ScriptKit as this directory is added.
+#                       has the target ScriptKit::ScriptKit as this directory is added. "WorldKit/scene.h",
+#                       the scene, includes ActorKit's headers: a game that includes it links
+#                       ActorKit::ActorKit.
 #
 # A project adds this directory and links the target for the level it uses.
 add_library(WorldKit INTERFACE)
@@ -47,15 +49,19 @@ endfunction()
 # The example programs, on by default when this directory is the top-level project; a project that adds
 # it turns them on with WORLDKIT_BUILD_EXAMPLES.
 #
-#   WorldKit-example-getting-started  the castle, from docs/getting-started.md.
+#   WorldKit-example-getting-started  the castle, from docs/getting-started.md. Built when the target
+#                                     ActorKit::ActorKit exists: the castle is run by the scene, and its
+#                                     inhabitants move with a mover of its own.
 #   WorldKit-example-farm             the farmyard, from docs/actors/getting-started.md. Built when the
 #                                     targets ActorKit::ActorKit and TopDownMovement::TopDownMovement
 #                                     exist: its actors walk with TopDownMovement's walkers.
 option(WORLDKIT_BUILD_EXAMPLES "Build the WorldKit module's example programs" ${PROJECT_IS_TOP_LEVEL})
 if(WORLDKIT_BUILD_EXAMPLES)
-    add_executable(WorldKit-example-getting-started examples/getting_started.cpp)
-    target_link_libraries(WorldKit-example-getting-started PRIVATE WorldKit::WorldKit)
-    worldkit_example(WorldKit-example-getting-started)
+    if(TARGET ActorKit::ActorKit)
+        add_executable(WorldKit-example-getting-started examples/getting_started.cpp)
+        target_link_libraries(WorldKit-example-getting-started PRIVATE ActorKit::ActorKit)
+        worldkit_example(WorldKit-example-getting-started)
+    endif()
 
     if(TARGET ActorKit::ActorKit AND TARGET TopDownMovement::TopDownMovement)
         add_executable(WorldKit-example-farm examples/farm/farm.cpp)
